@@ -55,7 +55,7 @@ export default function Home() {
               Confidential<br />Buy Now,<br />Pay Later.
             </h1>
             <p className="text-sm lg:text-base font-medium max-w-md leading-relaxed">
-              Leverage your on-chain assets to instantly access private credit everywhere. Polaris empowers your purchases with full privacy via Fhenix fHEVM.
+              Leverage your on-chain assets to instantly access private credit everywhere. Polaris empowers your purchases with full privacy via Fhenix Collaborative FHE (CoFHE).
             </p>
             <div>
               <Link 
@@ -190,9 +190,9 @@ export default function Home() {
           className="bg-[#85A1FF] text-black rounded-2xl p-8 lg:p-10 flex flex-col md:flex-row items-center justify-between gap-8"
         >
           <div className="max-w-xl">
-            <h2 className="text-3xl lg:text-4xl font-black mb-4 tracking-tighter uppercase">Powered By Fhenix fHEVM</h2>
+            <h2 className="text-3xl lg:text-4xl font-black mb-4 tracking-tighter uppercase">Powered By Fhenix CoFHE</h2>
             <p className="font-medium text-sm leading-relaxed opacity-80">
-              Secure, confidential on-chain computation enables seamless credit management and private payment tracking across the ecosystem.
+              Collaborative Fully Homomorphic Encryption (CoFHE) enables secure, confidential on-chain credit scores and private BNPL orchestration without exposing your financial history.
             </p>
           </div>
           <div className="font-black text-xl italic opacity-90 flex flex-col items-center">
@@ -217,7 +217,7 @@ export default function Home() {
             <div className="z-10 max-w-sm mb-12">
               <h3 className="text-3xl lg:text-5xl font-black uppercase tracking-tight leading-[0.9] mb-4">Confidential<br/>Credit</h3>
               <p className="font-medium text-sm lg:text-base opacity-80 leading-relaxed">
-                Deposit your assets into Polaris Vaults. Polaris securely tracks your credit worthiness via fHEVM to unlock private BNPL everywhere.
+                Deposit your assets into Polaris Vaults. Polaris securely tracks your creditworthiness via Fhenix's encrypted state variables and permit-based decryptions to unlock private BNPL everywhere.
               </p>
             </div>
             

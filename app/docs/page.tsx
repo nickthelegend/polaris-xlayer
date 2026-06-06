@@ -24,7 +24,7 @@ const Logo = ({ className = "" }: { className?: string }) => (
 
 export default function Docs() {
     const categories = [
-        { title: "Introduction", items: ["What is Polaris?", "Architecture", "Monad Integration"] },
+        { title: "Introduction", items: ["What is Polaris?", "Architecture", "Fhenix Integration"] },
         { title: "Payments", items: ["Merchant SDK", "Stablecoin Support", "Settlement Logic"] },
         { title: "Credit", items: ["BNPL Protocol", "Risk Models", "Liquidity Pools"] },
         { title: "Smart Contracts", items: ["Solidity", "EVM Implementation", "Audits"] },
@@ -92,7 +92,7 @@ export default function Docs() {
                         <article className="prose prose-invert max-w-none text-slate-400">
                             <h2 className="text-white text-3xl font-bold mb-6">High Performance Infrastructure</h2>
                             <p className="mb-6">
-                                Polaris is built from the ground up to leverage Monad's parallel execution model.
+                                Polaris is built from the ground up to leverage Fhenix's Collaborative FHE (CoFHE) model.
                                 Our infrastructure is designed for extreme throughput and predictable transaction costs.
                             </p>
                             <div className="bg-slate-900 rounded-xl p-6 font-mono text-sm border border-white/5 mb-8">

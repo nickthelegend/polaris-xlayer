@@ -45,7 +45,7 @@ export default function About() {
                         Building the <span className="text-primary">Future</span> of <br /> Decentralized Finance.
                     </h1>
                     <p className="text-slate-400 text-lg lg:text-xl leading-relaxed max-w-3xl">
-                        Polaris is an institutional-grade fintech layer built on the Monad blockchain.
+                        Polaris is an institutional-grade fintech layer built on the Fhenix blockchain.
                         We are dedicated to creating secure, non-custodial payment and credit infrastructure
                         that bridges the gap between traditional commerce and the decentralized world.
                     </p>
@@ -63,7 +63,7 @@ export default function About() {
                             <h4 className="font-bold text-primary mb-2">Institutional Grade</h4>
                             <p className="text-xs text-slate-500">
                                 We use Solidity and optimized EVM byte-code to ensure our smart contracts meet the highest
-                                security standards for institutional adoption on Monad.
+                                security standards for institutional adoption on Fhenix.
                             </p>
                         </div>
                     </motion.div>
@@ -103,7 +103,7 @@ export default function About() {
                         <span className="font-bold">Polaris</span>
                     </div>
                     <p className="text-[10px] text-slate-500 uppercase tracking-widest">
-                        © 2024 Polaris Finance. Built on Monad.
+                        © 2026 Polaris Finance. Built on Fhenix.
                     </p>
                 </div>
             </footer>
