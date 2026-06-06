@@ -36,3 +36,12 @@ Navigate to [http://localhost:3000](http://localhost:3000) to view the landing p
 
 ## 🌍 The Polaris Ecosystem
 For the protocol's core logic and user dashboard, check the [`polaris-core`](../polaris-core) and [`polaris-protocol`](../polaris-protocol) repositories.
+
+---
+
+## 🎨 Branding & Marketing Core
+The landing page highlights the core values of Polaris:
+* **Fhenix CoFHE Integration**: Highlights the cryptographic shield that guards institutional capital and retail debt.
+* **Premium Dark Mode**: Modern branding using Tailwind CSS v4, Framer Motion, and Geist typography.
+* **Confidential DeFi**: Transparent messaging on how Fully Homomorphic Encryption solves the public-ledger privacy bottleneck.
+
