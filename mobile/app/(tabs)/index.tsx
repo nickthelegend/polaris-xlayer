@@ -2,40 +2,71 @@ import { useRouter } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
 
-import { enterUpAfter } from "../../src/components/motion";
-
+import { usePolaris } from "../../src/chain/provider";
+import { nextCollection, useCreditLine } from "../../src/chain/usePolaris";
+import { USDC, nextBand } from "../../src/chain/math";
 import {
-  Button, CreditOrb, Figure, Label, ProgressBar, Rule, Screen, StatTile, Surface, Text
+  Button,
+  CreditOrb,
+  ErrorState,
+  Figure,
+  Label,
+  Loading,
+  ProgressBar,
+  Rule,
+  Screen,
+  StatTile,
+  Surface,
+  Text,
 } from "../../src/components";
-import {
-  USDC, creditLine, nextBand, nextCollection, profile
-} from "../../src/data/polaris";
+import { enterUpAfter } from "../../src/components/motion";
 import { ink, space } from "../../src/theme";
 
 const relativeDays = (unix: number) => {
   const days = Math.round((unix - Date.now() / 1000) / 86_400);
-  if (days <= 0) return "today";
+  if (days < 0) return "overdue";
+  if (days === 0) return "today";
   if (days === 1) return "tomorrow";
   return `in ${days} days`;
 };
 
 export default function CreditScreen() {
   const router = useRouter();
-  const line = creditLine(profile);
-  const next = nextCollection();
+  const { status, data, error, refresh } = usePolaris();
+  const line = useCreditLine(data);
+
+  if (status === "loading") {
+    return (
+      <Screen eyebrow="Your credit line" title="Polaris">
+        <Loading label="Reading your credit line" />
+      </Screen>
+    );
+  }
+
+  if (!data || !line) {
+    return (
+      <Screen eyebrow="Your credit line" title="Polaris">
+        <ErrorState message={error ?? "No data returned."} onRetry={refresh} />
+      </Screen>
+    );
+  }
+
+  const { profile, loans } = data;
+  const next = nextCollection(loans);
   const band = nextBand(profile.score);
 
   return (
     <Screen eyebrow="Your credit line" title="Polaris">
+      {error ? (
+        <Text variant="bodySmall" tone="danger" style={styles.stale}>
+          Showing the last good read — {error}
+        </Text>
+      ) : null}
+
       <View style={styles.orbWrap}>
         <CreditOrb score={profile.score} size={252} />
       </View>
 
-      {/*
-        The available figure is the one number this screen exists for, so it
-        gets the hero size and nothing competes with it. The limit and the debt
-        that produce it sit underneath in the quiet weight.
-      */}
       <Animated.View entering={enterUpAfter(120)}>
         <Surface padded={20} style={styles.hero}>
           <Label>Available to spend</Label>
@@ -45,12 +76,7 @@ export default function CreditScreen() {
             <Text variant="bodySmall" tone="soft">
               of{" "}
             </Text>
-            <Figure
-              value={line.limit}
-              variant="bodySmall"
-              tone="soft"
-              animate={false}
-            />
+            <Figure value={line.limit} variant="bodySmall" tone="soft" animate={false} />
             <Text variant="bodySmall" tone="soft">
               {" "}
               limit
@@ -86,12 +112,6 @@ export default function CreditScreen() {
         </Surface>
       </Animated.View>
 
-      {/*
-        What the keeper does next. This is the question a borrower actually has
-        — "when does money leave my account, and how much" — and answering it
-        without being asked is most of what makes an automated collection feel
-        like a service rather than a surprise.
-      */}
       {next ? (
         <Animated.View entering={enterUpAfter(190)}>
           <Surface padded={18} style={styles.card}>
@@ -125,7 +145,6 @@ export default function CreditScreen() {
         </Animated.View>
       ) : null}
 
-      {/* What the next score band is worth, in money rather than in points. */}
       {band ? (
         <Animated.View entering={enterUpAfter(250)}>
           <Surface padded={18} style={styles.card}>
@@ -136,9 +155,7 @@ export default function CreditScreen() {
               </Text>
             </View>
             <ProgressBar
-              value={
-                (profile.score - 580) / (band.at - 580 || 1)
-              }
+              value={(profile.score - 580) / Math.max(1, band.at - 580)}
               tone="accent"
               style={{ marginTop: space.md }}
             />
@@ -146,12 +163,7 @@ export default function CreditScreen() {
               <Text variant="bodySmall" tone="soft">
                 Reach {band.at} and your limit becomes
               </Text>
-              <Figure
-                value={band.limit}
-                variant="body"
-                tone="accent"
-                animate={false}
-              />
+              <Figure value={band.limit} variant="body" tone="accent" animate={false} />
             </View>
             <Text variant="bodySmall" tone="faint" style={{ marginTop: space.sm }}>
               Every installment paid on time is worth 12 points. A late one costs
@@ -161,10 +173,7 @@ export default function CreditScreen() {
         </Animated.View>
       ) : null}
 
-      <Animated.View
-        entering={enterUpAfter(310)}
-        style={styles.stats}
-      >
+      <Animated.View entering={enterUpAfter(310)} style={styles.stats}>
         <StatTile
           label="On time"
           value={profile.onTimePayments * USDC}
@@ -198,12 +207,9 @@ const styles = StyleSheet.create({
     paddingTop: space.sm,
     paddingBottom: space["3xl"],
   },
-  hero: {
-    marginBottom: space.lg,
-  },
-  card: {
-    marginBottom: space.lg,
-  },
+  hero: { marginBottom: space.lg },
+  card: { marginBottom: space.lg },
+  stale: { marginBottom: space.md },
   limitRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -215,15 +221,8 @@ const styles = StyleSheet.create({
     marginTop: space.xl,
     gap: space.md,
   },
-  breakItem: {
-    flex: 1,
-    gap: 5,
-  },
-  breakDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: ink.hairline,
-  },
+  breakItem: { flex: 1, gap: 5 },
+  breakDivider: { width: 1, height: 28, backgroundColor: ink.hairline },
   rowBetween: {
     flexDirection: "row",
     alignItems: "center",

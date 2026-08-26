@@ -17,11 +17,20 @@ export type Installment = {
   state: "paid" | "due" | "upcoming" | "missed";
 };
 
-const dateOf = (unix: number) =>
-  new Date(unix * 1000).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-  });
+/**
+ * A due date, at the resolution the schedule actually runs at.
+ *
+ * A weekly plan wants a date. A plan whose installments are a minute apart
+ * renders four identical dates, which reads as a rendering bug rather than as a
+ * schedule — so anything under a day carries the time instead.
+ */
+const dateOf = (unix: number, intervalSeconds: number) => {
+  const d = new Date(unix * 1000);
+  if (intervalSeconds < 86_400) {
+    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  }
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+};
 
 /**
  * The installment ladder.
@@ -35,7 +44,13 @@ const dateOf = (unix: number) =>
  * arithmetic `installment_due_at` does on chain — so what a borrower reads here
  * is what the keeper will act on, not a UI approximation of it.
  */
-export function ScheduleTimeline({ items }: { items: Installment[] }) {
+export function ScheduleTimeline({
+  items,
+  intervalSeconds = 604_800,
+}: {
+  items: Installment[];
+  intervalSeconds?: number;
+}) {
   return (
     <View>
       {items.map((item, i) => {
@@ -87,7 +102,7 @@ export function ScheduleTimeline({ items }: { items: Installment[] }) {
             <View style={styles.content}>
               <View style={styles.head}>
                 <Label>
-                  Installment {item.index + 1} · {dateOf(item.dueAt)}
+                  Installment {item.index + 1} · {dateOf(item.dueAt, intervalSeconds)}
                 </Label>
                 <Figure
                   value={item.amount}

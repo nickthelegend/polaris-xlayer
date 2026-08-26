@@ -996,3 +996,325 @@ describe("subscriptions", () => {
     await expectError(subscribe(h, m, plan, sub, ata).rpc(), "NotDelegated");
   });
 });
+
+// ===========================================================================
+// Coverage the plan demanded and the suite did not have.
+//
+// Each of these maps to a numbered item in docs/TEST-PLAN.md. They are the
+// guards that had never been fired: a second initialize, an out-of-range
+// config, an unauthorised admin call, an empty pool, a double liquidation, the
+// fee sweep, and the liquidity that accrued fees are not allowed to leave with.
+// ===========================================================================
+
+describe("configuration bounds and admin authority", () => {
+  it("A2 · cannot be initialized twice", async () => {
+    const h = await setup();
+    // The protocol PDA has a fixed address, so a second stand-up is not a
+    // retry — it is an error, and it has to be a loud one.
+    await expectError(
+      h.program.methods
+        .initialize(new BN(DAY), new BN(HOUR), 50, 15_000)
+        .accountsPartial({
+          authority: h.payer.publicKey,
+          protocol: h.protocol,
+          stablecoin: h.mint,
+          treasury: h.treasury,
+          liquidityVault: h.liquidityVault,
+          collateralVault: h.collateralVault,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([h.payer])
+        .rpc(),
+      "already in use",
+    );
+  });
+
+  it("A3 · refuses a grace period beyond the ceiling", async () => {
+    // An unbounded grace period makes every loan effectively un-liquidatable.
+    await expectError(setup({ gracePeriod: 31 * DAY }), "InvalidGracePeriod");
+    await setup({ gracePeriod: 30 * DAY }); // exactly the ceiling is allowed
+  });
+
+  it("A5 · refuses a fee above the ceiling", async () => {
+    await expectError(setup({ feeBps: 501 }), "InvalidFee");
+    await setup({ feeBps: 500 });
+  });
+
+  it("A6 · a fresh merchant starts inactive, with a conservative cap", async () => {
+    const h = await setup();
+    const authority = await h.wallet();
+    const payout = await h.tokenAccount(authority.publicKey);
+    const merchant = h.merchantOf(authority.publicKey);
+
+    await h.program.methods
+      .registerMerchant("Fresh", "https://example.test/f.json")
+      .accountsPartial({
+        authority: authority.publicKey,
+        protocol: h.protocol,
+        merchant,
+        payout,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([authority])
+      .rpc();
+
+    const m = await h.program.account.merchant.fetch(merchant);
+    assert.equal(m.active, false, "registration alone activated a merchant");
+    assert.equal(m.maxOrderValue.toNumber(), 500 * USDC);
+    assert.equal(m.totalSettled.toNumber(), 0);
+    assert.equal(m.payout.toBase58(), payout.toBase58());
+  });
+
+  it("A7 · only the protocol authority can activate a merchant", async () => {
+    const h = await setup();
+    const m = await h.newMerchant();
+    const stranger = await h.wallet();
+
+    await expectError(
+      h.program.methods
+        .setMerchantActive(false)
+        .accountsPartial({
+          authority: stranger.publicKey,
+          protocol: h.protocol,
+          merchant: m.merchant,
+        })
+        .signers([stranger])
+        .rpc(),
+      "Error",
+    );
+
+    // And the merchant is untouched by the attempt.
+    const after = await h.program.account.merchant.fetch(m.merchant);
+    assert.equal(after.active, true, "an unauthorised call changed state");
+  });
+
+  it("A16 · will not originate against a pool that cannot pay the merchant", async () => {
+    // The merchant is paid in full at origination. Opening a plan the pool
+    // cannot fund would either fail halfway or quietly under-pay them.
+    const h = await setup();
+    await h.fundLiquidity(50 * USDC);
+    const m = await h.newMerchant();
+    const b = await h.newBorrower(1_000 * USDC, 500 * USDC);
+    await expectError(
+      createLoan(h, b, m, 100 * USDC, 4, 7 * DAY),
+      "InsufficientLiquidity",
+    );
+  });
+});
+
+describe("liquidation guards and the protocol's own money", () => {
+  it("B1 · will not liquidate a loan that is merely due", async () => {
+    const h = await setup({ gracePeriod: DAY });
+    await h.fundLiquidity(10_000 * USDC);
+    const m = await h.newMerchant();
+    const b = await h.newBorrower(1_000 * USDC, 500 * USDC);
+    const { loan } = await createLoan(h, b, m, 200 * USDC, 4, 7 * DAY);
+
+    // Past due, but inside grace. Grace exists precisely so this is not a
+    // default yet.
+    await h.warpBy(7 * DAY + 1);
+    await expectError(
+      liquidate(h, loan, b.kp.publicKey, b.ata).rpc(),
+      "NotLiquidatable",
+    );
+
+    await h.warpBy(DAY + 2);
+    await liquidate(h, loan, b.kp.publicKey, b.ata).rpc();
+  });
+
+  it("B5 · a liquidated loan cannot be liquidated again", async () => {
+    const h = await setup({ gracePeriod: DAY });
+    await h.fundLiquidity(10_000 * USDC);
+    const m = await h.newMerchant();
+    const b = await h.newBorrower(1_000 * USDC, 500 * USDC);
+    const { loan } = await createLoan(h, b, m, 200 * USDC, 4, 7 * DAY);
+
+    await h.warpBy(7 * DAY + DAY + 2);
+    await liquidate(h, loan, b.kp.publicKey, b.ata).rpc();
+
+    const profileBefore = await h.program.account.creditProfile.fetch(b.profile);
+    await expectError(
+      liquidate(h, loan, b.kp.publicKey, b.ata).rpc(),
+      "NotLiquidatable",
+    );
+    // A second penalty for one default would be a real cost to the borrower.
+    const profileAfter = await h.program.account.creditProfile.fetch(b.profile);
+    assert.equal(profileAfter.score, profileBefore.score);
+    assert.equal(profileAfter.liquidations, 1);
+  });
+
+  it("B11 · sweeping fees moves exactly what accrued, and resets the ledger", async () => {
+    const h = await setup({ gracePeriod: DAY });
+    await h.fundLiquidity(10_000 * USDC);
+    const m = await h.newMerchant();
+
+    const principal = 400 * USDC;
+    const interval = 7 * DAY;
+    const interest = interestFor(principal, 4 * interval);
+    const b = await h.newBorrower(1_000 * USDC, principal + interest);
+    const { loan } = await createLoan(h, b, m, principal, 4, interval);
+
+    for (let k = 0; k < 4; k++) {
+      await h.warpBy(interval);
+      await collect(h, loan, b.kp.publicKey, b.ata).rpc();
+    }
+
+    const accrued = (
+      await h.program.account.protocol.fetch(h.protocol)
+    ).protocolFeesAccrued.toNumber();
+    assert.isAbove(accrued, 0, "a completed plan accrued no fee at all");
+
+    const before = (await h.readToken(h.treasury)).amount;
+    await h.program.methods
+      .sweepFees()
+      .accountsPartial({
+        authority: h.payer.publicKey,
+        protocol: h.protocol,
+        liquidityVault: h.liquidityVault,
+        treasury: h.treasury,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([h.payer])
+      .rpc();
+
+    assert.equal((await h.readToken(h.treasury)).amount, before + accrued);
+    assert.equal(
+      (await h.program.account.protocol.fetch(h.protocol)).protocolFeesAccrued.toNumber(),
+      0,
+      "the fee ledger was not reset, so a second sweep would pay twice",
+    );
+  });
+
+  it("B12 · accrued fees cannot leave as idle liquidity", async () => {
+    // Withdrawing the pool down past what the treasury is owed would strand
+    // the protocol's own claim on money it has already earned.
+    const h = await setup({ gracePeriod: DAY });
+    await h.fundLiquidity(1_000 * USDC);
+    const m = await h.newMerchant();
+
+    const principal = 400 * USDC;
+    const interval = 7 * DAY;
+    const interest = interestFor(principal, 4 * interval);
+    const b = await h.newBorrower(1_000 * USDC, principal + interest);
+    const { loan } = await createLoan(h, b, m, principal, 4, interval);
+    for (let k = 0; k < 4; k++) {
+      await h.warpBy(interval);
+      await collect(h, loan, b.kp.publicKey, b.ata).rpc();
+    }
+
+    const p = await h.program.account.protocol.fetch(h.protocol);
+    const accrued = p.protocolFeesAccrued.toNumber();
+    const balance = (await h.readToken(h.liquidityVault)).amount;
+    const free = balance - accrued;
+
+    const to = await h.tokenAccount(h.payer.publicKey);
+    const withdraw = (amount: number) =>
+      h.program.methods
+        .withdrawLiquidity(new BN(amount))
+        .accountsPartial({
+          authority: h.payer.publicKey,
+          protocol: h.protocol,
+          liquidityVault: h.liquidityVault,
+          to,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([h.payer]);
+
+    await expectError(withdraw(free + 1).rpc(), "InsufficientLiquidity");
+    await withdraw(free).rpc(); // exactly the free portion is allowed
+    assert.equal((await h.readToken(h.liquidityVault)).amount, accrued);
+  });
+});
+
+describe("subscription bounds", () => {
+  it("C6 · refuses a period below the deployment's floor", async () => {
+    const h = await setup({ minInterval: HOUR });
+    const m = await h.newMerchant();
+    const plan = h.planOf(0);
+
+    const create = (period: number) =>
+      h.program.methods
+        .createPlan(new BN(10 * USDC), new BN(period), "Too fast")
+        .accountsPartial({
+          authority: m.authority.publicKey,
+          protocol: h.protocol,
+          merchant: m.merchant,
+          plan,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([m.authority]);
+
+    await expectError(create(HOUR - 1).rpc(), "InvalidPeriod");
+    await expectError(create(366 * DAY).rpc(), "InvalidPeriod");
+    await create(HOUR).rpc();
+  });
+
+  it("C11 · will not charge a subscription before it is due", async () => {
+    const h = await setup();
+    const period = 30 * DAY;
+    const price = 10 * USDC;
+
+    const m = await h.newMerchant();
+    const plan = h.planOf(0);
+    await h.program.methods
+      .createPlan(new BN(price), new BN(period), "Monthly")
+      .accountsPartial({
+        authority: m.authority.publicKey,
+        protocol: h.protocol,
+        merchant: m.merchant,
+        plan,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([m.authority])
+      .rpc();
+
+    const sub = await h.wallet();
+    const ata = await h.tokenAccount(sub.publicKey, 1_000 * USDC);
+    await h.delegate(sub, ata, price * 12);
+
+    await h.program.methods
+      .subscribe()
+      .accountsPartial({
+        subscriber: sub.publicKey,
+        protocol: h.protocol,
+        merchant: m.merchant,
+        plan,
+        subscription: h.subOf(sub.publicKey, plan),
+        subscriberTokenAccount: ata,
+        merchantPayout: m.payout,
+        treasury: h.treasury,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([sub])
+      .rpc();
+
+    const paid = (await h.readToken(m.payout)).amount;
+
+    const charge = () =>
+      h.program.methods
+        .chargeDue()
+        .accountsPartial({
+          keeper: h.payer.publicKey,
+          protocol: h.protocol,
+          merchant: m.merchant,
+          plan,
+          subscription: h.subOf(sub.publicKey, plan),
+          subscriberTokenAccount: ata,
+          merchantPayout: m.payout,
+          treasury: h.treasury,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([h.payer]);
+
+    // One second before the boundary is not due.
+    await h.warpBy(period - 5);
+    await expectError(charge().rpc(), "NotDue");
+    assert.equal((await h.readToken(m.payout)).amount, paid, "money moved anyway");
+
+    await h.warpBy(10);
+    await charge().rpc();
+    assert.isAbove((await h.readToken(m.payout)).amount, paid);
+  });
+});

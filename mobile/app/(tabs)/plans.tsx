@@ -8,17 +8,16 @@ import Animated, {
 import { enterFade, enterUp } from "../../src/components/motion";
 
 import {
-  Empty, Figure, Label, ProgressBar, Rule, ScheduleTimeline, Screen, StatusPill, Surface, Text, type Installment
+  Empty, ErrorState, Figure, Label, Loading, ProgressBar, Rule, ScheduleTimeline, Screen, StatusPill, Surface, Text, type Installment
 } from "../../src/components";
+import { usePolaris } from "../../src/chain/provider";
 import {
   installmentDueAt,
-  loans,
   outstanding,
-  plans,
+  plural,
   thresholdFor,
-  type Loan,
-  type Plan,
-} from "../../src/data/polaris";
+} from "../../src/chain/math";
+import type { Loan, Plan } from "../../src/chain/queries";
 import { ink, motion, palette, radius, space } from "../../src/theme";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -126,7 +125,10 @@ function LoanCard({ loan, index }: { loan: Loan; index: number }) {
         {open ? (
           <Animated.View entering={enterFade()}>
             <Rule style={{ marginVertical: space.xl }} />
-            <ScheduleTimeline items={scheduleFor(loan)} />
+            <ScheduleTimeline
+              items={scheduleFor(loan)}
+              intervalSeconds={loan.intervalSeconds}
+            />
 
             <View style={styles.terms}>
               <View style={styles.termItem}>
@@ -181,7 +183,7 @@ function PlanRow({ plan, index }: { plan: Plan; index: number }) {
                 {plan.merchant}
               </Text>
               <Text variant="bodySmall" tone="faint">
-                {plan.name} · {plan.periodsCharged} periods charged
+                {plan.name} · {plural(plan.periodsCharged, "period")} charged
               </Text>
             </View>
           </View>
@@ -210,6 +212,24 @@ const TABS = ["Installments", "Subscriptions"] as const;
 
 export default function PlansScreen() {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Installments");
+  const { status, data, error, refresh } = usePolaris();
+
+  if (status === "loading") {
+    return (
+      <Screen eyebrow="What you owe" title="Plans">
+        <Loading label="Reading your plans" />
+      </Screen>
+    );
+  }
+  if (!data) {
+    return (
+      <Screen eyebrow="What you owe" title="Plans">
+        <ErrorState message={error ?? "No data returned."} onRetry={refresh} />
+      </Screen>
+    );
+  }
+
+  const { loans, subscriptions } = data;
   const active = loans.filter((l) => l.status === "active");
   const closed = loans.filter((l) => l.status !== "active");
 
@@ -243,7 +263,7 @@ export default function PlansScreen() {
         active.length || closed.length ? (
           <>
             {active.map((loan, i) => (
-              <LoanCard key={loan.id} loan={loan} index={i} />
+              <LoanCard key={loan.address} loan={loan} index={i} />
             ))}
             {closed.length ? (
               <>
@@ -251,7 +271,7 @@ export default function PlansScreen() {
                   Closed
                 </Label>
                 {closed.map((loan, i) => (
-                  <LoanCard key={loan.id} loan={loan} index={active.length + i} />
+                  <LoanCard key={loan.address} loan={loan} index={active.length + i} />
                 ))}
               </>
             ) : null}
@@ -262,8 +282,10 @@ export default function PlansScreen() {
             note="Split a purchase into four at checkout and it will appear here."
           />
         )
-      ) : plans.length ? (
-        plans.map((plan, i) => <PlanRow key={plan.id} plan={plan} index={i} />)
+      ) : subscriptions.length ? (
+        subscriptions.map((plan, i) => (
+          <PlanRow key={plan.address} plan={plan} index={i} />
+        ))
       ) : (
         <Empty
           title="No subscriptions"

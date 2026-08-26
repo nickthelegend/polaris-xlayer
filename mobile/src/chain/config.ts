@@ -1,0 +1,58 @@
+import { Keypair, PublicKey } from "@solana/web3.js";
+
+import deployment from "./deployment.json";
+
+/**
+ * Where the app points, and who it signs as.
+ *
+ * `deployment.json` is written by `scripts/seed.ts` against whichever cluster
+ * it ran on, so the app is always pointed at a program that actually exists
+ * rather than at an address someone typed.
+ *
+ * The keypair is a demo signer for a test cluster. It produces **real** signed
+ * transactions against a **real** deployed program — it is not standing in for
+ * signing. A shipped build replaces it with Mobile Wallet Adapter; nothing else
+ * about the transaction path changes, because every instruction is already
+ * built by the SDK rather than by the screen.
+ */
+export const RPC_URL = deployment.rpc;
+export const CLUSTER = deployment.cluster;
+export const PROGRAM_ID = new PublicKey(deployment.programId);
+export const STABLECOIN = new PublicKey(deployment.stablecoin);
+export const TREASURY = new PublicKey(deployment.treasury);
+
+export const wallet = Keypair.fromSecretKey(
+  Uint8Array.from(deployment.borrower.secretKey),
+);
+export const WALLET_TOKEN_ACCOUNT = new PublicKey(deployment.borrower.tokenAccount);
+
+export type MerchantRef = {
+  name: string;
+  icon: string;
+  pda: PublicKey;
+  payout: PublicKey;
+};
+
+/**
+ * The merchants registered on this deployment.
+ *
+ * Every one is a real `Merchant` account created by `scripts/seed.ts`; the
+ * addresses here are the same PDAs the program checks at origination, so a
+ * checkout against one of these is a checkout the program will accept.
+ */
+export const merchants: MerchantRef[] = deployment.merchants.map((m) => ({
+  name: m.name,
+  icon: m.icon,
+  pda: new PublicKey(m.pda),
+  payout: new PublicKey(m.payout),
+}));
+
+/** Merchant display names, keyed by their on-chain PDA. */
+export const merchantDirectory = new Map(
+  deployment.merchants.map((m) => [m.pda, { name: m.name, icon: m.icon }]),
+);
+
+export const explorerTx = (signature: string) =>
+  CLUSTER === "localnet"
+    ? `https://explorer.solana.com/tx/${signature}?cluster=custom&customUrl=${encodeURIComponent(RPC_URL)}`
+    : `https://explorer.solana.com/tx/${signature}?cluster=${CLUSTER}`;

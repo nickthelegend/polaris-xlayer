@@ -6,12 +6,12 @@ import { enterUp } from "../../src/components/motion";
 import Svg, { Path } from "react-native-svg";
 
 import {
-  Empty, Figure, Mono, Rule, Screen, Surface, Text
+  Empty, ErrorState, Figure, Loading, Mono, Rule, Screen, Surface, Text
 } from "../../src/components";
-import { activity, type ActivityEvent } from "../../src/data/polaris";
+import { usePolaris } from "../../src/chain/provider";
+import { explorerTx } from "../../src/chain/config";
+import type { ActivityEvent } from "../../src/chain/queries";
 import { palette, radius, space } from "../../src/theme";
-
-const CLUSTER = "devnet";
 
 const glyphs: Record<ActivityEvent["kind"], { path: string; tint: string }> = {
   // Arrow into a tray.
@@ -36,7 +36,7 @@ const ago = (unix: number) => {
 
 function Row({ event, index }: { event: ActivityEvent; index: number }) {
   const g = glyphs[event.kind];
-  const explorer = `https://explorer.solana.com/tx/${event.signature}?cluster=${CLUSTER}`;
+  const explorer = explorerTx(event.signature);
 
   return (
     <Animated.View
@@ -96,6 +96,25 @@ function Row({ event, index }: { event: ActivityEvent; index: number }) {
 }
 
 export default function ActivityScreen() {
+  const { status, data, error, refresh } = usePolaris();
+
+  if (status === "loading") {
+    return (
+      <Screen eyebrow="Every movement of money" title="Activity">
+        <Loading label="Reading the ledger" />
+      </Screen>
+    );
+  }
+  if (!data) {
+    return (
+      <Screen eyebrow="Every movement of money" title="Activity">
+        <ErrorState message={error ?? "No data returned."} onRetry={refresh} />
+      </Screen>
+    );
+  }
+
+  const { activity } = data;
+
   return (
     <Screen
       eyebrow="Every movement of money"

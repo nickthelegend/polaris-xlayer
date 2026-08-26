@@ -76,9 +76,29 @@ const tones = {
  * while it runs and shoves anything beside it around. That reads as broken
  * rather than as animated.
  */
+/**
+ * The decimals this figure actually needs.
+ *
+ * Two is right for money, until the amount is smaller than a cent — and then
+ * two renders a real balance as `0.00`, which states that nothing is owed when
+ * something is. Interest on a short plan is genuinely sub-cent, so the rule is:
+ * never display a non-zero amount as zero. Widen until a significant digit
+ * appears, and stop at the six the token actually has.
+ */
+function decimalsFor(value: number, preferred: number): number {
+  if (value === 0) return preferred;
+  // Anything large enough to show at the preferred precision stays there.
+  if (Math.abs(value) >= Math.pow(10, 6 - preferred)) return preferred;
+  // Below that, go to the token's full precision rather than to the first
+  // significant digit. Once a figure is already in sub-cent territory the
+  // reason to show it at all is exactness, and 0.00009 for 0.000091 is a
+  // rounded number wearing the costume of a precise one.
+  return 6;
+}
+
 export function Figure({
   value,
-  decimals = 2,
+  decimals: preferredDecimals = 2,
   variant = "stat",
   tone = "default",
   prefix = "",
@@ -87,6 +107,7 @@ export function Figure({
   animate = true,
   style,
 }: Props) {
+  const decimals = decimalsFor(value, preferredDecimals);
   const progress = useSharedValue(animate ? 0 : value);
 
   useEffect(() => {

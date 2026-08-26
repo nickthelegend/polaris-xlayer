@@ -1,3 +1,8 @@
+// Side-effect import, and it has to be first: web3.js needs Buffer and
+// getRandomValues installed before anything constructs a PublicKey or a
+// Keypair, and module evaluation order follows import order.
+import "../src/chain/polyfills";
+
 import {
   JetBrainsMono_400Regular, JetBrainsMono_500Medium
 } from "@expo-google-fonts/jetbrains-mono";
@@ -12,6 +17,7 @@ import { StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { PolarisProvider } from "../src/chain/provider";
 import { AmbientBackground } from "../src/components";
 import { ink, palette } from "../src/theme";
 
@@ -76,15 +82,17 @@ export default function RootLayout() {
           <AmbientBackground />
 
           <ThemeProvider value={polarisTheme}>
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: "transparent" },
-                animation: "fade",
-              }}
-            >
-              <Stack.Screen name="(tabs)" />
-            </Stack>
+            <PolarisProvider>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: "transparent" },
+                  animation: "fade",
+                }}
+              >
+                <Stack.Screen name="(tabs)" />
+              </Stack>
+            </PolarisProvider>
           </ThemeProvider>
         </View>
         <StatusBar style="light" />

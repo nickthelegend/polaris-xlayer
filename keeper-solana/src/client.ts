@@ -29,8 +29,11 @@ import {
   PublicKey,
   Transaction,
   TransactionInstruction,
-  TransactionSignature,
 } from "@solana/web3.js";
+// A type, not a value. Imported as a value it survives type-stripping as a
+// real runtime import, and @solana/web3.js is CommonJS — so the named export
+// does not exist and the process refuses to start.
+import type { TransactionSignature } from "@solana/web3.js";
 
 import { classify, type ClassifiedError } from "./errors.ts";
 
@@ -57,11 +60,28 @@ export type ExecuteOptions = {
 };
 
 export class PolarisKeeperClient {
+  /*
+   * Fields declared and assigned explicitly rather than as constructor
+   * parameter properties.
+   *
+   * The package's own scripts run this with `node --experimental-strip-types`,
+   * which erases type annotations without transforming anything — and a
+   * parameter property is a transform, not an annotation. It typechecks fine
+   * and then refuses to load, so the keeper was not runnable at all.
+   */
+  readonly connection: Connection;
+  readonly payer: Keypair;
+  readonly opts: { commitment?: "confirmed" | "finalized" };
+
   constructor(
-    readonly connection: Connection,
-    readonly payer: Keypair,
-    readonly opts: { commitment?: "confirmed" | "finalized" } = {},
-  ) {}
+    connection: Connection,
+    payer: Keypair,
+    opts: { commitment?: "confirmed" | "finalized" } = {},
+  ) {
+    this.connection = connection;
+    this.payer = payer;
+    this.opts = opts;
+  }
 
   /**
    * Price the priority fee from what the network is actually charging for the

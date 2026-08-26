@@ -204,16 +204,24 @@ export async function setup(
     );
   }
 
-  /** Create the owner's ATA and mint them `amount` base units. */
+  /**
+   * The owner's ATA, funded with `amount` base units.
+   *
+   * Idempotent on the account: creating an ATA that already exists fails with
+   * "Provided owner is not allowed", which is an opaque way of saying "already
+   * initialized" and reads like a permissions bug. A test that funds a wallet
+   * twice is a normal thing to write, so the helper absorbs it.
+   */
   async function tokenAccount(owner: PublicKey, amount = 0) {
     const ata = getAssociatedTokenAddressSync(mint, owner, true);
-    const ixs: any[] = [
-      createAssociatedTokenAccountInstruction(payer.publicKey, ata, owner, mint),
-    ];
+    const ixs: any[] = [];
+    if (!(await context.banksClient.getAccount(ata))) {
+      ixs.push(createAssociatedTokenAccountInstruction(payer.publicKey, ata, owner, mint));
+    }
     if (amount > 0) {
       ixs.push(createMintToInstruction(mint, ata, mintAuthority.publicKey, amount));
     }
-    await send(ixs);
+    if (ixs.length) await send(ixs);
     return ata;
   }
 

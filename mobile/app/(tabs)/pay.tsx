@@ -1,18 +1,34 @@
 import * as Haptics from "expo-haptics";
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Animated, {
-  LinearTransition, useAnimatedStyle, useSharedValue, withSequence, withTiming
+  LinearTransition,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
 } from "react-native-reanimated";
 
-import { enterFade, enterUp } from "../../src/components/motion";
-
+import { usePolaris } from "../../src/chain/provider";
+import { useCreditLine } from "../../src/chain/usePolaris";
+import { DAY, USDC, plural, quote } from "../../src/chain/math";
+import { merchants, type MerchantRef } from "../../src/chain/config";
+import { explainError, payLater, payNow, subscribeToPlan } from "../../src/chain/actions";
+import { explorerTx } from "../../src/chain/config";
 import {
-  Button, Figure, Label, Rule, ScheduleTimeline, Screen, Surface, Text
+  Button,
+  ErrorState,
+  Figure,
+  Label,
+  Loading,
+  Mono,
+  Rule,
+  ScheduleTimeline,
+  Screen,
+  Surface,
+  Text,
 } from "../../src/components";
-import {
-  DAY, USDC, creditLine, profile, quote
-} from "../../src/data/polaris";
+import { enterFade, enterUp } from "../../src/components/motion";
 import { ink, lime, palette, radius, space } from "../../src/theme";
 
 type Mode = "now" | "later" | "subscribe";
@@ -20,32 +36,69 @@ type Mode = "now" | "later" | "subscribe";
 const MODES: { id: Mode; title: string; note: string }[] = [
   { id: "now", title: "Pay in full", note: "Settles immediately" },
   { id: "later", title: "Pay in 4", note: "Every 7 days, 10% APR" },
-  { id: "subscribe", title: "Subscribe", note: "Charges every 30 days" },
+  { id: "subscribe", title: "Subscribe", note: "Charges every period" },
 ];
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"];
 
 export default function PayScreen() {
+  const { status, data, error, refresh } = usePolaris();
+  const line = useCreditLine(data);
+
   const [mode, setMode] = useState<Mode>("later");
   const [raw, setRaw] = useState("240");
+  const [merchant, setMerchant] = useState<MerchantRef>(merchants[0]);
+  const [planIndex, setPlanIndex] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string; signature?: string } | null>(
+    null,
+  );
 
-  const line = creditLine(profile);
   const amount = Math.round((parseFloat(raw || "0") || 0) * USDC);
-
-  const plan = useMemo(() => quote(amount, 4, 7 * DAY), [amount]);
-  const affordable = mode !== "later" || plan.totalOwed <= line.available;
+  const plan = useMemo(
+    () => quote(amount, 4, 7 * DAY),
+    [amount],
+  );
 
   const shake = useSharedValue(0);
   const shakeStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: shake.value }],
   }));
 
+  const refuse = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    shake.value = withSequence(
+      withTiming(-8, { duration: 55 }),
+      withTiming(8, { duration: 55 }),
+      withTiming(-5, { duration: 55 }),
+      withTiming(0, { duration: 55 }),
+    );
+  };
+
+  if (status === "loading") {
+    return (
+      <Screen eyebrow="Checkout" title="Pay">
+        <Loading label="Reading your credit line" />
+      </Screen>
+    );
+  }
+  if (!data || !line) {
+    return (
+      <Screen eyebrow="Checkout" title="Pay">
+        <ErrorState message={error ?? "No data returned."} onRetry={refresh} />
+      </Screen>
+    );
+  }
+
+  const subscriptions = data.subscriptions;
+  const affordable = mode !== "later" || plan.totalOwed <= line.available;
+
   const press = (key: string) => {
     Haptics.selectionAsync();
+    setResult(null);
     setRaw((cur) => {
       if (key === "⌫") return cur.length <= 1 ? "0" : cur.slice(0, -1);
       if (key === ".") return cur.includes(".") ? cur : `${cur}.`;
-      // Two decimal places is what a price has. A third is a typo.
       const [, frac] = cur.split(".");
       if (frac !== undefined && frac.length >= 2) return cur;
       if (cur === "0") return key;
@@ -54,25 +107,60 @@ export default function PayScreen() {
     });
   };
 
-  const submit = () => {
-    if (!affordable) {
-      // Refuse visibly rather than silently disabling the button — a dead
-      // control tells you nothing about why.
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      shake.value = withSequence(
-        withTiming(-8, { duration: 55 }),
-        withTiming(8, { duration: 55 }),
-        withTiming(-5, { duration: 55 }),
-        withTiming(0, { duration: 55 }),
-      );
-      return;
+  const submit = async () => {
+    if (amount <= 0) return refuse();
+    if (!affordable) return refuse();
+
+    setBusy(true);
+    setResult(null);
+    try {
+      if (mode === "now") {
+        const { signature } = await payNow({
+          merchant: merchant.pda,
+          merchantPayout: merchant.payout,
+          amount,
+          // Unique per attempt: the payment address is derived from this, and a
+          // repeated reference is refused by the program as a duplicate.
+          orderId: `POL-${Date.now().toString(36).toUpperCase()}`,
+        });
+        setResult({ ok: true, message: `Paid ${merchant.name} in full`, signature });
+      } else if (mode === "later") {
+        const { signature } = await payLater({
+          merchant: merchant.pda,
+          merchantPayout: merchant.payout,
+          amount,
+        });
+        setResult({
+          ok: true,
+          message: `Split into 4 — ${merchant.name} paid in full today`,
+          signature,
+        });
+      } else {
+        const target = subscriptions[planIndex];
+        if (!target) {
+          setResult({ ok: false, message: "No plan selected." });
+          setBusy(false);
+          return;
+        }
+        setResult({
+          ok: false,
+          message: `You already subscribe to ${target.merchant} ${target.name}. Cancel it before subscribing again.`,
+        });
+        setBusy(false);
+        return;
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await refresh();
+    } catch (e: any) {
+      refuse();
+      setResult({ ok: false, message: explainError(e) });
+    } finally {
+      setBusy(false);
     }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   return (
     <Screen eyebrow="Checkout" title="Pay">
-      {/* The amount, as the largest thing on the screen. */}
       <Animated.View style={shakeStyle}>
         <Surface padded={22} style={{ marginBottom: space.xl }}>
           <Label>Amount</Label>
@@ -107,15 +195,14 @@ export default function PayScreen() {
         {MODES.map((m, i) => {
           const on = mode === m.id;
           return (
-            <Animated.View
-              key={m.id}
-              entering={enterUp(i)}
-              style={{ flex: 1 }}
-            >
+            <Animated.View key={m.id} entering={enterUp(i)} style={{ flex: 1 }}>
               <Surface
                 variant={on ? "selected" : "raised"}
                 padded={13}
-                onPress={() => setMode(m.id)}
+                onPress={() => {
+                  setMode(m.id);
+                  setResult(null);
+                }}
                 style={{ minHeight: 84 }}
               >
                 <Text
@@ -135,23 +222,48 @@ export default function PayScreen() {
         })}
       </View>
 
-      {/*
-        The quote. Shown before anything is signed, and built from the same
-        ceiling ladder the program uses — so the four numbers here are the four
-        the keeper will collect, not an estimate that drifts by a base unit.
-      */}
+      {/* Who is being paid. A checkout without this is not a checkout. */}
+      {mode !== "subscribe" ? (
+        <View style={{ marginBottom: space.xl }}>
+          <Label style={{ marginBottom: space.md }}>Merchant</Label>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.merchantRow}>
+              {merchants.map((m) => {
+                const on = m.pda.equals(merchant.pda);
+                return (
+                  <Surface
+                    key={m.pda.toBase58()}
+                    variant={on ? "selected" : "raised"}
+                    padded={12}
+                    onPress={() => {
+                      setMerchant(m);
+                      setResult(null);
+                    }}
+                    style={{ minWidth: 132 }}
+                  >
+                    <Text variant="heading" tone={on ? "lime" : "default"}>
+                      {m.icon}
+                    </Text>
+                    <Text variant="bodySmall" numberOfLines={1} style={{ marginTop: 6 }}>
+                      {m.name}
+                    </Text>
+                  </Surface>
+                );
+              })}
+            </View>
+          </ScrollView>
+        </View>
+      ) : null}
+
       {mode === "later" ? (
-        <Animated.View
-          entering={enterFade()}
-          layout={LinearTransition.springify()}
-        >
+        <Animated.View entering={enterFade()} layout={LinearTransition.springify()}>
           <Surface padded={18} style={{ marginBottom: space.lg }}>
             <View style={styles.rowBetween}>
               <Label>You repay</Label>
               <Figure value={plan.totalOwed} variant="stat" />
             </View>
             <View style={[styles.rowBetween, { marginTop: space.sm }]}>
-              <Text variant="bodySmall" tone="faint">
+              <Text variant="bodySmall" tone="faint" style={{ flex: 1 }}>
                 {`${(amount / USDC).toFixed(2)} principal + interest, pro-rated over 28 days`}
               </Text>
               <Figure
@@ -166,7 +278,8 @@ export default function PayScreen() {
             <Rule style={{ marginVertical: space.lg }} />
 
             <ScheduleTimeline
-              items={plan.schedule.map((s, i) => ({
+              intervalSeconds={7 * DAY}
+              items={plan.schedule.map((s: any, i: number) => ({
                 ...s,
                 state: i === 0 ? "due" : "upcoming",
               }))}
@@ -178,8 +291,8 @@ export default function PayScreen() {
               </Text>
               <Text variant="bodySmall" tone="soft" style={{ marginTop: 3 }}>
                 The authorisation and the purchase go in a single transaction.
-                They both land or neither does, and the merchant is paid in full
-                today.
+                They both land or neither does, and {merchant.name} is paid in
+                full today.
               </Text>
             </View>
 
@@ -198,48 +311,89 @@ export default function PayScreen() {
       {mode === "subscribe" ? (
         <Animated.View entering={enterFade()}>
           <Surface padded={18} style={{ marginBottom: space.lg }}>
-            <View style={styles.rowBetween}>
-              <Label>Every 30 days</Label>
-              <Figure value={amount} variant="stat" />
-            </View>
+            <Label>Your subscriptions</Label>
+            {subscriptions.length ? (
+              subscriptions.map((s, i) => (
+                <View key={s.address} style={{ marginTop: space.md }}>
+                  {i > 0 ? <Rule style={{ marginBottom: space.md }} /> : null}
+                  <View style={styles.rowBetween}>
+                    <View style={{ flex: 1 }}>
+                      <Text variant="body" numberOfLines={1}>
+                        {s.merchant} · {s.name}
+                      </Text>
+                      <Text variant="bodySmall" tone="faint">
+                        {plural(s.periodsCharged, "period")} charged · {s.status}
+                      </Text>
+                    </View>
+                    <Figure value={s.pricePerPeriod} variant="body" animate={false} />
+                  </View>
+                </View>
+              ))
+            ) : (
+              <Text variant="bodySmall" tone="faint" style={{ marginTop: space.sm }}>
+                No subscriptions yet.
+              </Text>
+            )}
             <Rule style={{ marginVertical: space.lg }} />
             <Text variant="bodySmall" tone="soft">
-              You authorise twelve periods up front, not an unlimited amount,
+              You authorise a bounded number of periods, not an unlimited amount,
               and you can cancel at any time without the merchant's agreement.
             </Text>
           </Surface>
         </Animated.View>
       ) : null}
 
-      {/* A keypad rather than a text field: a price is entered, not typed. */}
-      <View style={styles.pad}>
-        {KEYS.map((k) => (
-          <Pressable
-            key={k}
-            style={({ pressed }) => [styles.key, pressed && styles.keyOn]}
-            onPress={() => press(k)}
-          >
-            <Text variant="heading" tone={k === "⌫" ? "faint" : "default"}>
-              {k}
+      {result ? (
+        <Animated.View entering={enterFade()}>
+          <Surface padded={16} style={{ marginBottom: space.lg }}>
+            <Text variant="body" tone={result.ok ? "lime" : "danger"}>
+              {result.ok ? "Confirmed" : "Refused"}
             </Text>
-          </Pressable>
-        ))}
-      </View>
+            <Text variant="bodySmall" tone="soft" style={{ marginTop: 4 }}>
+              {result.message}
+            </Text>
+            {result.signature ? (
+              <Mono numberOfLines={1} style={{ marginTop: space.sm, opacity: 0.7 }}>
+                {result.signature}
+              </Mono>
+            ) : null}
+          </Surface>
+        </Animated.View>
+      ) : null}
+
+      {mode !== "subscribe" ? (
+        <View style={styles.pad}>
+          {KEYS.map((k) => (
+            <Pressable
+              key={k}
+              style={({ pressed }) => [styles.key, pressed && styles.keyOn]}
+              onPress={() => press(k)}
+            >
+              <Text variant="heading" tone={k === "⌫" ? "faint" : "default"}>
+                {k}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       <Button
         label={
           mode === "now"
-            ? "Pay now"
+            ? `Pay ${merchant.name}`
             : mode === "later"
               ? "Split into 4"
-              : "Start subscription"
+              : "Manage subscriptions"
         }
         full
+        loading={busy}
+        disabled={busy}
         onPress={submit}
         style={{ marginTop: space.lg }}
       />
       <Text variant="bodySmall" tone="faint" style={styles.foot}>
-        Nothing is signed in this build — the wallet is not connected yet.
+        Signed and submitted to the cluster. Every figure above is what the
+        program will compute.
       </Text>
     </Screen>
   );
@@ -252,33 +406,18 @@ const styles = StyleSheet.create({
     gap: space.sm,
     marginVertical: space.sm,
   },
-  currency: {
-    fontSize: 28,
-  },
+  currency: { fontSize: 28 },
   rowBetween: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: space.md,
   },
-  rowGap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  modes: {
-    flexDirection: "row",
-    gap: space.sm,
-    marginBottom: space.xl,
-  },
-  modeTitle: {
-    fontWeight: "600",
-  },
-  modeNote: {
-    marginTop: 3,
-    fontSize: 11,
-    lineHeight: 15,
-  },
+  rowGap: { flexDirection: "row", alignItems: "center", gap: 6 },
+  modes: { flexDirection: "row", gap: space.sm, marginBottom: space.xl },
+  modeTitle: { fontWeight: "600" },
+  modeNote: { marginTop: 3, fontSize: 11, lineHeight: 15 },
+  merchantRow: { flexDirection: "row", gap: space.sm, paddingRight: space.xl },
   callout: {
     marginTop: space.lg,
     padding: space.md,
@@ -295,12 +434,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E7000B44",
   },
-  pad: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: space.sm,
-    marginTop: space.sm,
-  },
+  pad: { flexDirection: "row", flexWrap: "wrap", gap: space.sm, marginTop: space.sm },
   key: {
     width: "31.7%",
     height: 56,
@@ -311,12 +445,6 @@ const styles = StyleSheet.create({
     borderColor: ink.hairline,
     backgroundColor: palette.card,
   },
-  keyOn: {
-    backgroundColor: palette.secondary,
-    borderColor: ink.hairlineStrong,
-  },
-  foot: {
-    textAlign: "center",
-    marginTop: space.md,
-  },
+  keyOn: { backgroundColor: palette.secondary, borderColor: ink.hairlineStrong },
+  foot: { textAlign: "center", marginTop: space.md },
 });

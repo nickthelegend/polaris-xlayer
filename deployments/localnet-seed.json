@@ -1,0 +1,142 @@
+{
+  "cluster": "localnet",
+  "rpc": "http://127.0.0.1:8899",
+  "programId": "9wgqMhXvhzzDaLEWxXsQRx73CMtSUKRrVYL6Vy1cDKAU",
+  "stablecoin": "C3wtvQv85C2v5JcaFtzBKgtMLYX7XRAnhcap1EVfjSoh",
+  "protocol": "GvBQZxjf3d5exeq9cHV8b7Y5X9MVdF3DXRGzrZ5yzLaj",
+  "liquidityVault": "5S1pFyPJwFoQWXtuY2NKSgeE818EMZgGp5vSCkmC6jX5",
+  "collateralVault": "HkZ28RY4duwjd67uYGdQ9wGSsvNLv9usGSpkjsmc2cvr",
+  "treasury": "DJeMMB2Sagy4Y3k1g1CnU5E9qgU8zMrK2kVr7fdLnrHw",
+  "borrower": {
+    "publicKey": "E8mGaMzFzoNwpQAkEA4Lq4AViRMUDhV58SJhxonm7VZi",
+    "secretKey": [
+      148,
+      17,
+      131,
+      198,
+      65,
+      218,
+      33,
+      132,
+      171,
+      73,
+      159,
+      225,
+      121,
+      10,
+      38,
+      127,
+      77,
+      82,
+      11,
+      99,
+      91,
+      216,
+      18,
+      71,
+      6,
+      32,
+      248,
+      136,
+      176,
+      119,
+      162,
+      153,
+      195,
+      37,
+      12,
+      224,
+      144,
+      228,
+      108,
+      32,
+      75,
+      36,
+      190,
+      115,
+      182,
+      142,
+      169,
+      150,
+      71,
+      229,
+      232,
+      221,
+      28,
+      111,
+      244,
+      133,
+      8,
+      161,
+      214,
+      170,
+      235,
+      64,
+      31,
+      41
+    ],
+    "tokenAccount": "DUHgaQkJUSMeywdeedVZ5SnwfagnKCXRsx6RJ7itTaz1"
+  },
+  "merchants": [
+    {
+      "name": "Kettle & Co",
+      "icon": "◈",
+      "pda": "DXZHWyz9CKJUhEiS6KhCPi4sAmGgcL5yceVFa9QFQHFL",
+      "payout": "4RiGTBiRiDBDTNej7iWiqt2dUBDdShmXEW1218aUEsnd",
+      "authority": "5TVGFDmv6SEp77pUiGxSefVReKSLX2Axq9z8QAnxDb4j"
+    },
+    {
+      "name": "Northline Audio",
+      "icon": "▲",
+      "pda": "2tEfSHfZLYrex89d3jnDFZxAva6axv4oNNDLBVuw6btB",
+      "payout": "FDESGYuuSUtptAddZXYcAqomhc7ycrCxKuGxNQDsbBZ2",
+      "authority": "9xZwXqPaiwaUPWLWVwgKgzFcMAsWftGqyTPSTgAvqf1b"
+    },
+    {
+      "name": "Ascent Demo Store",
+      "icon": "●",
+      "pda": "DW6itDo63Mra13Ci2ZBFM763qjuJ9HQUov4hBY7oDCK3",
+      "payout": "98sD2rvfiA67TqwCv3b25qsjWgAekGtMoQnykEXrF6ri",
+      "authority": "BUjVQx5R1F6t1mnrMt4Jxxei2LMHcZwbPjjhmPnhoWrH"
+    },
+    {
+      "name": "Meridian",
+      "icon": "◇",
+      "pda": "vjfXyuvK85CgnZGjwied3pimri11d3dbh4NXZpYza53",
+      "payout": "BwbPQPc7WqU3bkFbuzBTGCmP8h2Vp3YeE3cdsUjG9hRT",
+      "authority": "BZzep676fNhg8V8hAMCtJfN8pewis9xqjhvnXLpXvKrc"
+    },
+    {
+      "name": "Relay Data",
+      "icon": "◆",
+      "pda": "4LDnpbjmQ8m2pQfwbhctWxPaadQ1ry3qEBT14euURuYz",
+      "payout": "7ENdBeP8r7w2epysr4WXmRGrJR3xRiicsN7UZYb691zC",
+      "authority": "5aQfMov5CZHPqQxsdKHzvFdomwH9K7MWcSmL6aL8ZUGN"
+    }
+  ],
+  "loans": [
+    {
+      "id": 0,
+      "pda": "sujsyHyouAyuijkQj3sHeuAnp2X3C1vyqTTYUh84BBJ"
+    },
+    {
+      "id": 1,
+      "pda": "Dazp3M1vhyndgGgda63j45PFdbAwSuKpd3bKoqjWsvbR"
+    },
+    {
+      "id": 2,
+      "pda": "9GZV47icQjANmUbgsWtdc7mbk1kttCD26p8kex66jupY"
+    }
+  ],
+  "plans": [
+    {
+      "id": 0,
+      "pda": "8622oDUNAr4FkdVocHzX23JyqsdyQ7j9RMJyqxbV2JrY"
+    },
+    {
+      "id": 1,
+      "pda": "AHEMEU6KwwaFk5rsafG9LdwLsoJeunN8zbofFgDNTNuA"
+    }
+  ],
+  "seededAt": "2026-08-26T12:16:36.323Z"
+}

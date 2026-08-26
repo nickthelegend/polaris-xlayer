@@ -21,6 +21,23 @@ export type KeeperConfig = {
   pdas: ReturnType<typeof derivePdas>;
 };
 
+/**
+ * Whatever `solana config get` is pointed at, unless overridden.
+ *
+ * Hardcoding `id.json` assumes a default the Solana CLI does not enforce — the
+ * keypair path is configurable and frequently is not that. A keeper that
+ * cannot find a key it was told about is a confusing first-run failure.
+ */
+function defaultKeypairPath(): string {
+  if (process.env.POLARIS_KEEPER_KEYPAIR) return process.env.POLARIS_KEEPER_KEYPAIR;
+  const cfg = resolve(homedir(), ".config/solana/cli/config.yml");
+  if (existsSync(cfg)) {
+    const m = readFileSync(cfg, "utf8").match(/keypair_path:\s*(.+)/);
+    if (m) return m[1].trim();
+  }
+  return "~/.config/solana/id.json";
+}
+
 function loadKeypair(path: string): Keypair {
   const expanded = path.startsWith("~") ? resolve(homedir(), path.slice(2)) : resolve(path);
   if (!existsSync(expanded)) {
@@ -57,9 +74,7 @@ export function loadConfig(idl: Idl): KeeperConfig {
   const rpc = process.env.POLARIS_RPC_URL ?? CLUSTERS[cluster] ?? cluster;
   const connection = new Connection(rpc, "confirmed");
 
-  const keeper = loadKeypair(
-    process.env.POLARIS_KEEPER_KEYPAIR ?? "~/.config/solana/id.json",
-  );
+  const keeper = loadKeypair(defaultKeypairPath());
 
   const provider = new AnchorProvider(connection, new Wallet(keeper), {
     commitment: "confirmed",
