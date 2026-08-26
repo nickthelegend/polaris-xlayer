@@ -85,8 +85,9 @@ says is due today. Arbitrary amounts need the borrower's own signature.
 programs/polaris        the program — one Anchor program, 21 instructions
 keeper-solana           the crank: collect · subscriptions · liquidate
 packages/sdk-solana     createPolaris() — pay, subscribe, payLater
+mobile/                 the Android app — Expo, signs on the device
 scripts/lifecycle.ts    stand it up and run a loan through its whole life
-tests/                  29 integration tests on bankrun
+tests/                  41 integration tests on bankrun
 docs/SOLANA-PORT.md     the port plan and every decision in it
 packages/contracts      the Solidity original, kept as the reference
 ```
@@ -134,17 +135,52 @@ and sizes the delegation against **everything** the borrower owes — not just
 this purchase. One delegate slot backs every open plan at once, so sizing it
 for a single plan is how a book ends up with loans it cannot collect.
 
+## The app
+
+An Expo app that opens a plan against the deployed program from an Android
+device — the credit line, the checkout, the schedule, and the activity feed all
+read from accounts rather than from a server.
+
+It generates its own signer on first launch and keeps it in the platform
+keystore, so **no private key is carried in this repository**. It shows its
+address on the home screen; fund that address on a test cluster with:
+
+```bash
+pnpm exec tsx scripts/fund.ts <address>
+```
+
+```bash
+pnpm --filter polaris-mobile android
+```
+
+Every instruction is built in `mobile/src/chain`, never in a screen, so the
+signer is the one piece a shipped build has to replace — see *What is not done*.
+
 ## Tests
 
 ```bash
 pnpm run program:test        # 11 — the arithmetic that costs money
-pnpm run anchor:test         # 29 — every exploit, on chain
+pnpm run anchor:test         # 41 — every exploit, on chain
 pnpm --filter @polaris/keeper-solana test   # 11 — the dunning ladder
+pnpm --filter @polaris/sdk-solana test      # 13 — the SDK against a live cluster
 ```
 
-51 in total. The integration tests are named for the exploit rather than the
-function, so a regression reads as *dust buys liquidation immunity again*
-rather than *repay test 4 failed*. Each one is a bug the Solidity build was
+`anchor test` starts its own validator and will refuse if you still have the
+one from the quick start on 8899. The bankrun suite does not need a validator
+at all, so run it directly instead:
+
+```bash
+pnpm exec ts-mocha -p ./tsconfig.anchor.json -t 1000000 'tests/**/*.ts'
+```
+
+
+76 in total, and all of them green. The reference build carries its own 308 --
+153 on the Solidity contracts, 82 on the database layer, 45 on KeeperHub, 20 on
+underwriting, 8 on the MCP server -- run with `pnpm test` at the root.
+
+The integration tests are named for the exploit rather than the function, so a
+regression reads as *dust buys liquidation immunity again* rather than *repay
+test 4 failed*. Each one is a bug the Solidity build was
 hardened against, re-proved here:
 
 - dust cannot buy liquidation immunity, or farm the credit score
@@ -162,31 +198,33 @@ cannot move the clock can only test origination.
 
 | | |
 |---|---|
-| Program | `9wgqMhXvhzzDaLEWxXsQRx73CMtSUKRrVYL6Vy1cDKAU` |
-| Devnet | deployed, **one version behind** — see below |
-| Full lifecycle | verified against a local validator, 11 transactions |
+| Program | `ApAHXF7U1Z8WKDYKM7ZvBMeho7tSkGQZS1LsaTNyzCra` |
+| Devnet | **live** — deployed, initialised, and exercised |
+| Localnet | full lifecycle verified, including a liquidation |
+| Android | verified on device against a live cluster |
 | Size | 571 KB, clean SBF build |
 
-The devnet program is live but predates the configurable interval floor. The
-upgrade needs a 3.98 SOL transient buffer and the deploy wallet holds 3.03; the
-devnet faucet is rate-limited. To finish it:
+Devnet carries the current build, an initialised protocol, a funded pool, and a
+real plan opened against it. `scripts/prove.ts` is what put it there. It uses
+one wallet for every role, so it costs almost no SOL and can be re-run against
+any deployment to confirm it for yourself:
 
 ```bash
-solana airdrop 2 --url devnet && solana program deploy target/deploy/polaris.so --program-id target/deploy/polaris-keypair.json --url devnet
+POLARIS_CLUSTER=devnet pnpm exec tsx scripts/prove.ts
 ```
 
-Then run the lifecycle against it. Nothing else is pending.
+To read the state of a deployment without touching it:
 
 ```bash
-POLARIS_CLUSTER=devnet pnpm exec tsx scripts/lifecycle.ts
+POLARIS_CLUSTER=devnet pnpm exec tsx scripts/inspect.ts
 ```
 
-The last local run, in `deployments/localnet.json`:
+The last local lifecycle run, in `deployments/localnet.json`:
 
 ```
 loan status      repaid
 repaid           400.000304 of 400.000304   (interest pro-rated over 240s)
-credit score     600 → 648                  (4 installments, all on time)
+credit score     600 -> 648                 (4 installments, all on time)
 protocol fees    0.000060 of 0.000304 interest — exactly the 20% cap
 keeper spent     0.000020 SOL in fees
 keeper USDC      none — it never held any
@@ -194,8 +232,20 @@ keeper USDC      none — it never held any
 loan status      liquidated                 (second borrower, delegation revoked)
 recovered        0.000000 of 200.000152
 bad debt booked  200.000152
-credit score     600 → 450
+credit score     600 -> 450
 ```
+
+## What is not done
+
+**Mobile Wallet Adapter.** The app signs with a keypair it generates on the
+device. Those are real signed transactions against the real program, but the
+key belongs to the app rather than to a wallet the user already trusts. A
+shipped build swaps `mobile/src/chain/wallet.ts` for MWA and nothing else
+moves — every instruction is already built by the chain layer.
+
+**The Solidity side is the reference, not the deliverable.** `packages/contracts`
+and the Next.js apps around it are the original build, kept so the port can be
+read against it. The Solana program is what this repository is for.
 
 ## License
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { isReady } from "./client";
 import {
   fetchActivity,
   fetchAvailablePlans,
@@ -83,7 +84,16 @@ export function usePolarisState(
   }, []);
 
   useEffect(() => {
-    if (ready) void load();
+    /*
+     * Both gates, not just the React one.
+     *
+     * `ready` says the provider believes the wallet has loaded; `isReady()`
+     * asks the client itself. They can disagree — a hot reload re-evaluates
+     * the module and clears the client while React keeps the state that says
+     * it is there — and the read then throws into the console for a state the
+     * app recovers from on its own a moment later.
+     */
+    if (ready && isReady()) void load();
   }, [ready, load]);
 
   return useMemo(() => ({ ...state, refresh: load }), [state, load]);

@@ -8,7 +8,7 @@
  * diagnostic that can only run inside the thing it is diagnosing is not much
  * of a diagnostic. Reads only — it never signs.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,9 +17,26 @@ import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const CLUSTER = process.env.POLARIS_CLUSTER ?? "localnet";
-const seed = JSON.parse(
-  readFileSync(resolve(here, `../deployments/${CLUSTER}-seed.json`), "utf8"),
-);
+
+/**
+ * The seed file is an optimisation, not a requirement.
+ *
+ * It records where a cluster was seeded from, but a cluster can be inspected
+ * without ever having been seeded from this machine — which is exactly when
+ * you most want to look at it. Falls back to the cluster's own endpoint.
+ */
+const seedPath = resolve(here, `../deployments/${CLUSTER}-seed.json`);
+const seed = existsSync(seedPath)
+  ? JSON.parse(readFileSync(seedPath, "utf8"))
+  : {
+      rpc:
+        process.env.POLARIS_RPC_URL ??
+        (CLUSTER === "localnet"
+          ? "http://127.0.0.1:8899"
+          : `https://api.${CLUSTER}.solana.com`),
+      seededBorrower: null,
+    };
+
 const IDL = JSON.parse(
   readFileSync(resolve(here, "../target/idl/polaris.json"), "utf8"),
 ) as Idl;
@@ -44,13 +61,27 @@ async function main() {
   const pda = (s: (Buffer | Uint8Array)[]) =>
     PublicKey.findProgramAddressSync(s, program.programId)[0];
 
-  const who = new PublicKey(process.argv[2] ?? seed.seededBorrower);
   const protocolPda = pda([Buffer.from("protocol")]);
 
+  const deployed = await connection.getAccountInfo(program.programId);
+  console.log(`cluster   ${CLUSTER}`);
+  console.log(`program   ${program.programId.toBase58()} ${deployed ? "· deployed" : "· NOT DEPLOYED"}`);
+
+  const protoInfo = await connection.getAccountInfo(protocolPda);
+  if (!protoInfo) {
+    console.log(`protocol  NOT initialized`);
+    return;
+  }
   const p: any = await (program.account as any).protocol.fetch(protocolPda);
   console.log(
     `protocol  loans ${p.loanCount} · plans ${p.planCount} · fees ${usd(p.protocolFeesAccrued)} · bad debt ${usd(p.badDebt)}`,
   );
+  const pool = await connection.getTokenAccountBalance(pda([Buffer.from("liquidity")]));
+  console.log(`pool      ${pool.value.uiAmountString} USDC`);
+
+  const target = process.argv[2] ?? seed.seededBorrower;
+  if (!target) return;
+  const who = new PublicKey(target);
 
   const profilePda = pda([Buffer.from("profile"), who.toBuffer()]);
   const info = await connection.getAccountInfo(profilePda);

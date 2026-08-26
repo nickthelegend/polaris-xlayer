@@ -32,7 +32,7 @@ type Health = {
         activeLoans: number;
         inDunning: number;
         liquidationCandidates: number;
-        collectionRate: number;
+        collectionRate: number | null;
     };
 };
 
@@ -142,8 +142,15 @@ export default function Home() {
                     <dl className="grid grid-cols-2 gap-y-9 border-y border-foreground/8 py-10 sm:grid-cols-4">
                         <Proof
                             term="Collected on time"
-                            value={`${health.book.collectionRate.toFixed(0)}%`}
-                            accent={health.book.collectionRate >= 95}
+                            value={
+                                health.book.collectionRate === null
+                                    ? "-"
+                                    : `${health.book.collectionRate.toFixed(0)}%`
+                            }
+                            accent={
+                                health.book.collectionRate !== null &&
+                                health.book.collectionRate >= 95
+                            }
                         />
                         <Proof term="Plans collecting" value={String(health.book.activeLoans)} />
                         <Proof term="In dunning" value={String(health.book.inDunning)} />

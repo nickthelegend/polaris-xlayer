@@ -6,10 +6,10 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-polaris = "9wgqMhXvhzzDaLEWxXsQRx73CMtSUKRrVYL6Vy1cDKAU"
+polaris = "ApAHXF7U1Z8WKDYKM7ZvBMeho7tSkGQZS1LsaTNyzCra"
 
 [programs.devnet]
-polaris = "9wgqMhXvhzzDaLEWxXsQRx73CMtSUKRrVYL6Vy1cDKAU"
+polaris = "ApAHXF7U1Z8WKDYKM7ZvBMeho7tSkGQZS1LsaTNyzCra"
 
 [registry]
 url = "https://api.apr.dev"

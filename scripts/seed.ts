@@ -51,6 +51,24 @@ const USDC = 1_000_000;
 const DAY = 86_400;
 const WEEK = 7 * DAY;
 
+/**
+ * Pace the sends on a shared cluster.
+ *
+ * A local validator will take everything you throw at it. A public devnet RPC
+ * will not: this script issues around forty transactions back to back and the
+ * endpoint starts answering 429 partway through, leaving a half-seeded
+ * protocol behind. Waiting between sends is the difference between a script
+ * that works on your machine and one that works on the network.
+ *
+ * 1.5s is what the free `api.devnet.solana.com` tolerates for this workload.
+ * A dedicated RPC needs far less — override with POLARIS_PACE_MS.
+ */
+const PACE_MS = Number(
+  process.env.POLARIS_PACE_MS ?? (CLUSTER === "localnet" ? 0 : 1500),
+);
+const pace = () =>
+  PACE_MS ? new Promise((r) => setTimeout(r, PACE_MS)) : Promise.resolve();
+
 function defaultKeypairPath(): string {
   if (process.env.POLARIS_KEYPAIR) return process.env.POLARIS_KEYPAIR;
   const cfg = resolve(homedir(), ".config/solana/cli/config.yml");
@@ -86,41 +104,53 @@ async function main() {
   const liquidityVault = pda([Buffer.from("liquidity")]);
   const collateralVault = pda([Buffer.from("collateral_vault")]);
 
-  const send = (ixs: any[], signers: Keypair[] = []) =>
-    provider.sendAndConfirm(new Transaction().add(...ixs), signers);
+  const send = async (ixs: any[], signers: Keypair[] = []) => {
+    await pace();
+    return provider.sendAndConfirm(new Transaction().add(...ixs), signers);
+  };
 
   console.log(`cluster   ${CLUSTER}\nprogram   ${program.programId.toBase58()}\n`);
 
-  // ---- mint ------------------------------------------------------------
-  const mintKp = Keypair.generate();
-  const mint = mintKp.publicKey;
-  const rent = await getMinimumBalanceForRentExemptMint(connection as any);
-  await send(
-    [
-      SystemProgram.createAccount({
-        fromPubkey: authority.publicKey,
-        newAccountPubkey: mint,
-        space: MINT_SIZE,
-        lamports: rent,
-        programId: TOKEN_PROGRAM_ID,
-      }),
-      createInitializeMint2Instruction(mint, 6, authority.publicKey, null),
-    ],
-    [mintKp],
-  );
-  console.log(`mint      ${mint.toBase58()}`);
+  // ---- mint and protocol ------------------------------------------------
+  //
+  // Both are once per deployment, and this has to be resumable. On a shared
+  // cluster a run can die partway — a public RPC answering 429 is enough —
+  // leaving an initialised protocol behind that the next attempt then trips
+  // over with "account already in use". Reusing what is already standing is
+  // the difference between a seed you can re-run and one you can run once.
+  let mint: PublicKey;
+  let treasury: PublicKey;
 
-  const ataFor = async (owner: PublicKey, fund = 0) => {
-    const ata = getAssociatedTokenAddressSync(mint, owner, true);
+  let existing: any = null;
+  try {
+    existing = await (program.account as any).protocol.fetch(protocolPda);
+  } catch {
+    /* not initialised yet */
+  }
+
+  const ataFor = async (owner: PublicKey, fund = 0, mintKey?: PublicKey) => {
+    const m = mintKey ?? mint;
+    const ata = getAssociatedTokenAddressSync(m, owner, true);
     const ixs: any[] = [];
     if (!(await connection.getAccountInfo(ata))) {
-      ixs.push(createAssociatedTokenAccountInstruction(authority.publicKey, ata, owner, mint));
+      ixs.push(createAssociatedTokenAccountInstruction(authority.publicKey, ata, owner, m));
     }
-    if (fund > 0) ixs.push(createMintToInstruction(mint, ata, authority.publicKey, fund));
+    if (fund > 0) ixs.push(createMintToInstruction(m, ata, authority.publicKey, fund));
     if (ixs.length) await send(ixs);
     return ata;
   };
-  const fundSol = (to: PublicKey, sol = 2) =>
+
+  /**
+   * Give an account just enough to sign with.
+   *
+   * The default used to be 2 SOL and merchants took 0.5 each. A merchant signs
+   * two transactions in its whole life — registration and a plan — costing
+   * about 0.002 SOL, so the rest was stranded in accounts whose keys are
+   * generated per run and thrown away. Three partial runs against devnet
+   * buried roughly seven SOL that way, which is how the faucet-limited wallet
+   * ran dry.
+   */
+  const fundSol = (to: PublicKey, sol = 0.05) =>
     send([
       SystemProgram.transfer({
         fromPubkey: authority.publicKey,
@@ -129,25 +159,55 @@ async function main() {
       }),
     ]);
 
-  // ---- protocol --------------------------------------------------------
-  const treasury = await ataFor(authority.publicKey, 200_000 * USDC);
-  await program.methods
-    // A 3-day grace and a 60-second interval floor: realistic for a consumer
-    // book, while still allowing one short-schedule loan for the keeper tests.
-    .initialize(new BN(3 * DAY), new BN(60), 50, 15_000)
-    .accountsPartial({
-      authority: authority.publicKey,
-      protocol: protocolPda,
-      stablecoin: mint,
-      treasury,
-      liquidityVault,
-      collateralVault,
-      tokenProgram: TOKEN_PROGRAM_ID,
-      systemProgram: SystemProgram.programId,
-    })
-    .rpc();
-  console.log(`protocol  initialized`);
+  if (existing) {
+    mint = existing.stablecoin;
+    treasury = existing.treasury;
+    console.log(`mint      ${mint.toBase58()} (reused)`);
+    console.log(
+      `protocol  already initialized · grace ${existing.gracePeriod}s · min interval ${existing.minIntervalSeconds}s`,
+    );
+  } else {
+    const mintKp = Keypair.generate();
+    mint = mintKp.publicKey;
+    const rent = await getMinimumBalanceForRentExemptMint(connection as any);
+    await send(
+      [
+        SystemProgram.createAccount({
+          fromPubkey: authority.publicKey,
+          newAccountPubkey: mint,
+          space: MINT_SIZE,
+          lamports: rent,
+          programId: TOKEN_PROGRAM_ID,
+        }),
+        createInitializeMint2Instruction(mint, 6, authority.publicKey, null),
+      ],
+      [mintKp],
+    );
+    console.log(`mint      ${mint.toBase58()}`);
 
+    treasury = await ataFor(authority.publicKey, 200_000 * USDC, mint);
+    await pace();
+    await program.methods
+      // A 3-day grace and a 60-second interval floor: realistic for a consumer
+      // book, while still allowing one short-schedule loan for the keeper tests.
+      .initialize(new BN(3 * DAY), new BN(60), 50, 15_000)
+      .accountsPartial({
+        authority: authority.publicKey,
+        protocol: protocolPda,
+        stablecoin: mint,
+        treasury,
+        liquidityVault,
+        collateralVault,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+    console.log(`protocol  initialized`);
+  }
+
+  // Top up the treasury and the pool. Safe to repeat.
+  await send([createMintToInstruction(mint, treasury, authority.publicKey, 200_000 * USDC)]);
+  await pace();
   await program.methods
     .fundLiquidity(new BN(50_000 * USDC))
     .accountsPartial({
@@ -170,7 +230,7 @@ async function main() {
   const merchants: any[] = [];
   for (const def of merchantDefs) {
     const kp = Keypair.generate();
-    await fundSol(kp.publicKey, 0.5);
+    await fundSol(kp.publicKey);
     const payout = await ataFor(kp.publicKey);
     const merchantPda = pda([Buffer.from("merchant"), kp.publicKey.toBuffer()]);
     await program.methods
@@ -198,7 +258,7 @@ async function main() {
 
   // ---- borrower --------------------------------------------------------
   const borrower = Keypair.generate();
-  await fundSol(borrower.publicKey, 5);
+  await fundSol(borrower.publicKey, 0.5);
   const borrowerAta = await ataFor(borrower.publicKey, 5_000 * USDC);
   const profilePda = pda([Buffer.from("profile"), borrower.publicKey.toBuffer()]);
 
@@ -224,6 +284,7 @@ async function main() {
   console.log(`borrower  ${borrower.publicKey.toBase58()} · 200 USDC collateral locked`);
 
   const openLoan = async (m: any, principal: number, count: number, interval: number) => {
+    await pace();
     const p: any = await (program.account as any).protocol.fetch(protocolPda);
     const id = Number(p.loanCount.toString());
     const loanPda = pda([Buffer.from("loan"), u64(id)]);
@@ -246,8 +307,9 @@ async function main() {
     return { id, pda: loanPda };
   };
 
-  const repay = (loanPda: PublicKey, amount: number) =>
-    program.methods
+  const repay = async (loanPda: PublicKey, amount: number) => {
+    await pace();
+    return program.methods
       .repay(new BN(amount))
       .accountsPartial({
         borrower: borrower.publicKey,
@@ -260,6 +322,7 @@ async function main() {
       })
       .signers([borrower])
       .rpc();
+  };
 
   const ceilThreshold = (owed: number, count: number, k: number) =>
     k >= count ? owed : Math.ceil((owed * k) / count);

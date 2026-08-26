@@ -32,9 +32,15 @@ const ENGINE_ABI = [
  * of.
  */
 export async function POST(request: Request): Promise<NextResponse> {
-  if (!(LOAN_ENGINE && ORIGINATOR_KEY)) {
+  // Name only what is actually missing. Listing both sends whoever is
+  // deploying this to re-check a variable that was already set.
+  const missing = [
+    LOAN_ENGINE ? null : "POLARIS_LOAN_ENGINE",
+    ORIGINATOR_KEY ? null : "DEPLOYER_PRIVATE_KEY",
+  ].filter((v): v is string => v !== null);
+  if (missing.length > 0) {
     return NextResponse.json(
-      { error: "Checkout is not configured: set POLARIS_LOAN_ENGINE and DEPLOYER_PRIVATE_KEY." },
+      { error: `Checkout is not configured: set ${missing.join(" and ")}.` },
       { status: 503 }
     );
   }

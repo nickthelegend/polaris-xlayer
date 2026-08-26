@@ -51,7 +51,8 @@ export type HealthReport = {
     inDunning: number;
     liquidationCandidates: number;
     unsettledValue: string;
-    collectionRate: number;
+    /** null when nothing has come due yet — there is no rate to report. */
+    collectionRate: number | null;
   };
   incidents: string[];
 };
@@ -176,11 +177,18 @@ export async function healthReport(chainId: number): Promise<HealthReport> {
 
   const activeLoans = docs.filter((l) => l.status === "active").length;
   const candidates = docs.filter((l) => l.liquidationCandidate && l.status === "active").length;
-  const collectionRate = due === 0 ? 100 : (collected / due) * 100;
+  /*
+   * null, not 100, when nothing has come due.
+   * A fresh book reported a perfect collection rate, and the landing page
+   * printed it as "Collected on time 100%" over the line "read from the live
+   * book" -- a number that had never had an instalment behind it. An empty
+   * book has no rate; saying so is the only honest answer.
+   */
+  const collectionRate = due === 0 ? null : (collected / due) * 100;
 
   // A collection rate that has fallen through the floor is either a bug or an
   // attack, and both want paging.
-  if (due >= 5 && collectionRate < 60) {
+  if (due >= 5 && collectionRate !== null && collectionRate < 60) {
     incidents.push(`Collection rate is ${collectionRate.toFixed(1)}% across ${due} due instalments.`);
   }
 
@@ -240,7 +248,7 @@ export function renderHealth(report: HealthReport): string {
      * to treat it as a debt the keeper was failing to clear.
      */
     `  collected, not paid out ${report.book.unsettledValue} (repayments, not merchant debt)`,
-    `  collection rate        ${report.book.collectionRate.toFixed(1)}%`
+    `  collection rate        ${report.book.collectionRate === null ? "-- nothing due yet" : `${report.book.collectionRate.toFixed(1)}%`}`
   );
   if (report.incidents.length > 0) {
     lines.push("", "incidents:");

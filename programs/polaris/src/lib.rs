@@ -37,7 +37,7 @@ pub mod token_ops;
 
 use instructions::*;
 
-declare_id!("9wgqMhXvhzzDaLEWxXsQRx73CMtSUKRrVYL6Vy1cDKAU");
+declare_id!("ApAHXF7U1Z8WKDYKM7ZvBMeho7tSkGQZS1LsaTNyzCra");
 
 #[program]
 pub mod polaris {
