@@ -62,7 +62,18 @@ export async function buildPaymentTransaction(
    * the wallet adds the only signature that matters -- the token authority's.
    */
   tx.feePayer = chain.underwriter.publicKey;
-  tx.recentBlockhash = (await chain.connection.getLatestBlockhash("finalized")).blockhash;
+  /*
+   * `confirmed`, not `finalized`.
+   *
+   * A blockhash is valid for about 150 slots — roughly a minute — and a
+   * finalized one is already ~32 slots into that window before anybody sees
+   * the code. Then a human reads the terms and decides, which is the slowest
+   * part of the whole flow. On devnet that combination expired the blockhash
+   * before the wallet's signature could land, and the checkout failed with
+   * "that took too long to confirm" on a transaction that was never at fault.
+   * Nothing here needs finality; it needs the longest validity it can get.
+   */
+  tx.recentBlockhash = (await chain.connection.getLatestBlockhash("confirmed")).blockhash;
   tx.partialSign(chain.underwriter);
 
   return { transaction: tx, message: describe(order, merchant) };

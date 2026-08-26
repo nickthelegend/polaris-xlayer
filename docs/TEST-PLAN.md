@@ -13,7 +13,7 @@ against.
 | `programs/polaris` | The Anchor program. 23 instructions, 7 account types |
 | `keeper-solana` | The crank: doctor, collect, subscriptions, liquidate |
 | `packages/sdk-solana` | `createPolaris()` — pay, payLater, subscribe, repay |
-| `mobile` | The Expo app. The customer-facing UI |
+| `mobile` | The Expo app. The customer-facing UI, web and native Android |
 | `apps/gateway` | The underwriter, the Solana Pay endpoint, and the merchant checkout page |
 | `scripts/lifecycle.ts` | Stand-up and end-to-end run |
 
@@ -250,6 +250,43 @@ item is checked against a real validator, not bankrun.
 | J4 | Reasons survive a cold start | With the gateway down but a line already open, the reasons still render from the profile's stored evidence |
 | J5 | IDL/deployment mismatch | If `idl.json` and `deployment.json` name different programs, the app refuses to start and names both files |
 | J6 | Errors are readable | A failed transaction shows a short sentence, never a simulation dump or a stack trace |
+
+
+## K. Signing — the device key and a wallet app
+
+The app must never present a key it generated as a wallet the user connected,
+and must never import a native module on a platform that cannot load it.
+
+| # | Item | Correct means |
+|---|---|---|
+| K1 | Boots on the device signer | The app is usable before any wallet is connected; the row reads "This device" |
+| K2 | Web never loads the adapter | `@solana-mobile` appears zero times in the web bundle |
+| K3 | Web says why | The wallet row reads "Wallet apps can only be reached from the Android build." and offers no dead button |
+| K4 | Localnet refuses a wallet | On a local validator the row reads "A wallet app cannot reach a local validator." — `chainIdFor` returns null |
+| K5 | Devnet offers a wallet | On devnet the row offers "Connect a wallet app" |
+| K6 | No wallet installed | Tapping connect on a device with no wallet says "No Solana wallet app is installed on this device." — never a stack trace |
+| K7 | Address decoding | A base58 address is refused, not silently decoded into a different account |
+| K8 | Authorize vs reauthorize | A cached token for the same chain reauthorizes; a different chain authorizes afresh |
+| K9 | Error classification | Each protocol code maps to its own sentence; an unknown code does not claim to be a refusal |
+| K10 | Fee-payer precondition | A transaction with no fee payer or blockhash is refused before the adapter sees it |
+| K11 | Disconnect | Returns to the device signer and forgets the token |
+| K12 | One session at a time | A second connect while one is open does not open a second session |
+| K13 | Signing with a real wallet | **UNTESTED** — needs a physical device with a wallet app installed |
+
+## L. Scan to pay
+
+| # | Item | Correct means |
+|---|---|---|
+| L1 | Centre button opens the scanner | The raised button in the tab bar routes to /scan |
+| L2 | Camera permission | Denied permission shows a readable reason, not a blank screen |
+| L3 | Not a Solana Pay code | "That is not a Solana Pay code." |
+| L4 | Bare transfer request | Refused with the reason Polaris pays through the program |
+| L5 | Dead merchant endpoint | Blames the merchant's checkout, never the RPC |
+| L6 | Unknown merchant | "That merchant is not registered on this deployment." |
+| L7 | Review before signing | The terms are shown and nothing is signed until the user approves |
+| L8 | Approve | A real transaction lands and the signature is shown |
+| L9 | Double approve | Four rapid taps open exactly one loan |
+| L10 | Re-scan a paid order | "That order has already been paid." |
 
 ## G. Out of scope — recorded, not tested
 

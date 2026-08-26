@@ -65,9 +65,16 @@ export function initClient(signer: ChainSigner): Client {
     // installment they watched land reads as broken. Anything that decides
     // money is decided by the program, not by what this fetched.
     commitment: "confirmed",
-    // The default is 30s. A dead RPC should surface an error state quickly
-    // rather than leaving the screen spinning.
-    confirmTransactionInitialTimeout: 20_000,
+    /*
+     * Long enough for a public cluster, short enough to surface a dead RPC.
+     *
+     * This was 20s, chosen against a local validator that confirms in under a
+     * second. Devnet routinely takes longer than that under load, and the app
+     * reported "that took too long to confirm" for transactions that were
+     * perfectly healthy. 45s is inside a blockhash's own validity window, so
+     * anything still unconfirmed by then genuinely will not land.
+     */
+    confirmTransactionInitialTimeout: 45_000,
   });
 
   const provider = new AnchorProvider(connection, signer, {

@@ -337,10 +337,24 @@ export async function fetchActivity(limit = 25): Promise<ActivityEvent[]> {
 
   const out: ActivityEvent[] = [];
 
-  txs.forEach((tx, i) => {
-    const meta = sigs[i];
-    if (!tx?.meta?.logMessages || meta.err) return;
-    const at = meta.blockTime ?? tx.blockTime ?? 0;
+  /*
+   * Pair each transaction with its OWN signature, not with the request index.
+   *
+   * `getTransactions` is a JSON-RPC batch, and a batch response is explicitly
+   * allowed to come back in any order — devnet does exactly that. Reading
+   * `sigs[i]` alongside `txs[i]` therefore attributed an event to whichever
+   * signature happened to sit at the same position: a credit line opened by
+   * one transaction was shown, and linked on the explorer, under the hash of
+   * an unrelated token transfer. The transaction knows its own signature.
+   */
+  const bySignature = new Map(sigs.map((s) => [s.signature, s]));
+
+  txs.forEach((tx) => {
+    const signature = tx?.transaction?.signatures?.[0];
+    if (!tx?.meta?.logMessages || !signature) return;
+    const meta = bySignature.get(signature);
+    if (meta?.err) return;
+    const at = meta?.blockTime ?? tx.blockTime ?? 0;
 
     /*
      * Who moved this installment.
@@ -367,9 +381,9 @@ export async function fetchActivity(limit = 25): Promise<ActivityEvent[]> {
     for (const event of parser().parseLogs(tx.meta.logMessages)) {
       const d: any = camelize(event.data);
       const base = {
-        id: `${meta.signature}:${idx++}`,
+        id: `${signature}:${idx++}`,
         at,
-        signature: meta.signature,
+        signature,
       };
 
       /*
