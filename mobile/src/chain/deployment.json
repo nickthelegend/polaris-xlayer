@@ -2,47 +2,47 @@
   "cluster": "localnet",
   "rpc": "http://127.0.0.1:8899",
   "programId": "CpRqbMywzAEKkEALZtrXqPYM36E5RrFewYnRtUYEEvUS",
-  "stablecoin": "FGc38xRZM7DBj4Bg4DY83uRVF4CnQH7kr5TsCiA2beyB",
+  "stablecoin": "4cjKQTJqg9uDGKYYLvbiM5KPu7wK3vQvkiaAhTXQK292",
   "protocol": "CNzJdr7boWapJ83uxTAstXQUUMLvTdvmkAv8P2uYDzFi",
   "liquidityVault": "B7dKfPVsoRK4n3mT9GzX8tWmvVDFLwtctEwMRgqqEXJt",
   "collateralVault": "6zZ2jjs1StPq7nMjANHm3TNo6KVhJtwhop4pH2V4UxM3",
-  "treasury": "FqpW9bRBvQpL2am1N5qvChy8QUY1VVHsqdX7GkC3ygyS",
-  "seededBorrower": "CzESZGX7auPSQY4F1yZpVS7QbTduK1DUa4h15Nr965Hn",
+  "treasury": "7i5eL1Qaw4UrarE5jCwv9mzy1orw46Eyqy5CVLU7YQZM",
+  "seededBorrower": "5yz9ej26ww5P7XMe8Q6LVkXze1X7FKcfePUd2ejsUEkM",
   "merchants": [
     {
       "name": "Kettle & Co",
       "icon": "◈",
-      "pda": "DMzaLDtmBxb6fN6wUB6tpiV9TgBSRPr9zxpbqchsfFbm",
-      "payout": "GH5PJsXzSsJv5q5snytjyaookTgJU4GbD7sArCeNLz54",
-      "authority": "3t4D5Q2jvm8da9hTKuAFLV111pC695ExTccaUfU6Fn1p"
+      "pda": "4pzZcc1gNqZJ8AhBW4dmhuFX5sYQGNWXBx3mnzEa9MET",
+      "payout": "GQsF8UbsQBNFiYvYnGPcUa9b9vHqW1zPv13wCrNRe65K",
+      "authority": "HmobZpPJbXTDuPBsvKu5bdsJH5zvBFFc2uwjzEQSEJSf"
     },
     {
       "name": "Northline Audio",
       "icon": "▲",
-      "pda": "6yjiEFBdhoquvd7tfKf4zjtn9AFwY41BEWv2Refjtbyb",
-      "payout": "5sj8eB6y4YoRrvbNF5vKHttBjQkNMrEanwv1FPKvMwMT",
-      "authority": "H1qSJWzRK7X2N4dwGgwm8ktw6PftybErNm2VpBRgdaQ9"
+      "pda": "CHLJo6YRsgoKSn1DoGw9qWfXVD1Pi8nJMNyf8rHdLqFs",
+      "payout": "44pMjNB2bSGp6AFPUpq3LW9mAwSQ5pvMrLYCCasKrA37",
+      "authority": "tW6Q9yZmjwhzMP8TS5Pgd9FWKbsYkZYjeCrC1utKn9E"
     },
     {
       "name": "Ascent Demo Store",
       "icon": "●",
-      "pda": "GLq5VQzH3LGVvGqoroPWEan2ErZu8YMuj5Y8YnctdGLx",
-      "payout": "4JdsSGwkJrRshC3RyDwgPDMqmNv9s8s2XFvQi2bTU3gK",
-      "authority": "DH9CFQLKcVBGuhPNLm94w8DMMgMP5sbezkeTcRojWYpV"
+      "pda": "3KVKhRra5134fZP6c9FeZqzSjBe4uq8uZsUUBRAkUzmF",
+      "payout": "5UCjojLWEtczhne9MTJkztrh7gVwyPUkEfoo4nWWNAVP",
+      "authority": "75LoEniwfUPadfRDTM8iPbNSCA1rqxvcG8MrEgfBURfR"
     },
     {
       "name": "Meridian",
       "icon": "◇",
-      "pda": "5H55Zx6JFSHUAPLtEtU2BVobs5L2s8rkFZw7v5dabqQL",
-      "payout": "9pgWXH19LPfrVFzzGE5QJJzCzEfQqZKv8ZT2fwcNHAwu",
-      "authority": "49zoftxcTZCysv5Uopno261RrjnDzCx9J5toj7Cw3mth"
+      "pda": "9abrJBJmGxax92ymhYsZABAwybuDJzcPbXjhSr3bLYR4",
+      "payout": "5rdpZhxHHFzV5w3xZDWGj7F9RG9HsycLscNWL5FGZQSH",
+      "authority": "5eSCbNKG3dABy2Uqc7xkxKPQJr5WTfgWYUb53Lrqu323"
     },
     {
       "name": "Relay Data",
       "icon": "◆",
-      "pda": "6J9HyfhFYjPuSsCc6g4VA1YLR2w24mAsTStUuUy9q2oU",
-      "payout": "Are7ygJQFNoucADXpW5H5KCfArvXj3iV3ph49uaWiQLM",
-      "authority": "9nfAYi49aADnYPp9gJs7hMGDTodzVjLLgfuN16aLTS86"
+      "pda": "HRWjyvu5QsykE34ncCUikXDUZfQTCNR1keSApW2L5SMz",
+      "payout": "6XC45zHD6XUNWDSTCDd38T3e5T9N5f7xULbrpfLj1maL",
+      "authority": "8aSLZVcFibn4Sg5qoeZSnfUfSxtfuj4EETgFgq7ztDap"
     }
   ],
   "loans": [
@@ -73,5 +73,5 @@
       "pda": "5WqtdSPjsyf77F8AEfAewB2eofHLhEBJYNfBYKDiNVCJ"
     }
   ],
-  "seededAt": "2026-08-26T20:54:17.633Z"
+  "seededAt": "2026-08-26T21:42:41.803Z"
 }

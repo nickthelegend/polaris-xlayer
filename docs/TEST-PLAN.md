@@ -43,77 +43,47 @@ than marked pass.
 
 ## Result
 
-**82 of 82 in-scope items pass** — A (24), B (12), C (16), D (9), E (18), F (3).
-
-**Verified twice over on the app**: in a browser against the live cluster, and
-on a real Android emulator over `adb reverse`, which is the actual target and
-which caught a fault no browser run could have.
-
-**Section G was re-opened rather than left as "untestable".** `mongod` is
-installed on this machine and the repository carries the real deployed Sepolia
-addresses, so G1 was stood up for real: local MongoDB, a public Sepolia RPC,
-and the genuinely deployed contracts. `GET /api/credit/me?address=0x7A2E…`
-returns **score 648, limit 1850.00** read off the live ScoreManager, and
-`/api/limits` reports **900 USDC of real locked collateral**. G1 now passes.
-G2–G4 remain untestable and are listed with their exact blocker.
-
-Every fix below was made at the root cause and re-verified against the same
-item. The full plan was then re-run top to bottom.
-
-### What was actually broken
-
-| Found | Fix |
-|---|---|
-| The app rendered fixtures, not chain state | Deleted the fixture module; every screen now reads live accounts and decodes the program's own events |
-| Anchor's `Wallet` is `NodeWallet` and is stripped from browser/RN bundles — the app threw on first paint | A three-member keypair signer |
-| Event names are PascalCase; the mapper matched camelCase, so every event fell through and the feed rendered **empty** — indistinguishable from "no activity" | Matched on the IDL's names; unknown events now surface as a row rather than vanishing |
-| Event fields are snake_case. Single-word fields matched, so events rendered correct money beside `Installment NaN` and `score undefined → undefined` | Normalised once at the boundary |
-| The activity feed read signatures off the **protocol** PDA — every borrower touches it, so it would have shown one customer another's loans | Scoped to the borrower's own profile and token account |
-| Sub-cent interest rendered as `0.00`, stating a loan was interest-free when it was not | Figures widen to full precision rather than round a real amount to zero |
-| Four installments 60s apart all showed the same date | Sub-day schedules show the time |
-| Installments the borrower paid early were captioned "collected by the keeper" | Attributed by instruction name — `Repay` vs `CollectInstallment` — not by fee payer, which Anchor sets to the provider wallet |
-| `1 periods charged` | — |
-| Titles rounded where `Figure` truncated, so one amount read two ways | Both truncate |
-| **The keeper could not run at all**: its own scripts use `node --experimental-strip-types`, which rejects constructor parameter properties; and `TransactionSignature` was imported as a value from a CommonJS module | Explicit fields; `import type` |
-| The keeper hardcoded `~/.config/solana/id.json` rather than reading the CLI config | Reads `solana config get` |
-| The checkout's Subscribe mode listed subscriptions but could not subscribe | Wired to a real `subscribe` transaction against an available plan |
-| `scripts/lifecycle.ts` waited out its **own** 30s grace constant while reusing a protocol with a 3-day grace, so liquidation failed `NotLiquidatable` | Adopts the deployment's real grace and interval; refuses to pretend when the wait is impractical |
-| 12 plan items had no test at all | Written; 41 integration + 11 program + 11 keeper all green |
-| `solana-test-validator` purges root slots at 10,000 shreds by default, silently emptying the activity feed | `reset-local.sh` raises retention |
-
-### Counts
+**117 of 119 in-scope items pass.** A (24) B (12) C (16) D (9) E (18) F (3)
+H (12) I (15) J (6), plus G1. Two are recorded UNTESTED with the specific
+blocker rather than marked green.
 
 | | |
 |---|---|
-| Program unit tests | 11 pass |
-| Program integration tests (bankrun) | 41 pass |
-| Keeper tests | 11 pass |
-| Browser items verified against live chain | 18 pass |
-| Real transactions signed and landed during this run | 30+ |
-| Console errors remaining | 0 |
-| Failed network requests remaining | 0 |
-| Mocks / stubs / fallback data remaining | 0 |
+| Tests | 98 on the Solana build, 308 on the EVM reference — all passing |
+| Clusters | Devnet **live**; a local validator for the lifecycle and liquidation |
+| Console | Zero errors across every screen at 375, 768 and 1280 px |
+| Mocks | None. Every grep hit for mock/stub/TODO is a comment explaining why something is *not* fake |
 
-### Found only by running on the device
+### Untested, and why
 
-The browser cannot surface these, and all four were real:
+| # | Item | Blocker |
+|---|---|---|
+| J-MWA | Mobile Wallet Adapter | Needs a wallet app on a physical Android device. The emulator will not boot on this host — it wants 5.1 GB and there is 3.9 GB free, so it falls back to software GL and hangs the QEMU main loop. Shipping unverified signing code into a payments app is worse than the honest gap. |
+| E-Android | Android re-verification at HEAD | Same emulator blocker. It was verified earlier in the session against an earlier commit; the only mobile file changed since is `usePolaris.ts`, which was re-verified in the browser. |
 
-| Found | Fix |
-|---|---|
-| **Every account decode failed on Android.** `Buffer.prototype.subarray` is inherited from `Uint8Array` and built through the species constructor; under Hermes that resolves to `Uint8Array`, so the view loses every Buffer method. Anchor strips the 8-byte discriminator with `subarray(8)`, and buffer-layout then calls `b.readUIntLE(...)` — thrown deep inside a borsh decode with nothing in the stack naming Buffer | Re-attach the prototype in the polyfill |
-| The chain modules trusted the root layout to import polyfills first — an order expo-router's `require.context` does not promise | Each module imports them itself |
-| `app.json` referenced `./assets/adaptive-icon.png`, which the SDK 57 template does not create | Points at the three files it does ship |
-| `plans.tsx` animated its expand with `LayoutAnimation`, a **no-op on the New Architecture** — it did nothing and printed a warning toast over the UI | Reanimated layout transition |
+### What running it actually found
 
-### Found in the EVM app while re-opening G1
+Nothing in this list came from reading code.
 
-| Found | Fix |
-|---|---|
-| `apps/core` imports `@polarispay/db` in five API routes and **never declared it as a dependency** — a clean install could not run it | Declared `workspace:*` |
-| `components/providers.tsx` imported `injected` from the `wagmi/connectors` barrel, which re-exports Safe, WalletConnect, Coinbase and Base, each pulling an uninstalled optional peer — four module-not-found errors on every page load | Import from `wagmi/connectors/injected` |
-| lucide-react 0.454 against React 19 produced a hydration mismatch on every icon's `aria-hidden` | Upgraded |
-
----
+- **The same Solana Pay code, scanned twice, opened two loans.** 11 → 12 → 13
+  for one basket. `pay` was never vulnerable — its payment account is seeded by
+  (merchant, order). Plans had no equivalent guard. Now they do, and the
+  re-test reads 3 → 4 → 4.
+- **The checkout opened on a hardcoded 240** against a 200 limit, so every new
+  user's first action was a refusal.
+- **A dead merchant endpoint blamed the RPC**, sending the reader to debug the
+  wrong machine.
+- **Four rapid taps on Approve ran approve four times** — React state is not a
+  lock.
+- **The tab bar hugged the left edge** on anything wider than a phone.
+- **An unregistered merchant returned a 500** — "something went wrong on our
+  side" when it had not.
+- **`prove.ts` could not prove a fresh deployment**: it fetched the protocol
+  account immediately and died on a program that had just been deployed.
+- **`packages/mcp` did not build** — it imported a workspace package it never
+  declared.
+- **`healthReport` reported a 100% collection rate over an empty book**, and
+  the landing page printed it under the words "read from the live book".
 
 ## A. Program — origination and collection
 
