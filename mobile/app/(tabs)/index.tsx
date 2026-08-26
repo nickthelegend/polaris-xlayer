@@ -31,6 +31,35 @@ const relativeDays = (unix: number) => {
   return `in ${days} days`;
 };
 
+/**
+ * The stored evidence, read back out of the borrower's own profile.
+ *
+ * Every number here was written on chain by the attestation that opened the
+ * line, so the limit can still be explained on a cold start with no gateway
+ * in reach.
+ */
+function evidenceReasons(p: {
+  walletAgeDays: number;
+  transactionCount: number;
+  tokenAccounts: number;
+  stableBalance: number;
+}): string[] {
+  const age =
+    p.walletAgeDays >= 365
+      ? `${Math.floor(p.walletAgeDays / 365)} year${p.walletAgeDays >= 730 ? "s" : ""}`
+      : p.walletAgeDays >= 30
+        ? `${Math.floor(p.walletAgeDays / 30)} month${p.walletAgeDays >= 60 ? "s" : ""}`
+        : null;
+  return [
+    age ? `Wallet first used ${age} ago` : "Wallet is less than a month old",
+    `${p.transactionCount.toLocaleString()} transactions signed`,
+    p.tokenAccounts === 0
+      ? "No tokens held"
+      : `${p.tokenAccounts} token${p.tokenAccounts === 1 ? "" : "s"} held`,
+    `${(p.stableBalance / USDC).toFixed(2)} USDC on hand`,
+  ];
+}
+
 export default function CreditScreen() {
   const router = useRouter();
   const { width, height } = useWindowDimensions();
@@ -58,7 +87,7 @@ export default function CreditScreen() {
     );
   }
 
-  if (!data || !line) {
+  if (!data) {
     return (
       <Screen eyebrow="Your credit line" title="Polaris">
         <ErrorState message={error ?? "No data returned."} onRetry={refresh} />
@@ -66,9 +95,51 @@ export default function CreditScreen() {
     );
   }
 
-  const { profile, loans } = data;
+  /*
+   * No line yet is its own state, not an error.
+   *
+   * It means the underwriter has not been reached, so nothing has read this
+   * wallet's history. Showing an error here sent people looking for a fault in
+   * the chain; showing a limit here — which is what the app used to do, from a
+   * hardcoded 600 — was worse, because the number was invented.
+   */
+  if (!data.profile || !line) {
+    return (
+      <Screen eyebrow="Your credit line" title="Polaris">
+        <WalletRow address={address} />
+        <Animated.View entering={enterUpAfter(80)}>
+          <Surface padded={20} style={styles.unopened}>
+            <Label>No credit line yet</Label>
+            <Text variant="body" style={styles.unopenedBody}>
+              Your limit is read from this wallet&apos;s own history on chain —
+              how long it has been active, what it has done, and what it holds.
+              Nothing has read it yet.
+            </Text>
+            <Text variant="bodySmall" tone="faint" style={styles.unopenedBody}>
+              {error ?? "The underwriter is not reachable from here."}
+            </Text>
+            <Button label="Try again" onPress={refresh} />
+          </Surface>
+        </Animated.View>
+      </Screen>
+    );
+  }
+
+  const { profile, loans, underwriting } = data;
   const next = nextCollection(loans);
   const band = nextBand(profile.score);
+
+  /*
+   * The gateway's reasons when it has just opened the line, and the profile's
+   * own recorded evidence otherwise — the program stores what it scored, so a
+   * limit stays explainable long after the attestation that set it.
+   */
+  const reasons =
+    underwriting?.reasons.length
+      ? underwriting.reasons
+      : profile.underwrittenAt > 0
+        ? evidenceReasons(profile)
+        : [];
 
   return (
     <Screen eyebrow="Your credit line" title="Polaris">
@@ -190,6 +261,28 @@ export default function CreditScreen() {
         </Animated.View>
       ) : null}
 
+      {reasons.length > 0 ? (
+        <Animated.View entering={enterUpAfter(280)}>
+          <Surface padded={18} style={styles.card}>
+            <Label>How this limit was set</Label>
+            <Text variant="bodySmall" tone="soft" style={{ marginTop: space.sm }}>
+              Read from this wallet on chain. No application, no bureau, nothing
+              you had to tell us.
+            </Text>
+            {reasons.map((reason) => (
+              <View key={reason} style={styles.reason}>
+                <Text variant="bodySmall" tone="soft" style={styles.reasonText}>
+                  {reason}
+                </Text>
+              </View>
+            ))}
+            <Text variant="bodySmall" tone="faint" style={{ marginTop: space.sm }}>
+              History opens a line. Repaying is what raises it.
+            </Text>
+          </Surface>
+        </Animated.View>
+      ) : null}
+
       <Animated.View entering={enterUpAfter(310)} style={styles.stats}>
         <StatTile
           label="On time"
@@ -219,6 +312,15 @@ export default function CreditScreen() {
 }
 
 const styles = StyleSheet.create({
+  unopened: { marginTop: space.lg, gap: space.md },
+  unopenedBody: { marginTop: space.xs },
+  reason: {
+    marginTop: space.sm,
+    paddingLeft: space.md,
+    borderLeftWidth: 2,
+    borderLeftColor: ink.hairline,
+  },
+  reasonText: { lineHeight: 20 },
   orbWrap: {
     alignItems: "center",
     paddingTop: space.sm,

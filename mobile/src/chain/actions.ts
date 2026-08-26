@@ -101,7 +101,9 @@ export async function payLater(params: {
 
   const [protocol, profile] = await Promise.all([fetchProtocol(), fetchProfile()]);
   const interest = interestFor(params.amount, installmentCount * intervalSeconds);
-  const required = profile.activeDebt + params.amount + interest;
+  // No profile means no debt to size the delegation against, not an error: the
+  // program opens the account as part of this very transaction.
+  const required = (profile?.activeDebt ?? 0) + params.amount + interest;
 
   const loanId = protocol.loanCount;
 
@@ -151,7 +153,7 @@ export async function subscribeToPlan(params: {
 }): Promise<ActionResult> {
   const periods = params.periods ?? 12;
   const profile = await fetchProfile();
-  const authorize = profile.activeDebt + params.pricePerPeriod * periods;
+  const authorize = (profile?.activeDebt ?? 0) + params.pricePerPeriod * periods;
 
   const approve = createApproveInstruction(
     getTokenAccount(),

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { isReady } from "./client";
+import { getWallet, isReady } from "./client";
 import {
   fetchActivity,
   fetchAvailablePlans,
@@ -15,10 +15,14 @@ import {
   type ProtocolConfig,
 } from "./queries";
 import { creditLine } from "./math";
+import { requestUnderwriting, type Underwriting } from "./underwriting";
 
 export type ChainState = {
   protocol: ProtocolConfig;
-  profile: CreditProfile;
+  /** `null` until this wallet has a line. */
+  profile: CreditProfile | null;
+  /** Why the line is the size it is, when the gateway told us. */
+  underwriting: Underwriting | null;
   loans: Loan[];
   subscriptions: Plan[];
   /** Plans on offer that this borrower does not already hold. */
@@ -54,7 +58,7 @@ export function usePolarisState(
 
   const load = useCallback(async () => {
     try {
-      const [protocol, profile, loans, subscriptions, availablePlans, activity] =
+      const [protocol, existing, loans, subscriptions, availablePlans, activity] =
         await Promise.all([
           fetchProtocol(),
           fetchProfile(),
@@ -63,9 +67,33 @@ export function usePolarisState(
           fetchAvailablePlans(),
           fetchActivity(30),
         ]);
+
+      /*
+       * A wallet with no line gets one, from its own history.
+       *
+       * This is the first thing that happens to a new install, and it is the
+       * one read the app cannot do for itself: attesting requires the
+       * underwriter's signature, and that key belongs on a service rather than
+       * in a client anyone can decompile.
+       *
+       * A gateway that is not running is not a failure of the rest of the
+       * screen. The line simply stays unopened and says so, and every other
+       * number here is still read from the chain.
+       */
+      let profile = existing;
+      let underwriting: Underwriting | null = null;
+      if (!profile) {
+        try {
+          underwriting = await requestUnderwriting(getWallet().publicKey.toBase58());
+          profile = await fetchProfile();
+        } catch (e: any) {
+          if (__DEV__) console.warn("[polaris] underwriting unavailable:", e?.message ?? e);
+        }
+      }
+
       setState({
         status: "ready",
-        data: { protocol, profile, loans, subscriptions, availablePlans, activity },
+        data: { protocol, profile, underwriting, loans, subscriptions, availablePlans, activity },
         error: null,
       });
     } catch (e: any) {
@@ -102,7 +130,10 @@ export function usePolarisState(
 /** The derived credit line, or nulls while there is nothing to derive it from. */
 export function useCreditLine(data: ChainState | null) {
   return useMemo(() => {
-    if (!data) return null;
+    // No profile is not zero: it is "no line yet". Deriving a limit from an
+    // absent profile is how the app used to show 500 USDC to a wallet the
+    // program had never heard of.
+    if (!data?.profile) return null;
     return creditLine(data.profile, data.protocol.creditMultiplierBps);
   }, [data]);
 }

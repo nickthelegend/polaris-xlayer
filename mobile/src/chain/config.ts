@@ -52,6 +52,21 @@ export const merchantDirectory = new Map(
   deployment.merchants.map((m) => [m.pda, { name: m.name, icon: m.icon }]),
 );
 
+/**
+ * The underwriter service.
+ *
+ * The app cannot open its own credit line: doing so would mean shipping the
+ * underwriter key inside the client, where anyone could read it out and attest
+ * themselves any history they liked. So the app asks, and the gateway signs.
+ *
+ * Overridable because a phone is not on the host's localhost. Point
+ * EXPO_PUBLIC_GATEWAY_URL at the machine's LAN address when running on a
+ * device.
+ */
+export const GATEWAY_URL = (
+  process.env.EXPO_PUBLIC_GATEWAY_URL ?? "http://localhost:4100"
+).replace(/\/$/, "");
+
 export const explorerTx = (signature: string) =>
   CLUSTER === "localnet"
     ? `https://explorer.solana.com/tx/${signature}?cluster=custom&customUrl=${encodeURIComponent(RPC_URL)}`

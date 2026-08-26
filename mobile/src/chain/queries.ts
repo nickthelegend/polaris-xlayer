@@ -47,6 +47,12 @@ export type CreditProfile = {
   liquidations: number;
   activeDebt: number;
   lockedCollateral: number;
+  /** 0 when the line was never underwritten from chain history. */
+  underwrittenAt: number;
+  walletAgeDays: number;
+  transactionCount: number;
+  tokenAccounts: number;
+  stableBalance: number;
 };
 
 export type ProtocolConfig = {
@@ -65,19 +71,16 @@ const statusOf = (s: any) => Object.keys(s ?? {})[0] as any;
 const merchantName = (pk: PublicKey) =>
   merchantDirectory.get(pk.toBase58()) ?? { name: "Unknown merchant", icon: "◻" };
 
-/**
- * A fresh profile has no account on chain — the program creates it on the first
- * loan or the first collateral lock. That is not an error state, it is a
- * borrower with no history, and the program's own defaults are what they get.
+/*
+ * There is deliberately no default profile here any more.
+ *
+ * This used to return a score of 600 for a wallet with no account, which was a
+ * guess dressed as a reading: the app showed a 500 USDC limit to a wallet the
+ * program had never heard of, and the number came from this file rather than
+ * from the chain. Since a line is now underwritten from the wallet's own
+ * history, "no account" means "not underwritten yet" -- which is a real state
+ * with a real answer, and `null` is how it is said.
  */
-const FRESH_PROFILE: CreditProfile = {
-  score: 600,
-  onTimePayments: 0,
-  latePayments: 0,
-  liquidations: 0,
-  activeDebt: 0,
-  lockedCollateral: 0,
-};
 
 export async function fetchProtocol(): Promise<ProtocolConfig> {
   const p: any = await (getProgram().account as any).protocol.fetch(pdas.protocol);
@@ -93,9 +96,12 @@ export async function fetchProtocol(): Promise<ProtocolConfig> {
   };
 }
 
-export async function fetchProfile(user = getWallet().publicKey): Promise<CreditProfile> {
+/** `null` when this wallet has no line yet, rather than an invented one. */
+export async function fetchProfile(
+  user = getWallet().publicKey,
+): Promise<CreditProfile | null> {
   const info = await getConnection().getAccountInfo(pdas.profileOf(user));
-  if (!info) return FRESH_PROFILE;
+  if (!info) return null;
   const p: any = (getProgram().account as any).creditProfile.coder.accounts.decode(
     "creditProfile",
     info.data,
@@ -107,6 +113,11 @@ export async function fetchProfile(user = getWallet().publicKey): Promise<Credit
     liquidations: p.liquidations,
     activeDebt: n(p.activeDebt),
     lockedCollateral: n(p.lockedCollateral),
+    underwrittenAt: n(p.underwrittenAt),
+    walletAgeDays: p.walletAgeDays,
+    transactionCount: p.transactionCount,
+    tokenAccounts: p.tokenAccounts,
+    stableBalance: n(p.stableBalance),
   };
 }
 
