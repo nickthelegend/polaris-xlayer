@@ -55,15 +55,15 @@ pub enum PolarisError {
     TokenOwnerMismatch,
     #[msg("Token account mint is not the protocol stablecoin")]
     MintMismatch,
-    #[msg("Signer is not the protocol underwriter")]
+    #[msg("Not the underwriter")]
     NotUnderwriter,
     /// Distinct from a stale reading: a timestamp ahead of the cluster is a
     /// broken underwriter, not a slow one, and should be fixed rather than
     /// retried.
-    #[msg("Underwriting evidence is timestamped in the future")]
+    #[msg("Evidence is from the future")]
     EvidenceFromTheFuture,
-    #[msg("Underwriting evidence is too old to act on")]
+    #[msg("Evidence is stale")]
     EvidenceStale,
-    #[msg("This borrower already has a record; their score is earned, not attested")]
+    #[msg("Borrower already has a record")]
     AlreadyUnderwritten,
 }

@@ -84,7 +84,6 @@ pub fn underwrite_handler(
     emit!(Underwritten {
         user: profile.user,
         score,
-        credit_limit: profile.credit_limit(ctx.accounts.protocol.credit_multiplier_bps),
         wallet_age_days,
         transaction_count,
         token_accounts,

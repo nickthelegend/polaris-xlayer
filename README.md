@@ -86,6 +86,7 @@ programs/polaris        the program — one Anchor program, 21 instructions
 keeper-solana           the crank: collect · subscriptions · liquidate
 packages/sdk-solana     createPolaris() — pay, subscribe, payLater
 mobile/                 the Android app — Expo, signs on the device
+apps/gateway            the underwriter, and a Solana Pay endpoint
 scripts/lifecycle.ts    stand it up and run a loan through its whole life
 tests/                  41 integration tests on bankrun
 docs/SOLANA-PORT.md     the port plan and every decision in it
@@ -120,6 +121,22 @@ whole book is one `getProgramAccounts` call:
 KEEPER_DRY_RUN=true pnpm --filter @polaris/keeper-solana start
 ```
 
+Or stand the whole demo up in one command — validator, program, five merchants,
+a borrower with history, three loans and three subscription plans:
+
+```bash
+./scripts/reset-local.sh
+```
+
+Then the gateway, which underwrites new wallets and serves the Solana Pay
+checkout:
+
+```bash
+pnpm --filter @polaris/gateway start
+```
+
+[`docs/DEMO.md`](docs/DEMO.md) is the five-minute recording script.
+
 ## Three payment modes
 
 ```ts
@@ -134,6 +151,60 @@ await polaris.payLater({ merchant, amount: 200_000_000n });       // 4 installme
 and sizes the delegation against **everything** the borrower owes — not just
 this purchase. One delegate slot backs every open plan at once, so sizing it
 for a single plan is how a book ends up with loans it cannot collect.
+
+## Where a credit line comes from
+
+The hardest problem in an undercollateralized book is the first loan. Everyone
+used to open at 600, which answered it by ignoring it: a wallet funded an hour
+ago and a wallet that has been paying for things for three years got the same
+500 USDC line.
+
+They are not the same risk, and on Solana the difference is public. `underwrite`
+takes four facts a wallet cannot hide and the **program** turns them into a
+score:
+
+```
+Wallet first used 2 years ago     · +48
+1,240 transactions signed         · +49
+7 tokens held                     · +14
+820.00 USDC on hand               · +8
+                                    ---
+                                    520 floor + 119 = 639
+```
+
+The underwriter attests to the facts and never to the result. A compromised
+service key cannot hand anyone an 850 — it would have to claim an age and an
+activity level anyone can check against the same RPC. Evidence older than
+fifteen minutes is refused, and a borrower with any record at all is refused
+outright, because by then the score is earned rather than attested.
+
+There is a ceiling on all of it. The best wallet history in the world opens a
+1,000 USDC line; 2,500 and 5,000 are reached by repaying. Three years of
+holding tokens is evidence of solvency, not of willingness to pay.
+
+Score any wallet without opening anything:
+
+```bash
+pnpm --filter @polaris/gateway underwrite <address> --read
+```
+
+## Paying by QR
+
+The gateway serves a [Solana Pay](https://docs.solanapay.com) transaction
+request. Any Solana Pay wallet scans the code and is handed **one** transaction
+carrying the SPL approval and the origination together — and if that wallet has
+never borrowed, a line underwritten from its own history moments earlier.
+
+```
+http://localhost:4100/checkout?merchant=<merchant PDA>&amount=180000000
+```
+
+The customer pays nothing to do it. `create_loan` takes a payer separate from
+the borrower, so the gateway covers rent as well as the fee and a shopper who
+has never held SOL can still open a plan. Sponsorship that stops at the fee is
+not sponsorship — it still leaves them unable to check out.
+
+Both still sign, so nobody opens a loan in another name.
 
 ## The app
 
@@ -159,10 +230,11 @@ signer is the one piece a shipped build has to replace — see *What is not done
 ## Tests
 
 ```bash
-pnpm run program:test        # 11 — the arithmetic that costs money
+pnpm run program:test        # 18 — the arithmetic that costs money
 pnpm run anchor:test         # 41 — every exploit, on chain
 pnpm --filter @polaris/keeper-solana test   # 11 — the dunning ladder
 pnpm --filter @polaris/sdk-solana test      # 13 — the SDK against a live cluster
+pnpm --filter @polaris/gateway test         # 14 — underwriting and Solana Pay
 ```
 
 `anchor test` starts its own validator and will refuse if you still have the
@@ -174,7 +246,7 @@ pnpm exec ts-mocha -p ./tsconfig.anchor.json -t 1000000 'tests/**/*.ts'
 ```
 
 
-76 in total, and all of them green. The reference build carries its own 308 --
+97 in total, and all of them green. The reference build carries its own 308 --
 153 on the Solidity contracts, 82 on the database layer, 45 on KeeperHub, 20 on
 underwriting, 8 on the MCP server -- run with `pnpm test` at the root.
 
@@ -198,20 +270,42 @@ cannot move the clock can only test origination.
 
 | | |
 |---|---|
-| Program | `ApAHXF7U1Z8WKDYKM7ZvBMeho7tSkGQZS1LsaTNyzCra` |
-| Devnet | **live** — deployed, initialised, and exercised |
+| Program | `CpRqbMywzAEKkEALZtrXqPYM36E5RrFewYnRtUYEEvUS` |
+| Devnet | **not currently deployed** — see below |
 | Localnet | full lifecycle verified, including a liquidation |
 | Android | runs on an emulator against a live cluster — never on physical hardware |
-| Size | 571 KB, clean SBF build |
+| Size | 593 KB, clean SBF build |
 
-Devnet carries the current build, an initialised protocol, a funded pool, and a
-real plan opened against it. `scripts/prove.ts` is what put it there. It uses
-one wallet for every role, so it costs almost no SOL and can be re-run against
-any deployment to confirm it for yourself:
+Devnet is empty right now, and the reason is worth stating plainly rather than
+leaving a stale address in a table.
+
+The build that was on devnet predates underwriting. Upgrading needs a transient
+buffer of about 4.14 SOL, and the deploy wallet held 0.15, so the old program
+was closed to reclaim its rent — which returned 3.98 and left the wallet
+**0.012 SOL short** of the new binary. The devnet faucet is rate-limited by IP
+and refused every request after that. The only other SOL on the wallet is rent
+inside three unrelated programs, which are not this project's to close.
+
+So: closing before confirming the funds was the wrong order, and this is the
+cost of it. Everything below runs against a local validator instead, which is a
+real cluster with real signatures — but it is not a public one, and the table
+says so.
+
+To put it back, with a wallet holding ~4.2 SOL:
+
+```bash
+solana program deploy target/deploy/polaris.so \
+  --program-id target/deploy/polaris-keypair.json --url devnet
+```
 
 ```bash
 POLARIS_CLUSTER=devnet pnpm exec tsx scripts/prove.ts
 ```
+
+`prove.ts` initialises the protocol, funds the pool and opens a real plan
+against it, using one wallet for every role so it costs almost nothing. Run it
+against any deployment to confirm that deployment for yourself rather than
+taking this file's word for it.
 
 To read the state of a deployment without touching it:
 
@@ -243,9 +337,13 @@ key belongs to the app rather than to a wallet the user already trusts. A
 shipped build swaps `mobile/src/chain/wallet.ts` for MWA and nothing else
 moves — every instruction is already built by the chain layer.
 
+**Devnet, until the faucet lets go.** See *Status* above — the binary and the
+command are ready, the wallet is 0.012 SOL short.
+
 **The Solidity side is the reference, not the deliverable.** `packages/contracts`
 and the Next.js apps around it are the original build, kept so the port can be
-read against it. The Solana program is what this repository is for.
+read against it. `packages/protocol` is an older design again, superseded and
+marked as such. The Solana program is what this repository is for.
 
 ## License
 

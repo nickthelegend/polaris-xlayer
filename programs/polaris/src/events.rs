@@ -174,7 +174,6 @@ pub struct FeesSwept {
 pub struct Underwritten {
     pub user: Pubkey,
     pub score: u16,
-    pub credit_limit: u64,
     pub wallet_age_days: u32,
     pub transaction_count: u32,
     pub token_accounts: u32,

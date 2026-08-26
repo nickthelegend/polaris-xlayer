@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node --experimental-strip-types src/server.ts",
     "test": "node --experimental-strip-types --test test/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "underwrite": "node --experimental-strip-types src/cli.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",

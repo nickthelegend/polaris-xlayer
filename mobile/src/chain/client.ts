@@ -16,7 +16,7 @@ import {
 } from "@solana/web3.js";
 
 import idl from "./idl.json";
-import { RPC_URL, STABLECOIN } from "./config";
+import { PROGRAM_ID, RPC_URL, STABLECOIN } from "./config";
 
 /**
  * A signer Anchor will accept.
@@ -68,6 +68,23 @@ export type Client = {
 let client: Client | null = null;
 
 export function initClient(wallet: Keypair): Client {
+  /*
+   * The IDL and the deployment have to name the same program.
+   *
+   * Anchor takes the program id from the IDL, while everything else in the app
+   * takes it from deployment.json. When a rebuild issued a new program id and
+   * only deployment.json was synced, the two silently disagreed and every
+   * transaction came back "Attempt to load a program that does not exist" --
+   * an error about a program that existed perfectly well, at the other address.
+   * Better to refuse to start, and say which two files disagree.
+   */
+  if ((idl as { address?: string }).address !== PROGRAM_ID.toBase58()) {
+    throw new Error(
+      `idl.json is for ${(idl as { address?: string }).address}, but deployment.json ` +
+        `says ${PROGRAM_ID.toBase58()}. Re-run ./scripts/reset-local.sh to sync them.`,
+    );
+  }
+
   const connection = new Connection(RPC_URL, {
     // `confirmed` rather than `finalized` for reads: a borrower who has just
     // paid should see it, and waiting ~13 seconds for finality to show an

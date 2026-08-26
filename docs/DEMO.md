@@ -1,101 +1,113 @@
 # Recording the demo
 
-Everything below runs against Sepolia. Nothing is mocked, nothing is replayed:
-each transaction in the recording is one you can open on Etherscan afterwards.
+Five minutes against a real validator. Nothing here is mocked or replayed:
+every figure on screen is read from a program account, and every transaction
+has a signature you can open in the explorer afterwards.
+
+The EVM recording script — the original build, on Sepolia — is in
+[`DEMO-EVM.md`](DEMO-EVM.md). This is the Solana one.
 
 ## Before you press record
 
-Three processes, in three terminals:
+One command stands the whole thing up: a fresh validator with the program
+deployed, five merchants, a borrower with history, three loans in different
+states and three subscription plans.
 
 ```bash
-mongod --dbpath <your-data-dir> --port 27077          # or point MONGODB_URI at Atlas
-pnpm --filter @polarispay/core dev                    # http://localhost:3110
-pnpm --filter @polarispay/merchant dev                # http://localhost:3111
+./scripts/reset-local.sh
 ```
 
-Then confirm the keeper can reach KeeperHub and the book agrees with the chain:
+Then two services, in two terminals:
 
 ```bash
-cd keeper && npm run doctor && cd ../packages/db && npm run reconcile
+pnpm --filter @polaris/gateway start
 ```
 
-`doctor` prints the API key prefix, the chain, the contracts, and whether the
-chain is sponsorship-eligible. `reconcile` should say "No drift". If it does
-not, run `npm run sync` first -- the chain is the source of truth and the book
-follows it, never the other way around.
+```bash
+pnpm --filter polaris-mobile start
+```
+
+The gateway is the underwriter and the Solana Pay endpoint. The app is the
+customer. Check the gateway agrees with the cluster before you start:
+
+```bash
+curl -s localhost:4100/health
+```
 
 ## The five minutes
 
-**1. A shopper checks out.** `localhost:3111/store`. Pick an item, pay in four.
-The loan opens on chain in one transaction and the response carries its hash.
+**1. A wallet nobody has ever underwritten.** Open the app on a fresh install.
+It generates a signer on the device, and the credit screen fills in from
+nothing: score 520, a 200 USDC line, and four lines saying why —
 
-The storefront posts to its own `/api/store/checkout`, which holds the merchant
-API key server-side. The key is never in the page.
-
-**2. Arm the plan.** A real plan does not have an instalment due for a
-fortnight, and the contract refuses any interval under an hour, so there is
-nothing to collect during a recording. Move the schedule instead:
-
-```bash
-cd packages/db && npm run demo:arm -- <loanId>
+```
+Wallet is less than a month old · +0
+0 transactions signed · +0
+No tokens held · +0
+0.00 USDC on hand · +0
 ```
 
-That shifts the plan's due dates into the past and prints the new schedule. The
-loan, the money and the collection are all real; only the business calendar
-moves, which is what "this customer checked out a fortnight ago" means. It
-refuses to run on a plan that is not active, and it will not invent one.
+That is the whole argument on one screen. The limit was read off the chain, and
+because every input is public, the reasons can be shown. Nobody filled in a
+form.
 
-**3. The keeper collects.** `cd keeper && npm run collect`. It simulates first,
-then sends. One line comes back per instalment with the transaction hash and
-whether gas was sponsored.
-
-Sponsored execution runs through a smart account, so the keeper wallet's nonce,
-balance and Etherscan transaction list do not move. Confirm charges with the
-execution status or the receipt, never with the wallet -- this catches people
-out every time.
-
-**4. Watch it land.** `localhost:3110` shows the keeper's own receipts in the
-hero, newest first, each linked to Etherscan. `localhost:3111/demo` is the
-merchant's read-only console over the same live data: outstanding, at risk,
-collection rate, and every plan's state.
-
-**5. Close the loop.** The remaining jobs, each of which stands alone:
+To show the other end of it, underwrite a wallet that has actually been used.
+`--read` scores it without opening anything:
 
 ```bash
-cd keeper
-npm run subscriptions   # charges any subscription past its boundary
-npm run settle          # pays merchants out of escrow
-npm run liquidate       # checks health; sends nothing when every loan is fine
-npm run close-out       # releases collateral on fully repaid loans
-npm run health          # one screen: per-job status, exposure, incidents
+pnpm --filter @polaris/gateway underwrite <address> --read
 ```
 
-`health` is the closing shot. It reports the last run of every job, what is
-overdue, what is in dunning, and any incident -- and it will say DEGRADED if
-something actually failed, which is the point of showing it.
+**2. Fund the wallet.** The app shows its address; give it something to spend.
+
+```bash
+pnpm exec tsx scripts/fund.ts <address>
+```
+
+**3. Check out.** Pick a merchant, split into four. One transaction carries the
+SPL approval and the origination together, the merchant is paid in full
+immediately out of protocol liquidity, and the plan appears on the Plans tab
+with all four dates.
+
+**4. Or check out by QR.** The merchant's side of the same thing:
+
+```
+http://localhost:4100/checkout?merchant=<merchant PDA>&amount=180000000
+```
+
+A Solana Pay transaction request. Any Solana Pay wallet scans it and is handed
+one transaction to approve — and if that wallet has never borrowed, a line is
+underwritten from its own history first, mid-checkout.
+
+The line to point at is **Network fee — paid by Polaris**. The gateway is the
+fee payer *and* the rent payer, so the customer opens a credit plan holding no
+SOL at all. On EVM that was a product we bought; here it is a field on the
+transaction.
+
+Merchant PDAs are in `deployments/localnet-seed.json`.
+
+**5. The keeper collects.** Loan #2 in the seed runs on a 60-second interval
+precisely so a collection can happen inside a recording.
+
+```bash
+pnpm --filter @polaris/keeper-solana start
+```
+
+It reads what is due with one `getProgramAccounts` call — there is no database
+behind it — simulates, then sends. The Activity tab updates, and the borrower
+never signed anything.
+
+**6. Default and liquidation.** The full arc, unattended, in about five
+minutes: origination, four collections, then a second borrower who revokes
+their delegation and is liquidated.
+
+```bash
+POLARIS_CLUSTER=localnet pnpm exec tsx scripts/lifecycle.ts
+```
 
 ## What to say about failures
 
-Leave them in. The receipts feed shows failed actions in amber alongside the
-successes, and a run that only ever shows green is a marketing asset rather
-than evidence.
-
-If a collection fails during the take, the interesting part is what happens
-next: the failure is classified, and the keeper decides from the classification
-whether the idempotency key may rotate. A revert is definite, so the key
-rotates; a timeout or an in-flight duplicate is not, so the key is held. That
-distinction is the subject of the upstream fix in
-[KeeperHub#1922](https://github.com/KeeperHub/keeperhub/pull/1922), which came
-out of this keeper double-charging nothing only because it was written to hold
-the key.
-
-## Resetting between takes
-
-```bash
-cd packages/db
-npm run sync        # pull chain state into the book
-npm run reconcile   # prove they agree
-```
-
-There is no reset that unwinds the chain, and there should not be. Open a fresh
-plan for each take.
+Leave them in. A liquidation that recovers nothing is not a bug — it is the
+protocol booking bad debt against itself, which is what an undercollateralized
+book does when it is wrong. `scripts/inspect.ts` prints that ledger, and a run
+that only ever shows green is a marketing asset rather than a demo.

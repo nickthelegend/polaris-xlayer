@@ -22,7 +22,7 @@ import { buildPaymentTransaction, totalOwed, type Order } from "./solana-pay.ts"
 import { underwrite } from "./underwrite.ts";
 import { checkoutPage } from "./page.ts";
 
-const PORT = Number(process.env.PORT ?? 4000);
+const PORT = Number(process.env.PORT ?? 4100);
 /**
  * The URL a wallet will fetch the transaction request from.
  *

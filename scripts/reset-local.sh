@@ -39,4 +39,8 @@ echo "validator up · program $PID"
 
 POLARIS_CLUSTER=localnet pnpm exec tsx scripts/seed.ts
 cp deployments/localnet-seed.json mobile/src/chain/deployment.json
+# The IDL carries the program id too, and Anchor reads it from there rather
+# than from deployment.json. Syncing one without the other left the app calling
+# an address that no longer had a program on it.
+cp target/idl/polaris.json mobile/src/chain/idl.json
 echo "deployment.json synced to the app"

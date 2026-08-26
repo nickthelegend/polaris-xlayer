@@ -1,5 +1,5 @@
 {
-  "address": "ApAHXF7U1Z8WKDYKM7ZvBMeho7tSkGQZS1LsaTNyzCra",
+  "address": "CpRqbMywzAEKkEALZtrXqPYM36E5RrFewYnRtUYEEvUS",
   "metadata": {
     "name": "polaris",
     "version": "0.1.0",
@@ -392,6 +392,22 @@
             "this instruction in **one atomic transaction**, so the borrower signs",
             "once at checkout and the permissioned-originator role — along with the",
             "window between approving and borrowing — disappears entirely."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "payer",
+          "docs": [
+            "Who pays rent for the accounts this opens.",
+            "",
+            "Normally the borrower, and passing the borrower here is the ordinary",
+            "case. A sponsored checkout passes the gateway instead, which is what",
+            "lets a customer with no SOL at all open a plan: the fee payer already",
+            "differs from the token authority on Solana, and rent is the only other",
+            "thing standing between a shopper and a wallet that has never held the",
+            "native token. Both still sign, so nobody is opening a loan in someone",
+            "else's name."
           ],
           "writable": true,
           "signer": true
@@ -1772,6 +1788,53 @@
       ]
     },
     {
+      "name": "set_underwriter",
+      "discriminator": [
+        100,
+        73,
+        161,
+        131,
+        128,
+        144,
+        113,
+        17
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "protocol"
+          ]
+        },
+        {
+          "name": "protocol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "underwriter"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "subscribe",
       "discriminator": [
         254,
@@ -1987,6 +2050,110 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "underwrite",
+      "docs": [
+        "Open a credit line from what the wallet's own history shows.",
+        "",
+        "The underwriter attests to four facts it read off the cluster; the",
+        "program turns them into a score. Only ever valid for a borrower with no",
+        "record of their own — after the first repayment their behaviour is",
+        "better evidence than their wallet age."
+      ],
+      "discriminator": [
+        130,
+        243,
+        71,
+        79,
+        111,
+        78,
+        186,
+        213
+      ],
+      "accounts": [
+        {
+          "name": "underwriter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "protocol",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "borrower",
+          "docs": [
+            "as the key the profile PDA is derived from."
+          ]
+        },
+        {
+          "name": "profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "borrower"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "wallet_age_days",
+          "type": "u32"
+        },
+        {
+          "name": "transaction_count",
+          "type": "u32"
+        },
+        {
+          "name": "token_accounts",
+          "type": "u32"
+        },
+        {
+          "name": "stable_balance",
+          "type": "u64"
+        },
+        {
+          "name": "observed_at",
+          "type": "i64"
+        }
+      ]
     },
     {
       "name": "update_payout_address",
@@ -2613,6 +2780,19 @@
         199,
         232
       ]
+    },
+    {
+      "name": "Underwritten",
+      "discriminator": [
+        195,
+        106,
+        147,
+        39,
+        83,
+        21,
+        26,
+        239
+      ]
     }
   ],
   "errors": [
@@ -2740,6 +2920,26 @@
       "code": 6024,
       "name": "MintMismatch",
       "msg": "Token account mint is not the protocol stablecoin"
+    },
+    {
+      "code": 6025,
+      "name": "NotUnderwriter",
+      "msg": "Not the underwriter"
+    },
+    {
+      "code": 6026,
+      "name": "EvidenceFromTheFuture",
+      "msg": "Evidence is from the future"
+    },
+    {
+      "code": 6027,
+      "name": "EvidenceStale",
+      "msg": "Evidence is stale"
+    },
+    {
+      "code": 6028,
+      "name": "AlreadyUnderwritten",
+      "msg": "Borrower already has a record"
     }
   ],
   "types": [
@@ -2882,6 +3082,35 @@
           {
             "name": "first_seen_at",
             "type": "i64"
+          },
+          {
+            "name": "underwritten_at",
+            "docs": [
+              "When this line was underwritten from chain history, or 0 if it opened",
+              "at the flat starting score."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "wallet_age_days",
+            "docs": [
+              "The evidence the opening score was computed from, kept so a borrower can",
+              "be shown why their limit is what it is, and so a disputed line can be",
+              "recomputed rather than argued about."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "transaction_count",
+            "type": "u32"
+          },
+          {
+            "name": "token_accounts",
+            "type": "u32"
+          },
+          {
+            "name": "stable_balance",
+            "type": "u64"
           },
           {
             "name": "bump",
@@ -3498,6 +3727,18 @@
             "type": "u16"
           },
           {
+            "name": "underwriter",
+            "docs": [
+              "Who may attest to a wallet's history when opening its first line.",
+              "",
+              "Separate from `authority` on purpose. The underwriter signs constantly —",
+              "once per new borrower — so it wants to be a warm key on a service, while",
+              "the authority moves protocol money and should not be. It attests to",
+              "facts, never to a score: the arithmetic lives in `underwrite_from`."
+            ],
+            "type": "pubkey"
+          },
+          {
             "name": "bump",
             "type": "u8"
           },
@@ -3689,6 +3930,54 @@
           {
             "name": "misses",
             "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Underwritten",
+      "docs": [
+        "Emitted when a line is opened from chain history rather than a flat score.",
+        "",
+        "Carries the evidence, not just the result. An indexer, a borrower disputing",
+        "their limit, or anyone auditing the underwriter can recompute the score from",
+        "this event and the on-chain weights, and check the facts against the same",
+        "cluster the underwriter read."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "score",
+            "type": "u16"
+          },
+          {
+            "name": "wallet_age_days",
+            "type": "u32"
+          },
+          {
+            "name": "transaction_count",
+            "type": "u32"
+          },
+          {
+            "name": "token_accounts",
+            "type": "u32"
+          },
+          {
+            "name": "stable_balance",
+            "type": "u64"
+          },
+          {
+            "name": "observed_at",
+            "type": "i64"
+          },
+          {
+            "name": "underwritten_at",
+            "type": "i64"
           }
         ]
       }

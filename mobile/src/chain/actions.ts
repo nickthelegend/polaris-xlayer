@@ -208,6 +208,30 @@ export function explainError(e: any): string {
   if (code && map[code]) return map[code];
   if (/already in use/i.test(text)) return "That order has already been paid.";
   if (/insufficient funds|0x1\b/.test(text)) return "Your balance does not cover this.";
+  // Not a borrower's problem, and not something they can retry into working:
+  // the app is pointed at an address with no program on it.
+  if (/program that does not exist|ProgramAccountNotFound/i.test(text)) {
+    return "This app is pointed at the wrong program. Its deployment needs re-syncing.";
+  }
+  if (/blockhash not found|block height exceeded/i.test(text)) {
+    return "That took too long to confirm. Nothing was charged — try again.";
+  }
+  if (/failed to fetch|network request failed|ECONNREFUSED/i.test(text)) {
+    return "Cannot reach the network. Check the RPC endpoint is running.";
+  }
   if (code) return code;
-  return e?.message ?? "The transaction was refused.";
+
+  /*
+   * Last resort, and the reason it is not just `e.message`.
+   *
+   * A simulation failure's message is a paragraph of logs, a hint about
+   * catching SendTransactionError, and an empty array -- all of which landed
+   * on the screen verbatim under the word "Refused". Anything that long is a
+   * stack trace wearing a sentence, so it goes to the log and the borrower
+   * gets something true and short.
+   */
+  const message = String(e?.message ?? "").split("\n")[0]?.trim() ?? "";
+  if (message && message.length <= 120) return message;
+  if (__DEV__) console.error("[polaris] unexplained failure:", e);
+  return "The transaction was refused. Nothing was charged.";
 }
