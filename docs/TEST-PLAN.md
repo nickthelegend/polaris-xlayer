@@ -43,47 +43,45 @@ than marked pass.
 
 ## Result
 
-**117 of 119 in-scope items pass.** A (24) B (12) C (16) D (9) E (18) F (3)
-H (12) I (15) J (6), plus G1. Two are recorded UNTESTED with the specific
+**140 of 142 in-scope items pass.** Two are recorded UNTESTED with the specific
 blocker rather than marked green.
+
+Run against **devnet** — the cluster the app ships pointed at — with a local
+validator for the lifecycle and liquidation paths that need a controllable
+clock.
 
 | | |
 |---|---|
-| Tests | 98 on the Solana build, 308 on the EVM reference — all passing |
-| Clusters | Devnet **live**; a local validator for the lifecycle and liquidation |
-| Console | Zero errors across every screen at 375, 768 and 1280 px |
-| Mocks | None. Every grep hit for mock/stub/TODO is a comment explaining why something is *not* fake |
+| Tests | 120 on the Solana build, 235 on the EVM reference — all passing |
+| Clusters | Devnet live; a local validator for liquidation |
+| Console | Zero errors on every screen at 375, 768 and 1440 px |
+| Mocks | None. Three grep hits remain and all three are prose: two name a
+read-only provider's unused signer, one is a comment explaining why something
+is *not* a stub |
 
 ### Untested, and why
 
 | # | Item | Blocker |
 |---|---|---|
-| J-MWA | Mobile Wallet Adapter | Needs a wallet app on a physical Android device. The emulator will not boot on this host — it wants 5.1 GB and there is 3.9 GB free, so it falls back to software GL and hangs the QEMU main loop. Shipping unverified signing code into a payments app is worse than the honest gap. |
-| E-Android | Android re-verification at HEAD | Same emulator blocker. It was verified earlier in the session against an earlier commit; the only mobile file changed since is `usePolaris.ts`, which was re-verified in the browser. |
+| K13 | A wallet actually signing | Needs a physical device with Phantom or Solflare installed. Everything up to the approval sheet is exercised: the intent fires, and a device with no wallet returns ERROR_WALLET_NOT_FOUND, which the app renders as a sentence. |
+| E-Android | Android re-check at HEAD | The emulator boots headless (`-no-window -gpu off -memory 2048`) and the app was verified on it against devnet. It has not been re-run after the last three commits, which touch the activity feed and two copy strings. |
 
-### What running it actually found
+### What running it against devnet found
 
-Nothing in this list came from reading code.
+Neither of these reproduces on a local validator, which is why neither had been
+seen before.
 
-- **The same Solana Pay code, scanned twice, opened two loans.** 11 → 12 → 13
-  for one basket. `pay` was never vulnerable — its payment account is seeded by
-  (merchant, order). Plans had no equivalent guard. Now they do, and the
-  re-test reads 3 → 4 → 4.
-- **The checkout opened on a hardcoded 240** against a 200 limit, so every new
-  user's first action was a refusal.
-- **A dead merchant endpoint blamed the RPC**, sending the reader to debug the
-  wrong machine.
-- **Four rapid taps on Approve ran approve four times** — React state is not a
-  lock.
-- **The tab bar hugged the left edge** on anything wider than a phone.
-- **An unregistered merchant returned a 500** — "something went wrong on our
-  side" when it had not.
-- **`prove.ts` could not prove a fresh deployment**: it fetched the protocol
-  account immediately and died on a program that had just been deployed.
-- **`packages/mcp` did not build** — it imported a workspace package it never
-  declared.
-- **`healthReport` reported a 100% collection rate over an empty book**, and
-  the landing page printed it under the words "read from the live book".
+- **The activity feed linked every event to the wrong transaction.** It paired
+  `txs[i]` with `sigs[i]`, assuming a JSON-RPC batch returns in request order.
+  The spec allows any order and devnet returns them swapped, so a credit line
+  opened by one transaction was displayed — and linked on the explorer — under
+  the hash of an unrelated token transfer.
+- **The Solana Pay blockhash was `finalized`.** Already ~32 slots into its own
+  validity before anyone sees the code, and then a human has to read the terms
+  and decide. It expired mid-checkout, and the app blamed the transaction.
+- **Two empty states claimed the opposite of the truth.** With no subscription
+  plans on the deployment at all, the app said "You already subscribe to every
+  plan on offer" and the button read "Nothing left to subscribe to".
 
 ## A. Program — origination and collection
 

@@ -208,7 +208,9 @@ export default function PayScreen() {
         if (!target) {
           setResult({
             ok: false,
-            message: "You already subscribe to every plan on offer.",
+            message: subscriptions.length
+              ? "You already subscribe to every plan on offer."
+              : "No merchant on this deployment offers a subscription yet.",
           });
           return;
         }
@@ -424,8 +426,19 @@ export default function PayScreen() {
                 );
               })
             ) : (
+              /*
+                Two different empty states, and they were one.
+                
+                `availablePlans` is what this borrower does not already hold, so
+                an empty list means either "you have them all" or "this
+                deployment has none". Saying the first on a deployment with no
+                plans at all tells the borrower they subscribe to things that do
+                not exist.
+              */
               <Text variant="bodySmall" tone="faint" style={{ marginTop: space.sm }}>
-                You already subscribe to every plan on offer.
+                {subscriptions.length
+                  ? "You already subscribe to every plan on offer."
+                  : "No merchant on this deployment offers a subscription yet."}
               </Text>
             )}
 
@@ -502,7 +515,9 @@ export default function PayScreen() {
               ? "Split into 4"
               : data.availablePlans.length
                 ? `Subscribe to ${data.availablePlans[planIndex]?.merchant ?? ""}`
-                : "Nothing left to subscribe to"
+                : subscriptions.length
+                  ? "Nothing left to subscribe to"
+                  : "No plans on this deployment"
         }
         full
         loading={busy}
