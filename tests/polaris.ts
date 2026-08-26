@@ -163,9 +163,61 @@ describe("origination and collection", () => {
     // origination — liquidatable one grace period later.
     await expectError(createLoan(h, b, m, 100 * USDC, 4, 0), "InvalidInterval");
     await expectError(createLoan(h, b, m, 100 * USDC, 4, HOUR - 1), "InvalidInterval");
+    await expectError(
+      createLoan(h, b, m, 100 * USDC, 4, 366 * DAY),
+      "InvalidInterval",
+    );
     await expectError(createLoan(h, b, m, 100 * USDC, 0, 7 * DAY), "InvalidInstallments");
     await expectError(createLoan(h, b, m, 100 * USDC, 25, 7 * DAY), "InvalidInstallments");
     await expectError(createLoan(h, b, m, 0, 4, 7 * DAY), "ZeroAmount");
+  });
+});
+
+describe("the interval floor is per deployment", () => {
+  it("a machine-to-machine book can run minutes where a consumer book runs weeks", async () => {
+    // The same argument that makes the grace period per-deployment: an agent
+    // paying per call does not want a week between installments, and a devnet
+    // deployment needs the collection path to be demonstrable inside a demo.
+    const h = await setup({ gracePeriod: 60, minInterval: 60 });
+    await h.fundLiquidity(10_000 * USDC);
+    const m = await h.newMerchant();
+    const b = await h.newBorrower(1_000 * USDC, 500 * USDC);
+
+    const { loan } = await createLoan(h, b, m, 100 * USDC, 4, 60);
+    await h.warpBy(60);
+    await collect(h, loan, b.kp.publicKey, b.ata).rpc();
+    assert.equal((await h.program.account.loan.fetch(loan)).installmentsPaid, 1);
+  });
+
+  it("no deployment may go below the absolute floor", async () => {
+    // Below a minute the schedule stops being a payment plan and becomes a way
+    // to grind a borrower's balance one transaction at a time.
+    await expectError(setup({ minInterval: 59 }), "InvalidInterval");
+    await expectError(setup({ minInterval: -1 }), "InvalidInterval");
+  });
+
+  it("the floor cannot be lowered under a schedule already running", async () => {
+    // set_config deliberately does not expose it, the same way it does not
+    // expose the grace period.
+    const h = await setup({ minInterval: HOUR });
+    const before = await h.program.account.protocol.fetch(h.protocol);
+    await h.program.methods
+      .setConfig(100, 20_000)
+      .accountsPartial({
+        authority: h.payer.publicKey,
+        protocol: h.protocol,
+        treasury: h.treasury,
+      })
+      .signers([h.payer])
+      .rpc();
+    const after = await h.program.account.protocol.fetch(h.protocol);
+    assert.equal(
+      after.minIntervalSeconds.toNumber(),
+      before.minIntervalSeconds.toNumber(),
+      "the interval floor moved",
+    );
+    assert.equal(after.gracePeriod.toNumber(), before.gracePeriod.toNumber());
+    assert.equal(after.feeBps, 100, "set_config did not apply what it should");
   });
 });
 

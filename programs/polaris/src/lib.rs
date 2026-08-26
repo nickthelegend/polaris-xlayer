@@ -45,13 +45,22 @@ pub mod polaris {
 
     // -- protocol ---------------------------------------------------------
 
+    /// `grace_period` and `min_interval_seconds` are fixed here for the life of
+    /// the deployment. Zero means the default for either.
     pub fn initialize(
         ctx: Context<Initialize>,
         grace_period: i64,
+        min_interval_seconds: i64,
         fee_bps: u16,
         credit_multiplier_bps: u16,
     ) -> Result<()> {
-        instructions::initialize::handler(ctx, grace_period, fee_bps, credit_multiplier_bps)
+        instructions::initialize::handler(
+            ctx,
+            grace_period,
+            min_interval_seconds,
+            fee_bps,
+            credit_multiplier_bps,
+        )
     }
 
     pub fn set_config(

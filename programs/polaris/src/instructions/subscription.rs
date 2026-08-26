@@ -47,10 +47,11 @@ pub fn create_plan_handler(
 ) -> Result<()> {
     require!(price_per_period > 0, PolarisError::ZeroAmount);
     require!(name.len() <= MAX_NAME_LEN, PolarisError::StringTooLong);
-    // A period under an hour is almost certainly a mistake, and one over a year
-    // makes the delegation a standing risk for no benefit.
+    // A period below the deployment's floor is almost certainly a mistake, and
+    // one over a year makes the delegation a standing risk for no benefit.
     require!(
-        (MIN_INTERVAL_SECONDS..=MAX_INTERVAL_SECONDS).contains(&period_seconds),
+        (ctx.accounts.protocol.min_interval_seconds..=MAX_INTERVAL_SECONDS)
+            .contains(&period_seconds),
         PolarisError::InvalidPeriod
     );
 

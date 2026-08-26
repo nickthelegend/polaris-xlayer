@@ -62,11 +62,18 @@ pub struct Initialize<'info> {
 pub fn handler(
     ctx: Context<Initialize>,
     grace_period: i64,
+    min_interval_seconds: i64,
     fee_bps: u16,
     credit_multiplier_bps: u16,
 ) -> Result<()> {
     require!(grace_period >= 0, PolarisError::InvalidGracePeriod);
     require!(grace_period <= MAX_GRACE_PERIOD, PolarisError::InvalidGracePeriod);
+    require!(min_interval_seconds >= 0, PolarisError::InvalidInterval);
+    require!(
+        min_interval_seconds == 0
+            || (ABSOLUTE_MIN_INTERVAL_SECONDS..=MAX_INTERVAL_SECONDS).contains(&min_interval_seconds),
+        PolarisError::InvalidInterval
+    );
     require!(fee_bps <= MAX_FEE_BPS, PolarisError::InvalidFee);
     require!(
         credit_multiplier_bps > 0 && credit_multiplier_bps <= MAX_CREDIT_MULTIPLIER_BPS,
@@ -81,6 +88,11 @@ pub fn handler(
         DEFAULT_GRACE_PERIOD
     } else {
         grace_period
+    };
+    p.min_interval_seconds = if min_interval_seconds == 0 {
+        DEFAULT_MIN_INTERVAL_SECONDS
+    } else {
+        min_interval_seconds
     };
     p.loan_count = 0;
     p.plan_count = 0;
@@ -113,8 +125,9 @@ pub struct SetConfig<'info> {
 
 /// Adjust the levers that are safe to move under a live book.
 ///
-/// `grace_period` is deliberately absent: it is fixed at initialization so it
-/// can never be changed under a loan that is already running its schedule.
+/// `grace_period` and `min_interval_seconds` are deliberately absent: both are
+/// fixed at initialization so neither can be changed under a loan that is
+/// already running its schedule.
 pub fn set_config_handler(
     ctx: Context<SetConfig>,
     fee_bps: u16,

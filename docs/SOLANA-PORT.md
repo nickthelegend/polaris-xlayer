@@ -84,11 +84,27 @@ What genuinely still needs writing off-chain:
 - **Priority fees.** Replaces "gas spike" handling. A compute-budget instruction
   with a fee scaled to recent congestion.
 
-The failure taxonomy shifts. `insufficient_funds` survives verbatim.
-`would_revert` becomes a simulation error. `auth` and `spend_cap` become
-**delegate revoked** and **`delegated_amount` exhausted** — both operator-visible,
-neither the borrower's fault, and the ladder already routes those away from
-borrower notifications.
+The failure taxonomy shifts, and one branch changes meaning rather than just
+changing name. `insufficient_funds` survives verbatim — it still dominates a
+credit book. `would_revert` becomes a simulation error.
+
+`auth` and `spend_cap` do **not** map across cleanly, which is worth being
+precise about. On EVM both were purely operator-side: our KeeperHub credentials
+were wrong, or the platform's own spend limit stopped us. The borrower had done
+nothing and the ladder deliberately routed those away from customer
+notifications. The nearest Solana surface is the SPL delegation — and losing it
+is the *borrower's* action, not ours. They revoked it, or another app took the
+single delegate slot on the same token account.
+
+So they become two new kinds with their own short ladder: **delegation lost**
+and **delegation exhausted**. Both notify the borrower promptly, because there
+is exactly one action that fixes them and until it is taken every retry fails
+identically. Filing them under "operator problem, stay quiet" would leave a
+borrower silently defaulting on a plan they believed was running.
+
+That leaves a genuinely operator-side kind — keeper wallet out of SOL, RPC
+credentials rejected — which keeps the old behaviour of never reaching a
+customer.
 
 ---
 

@@ -14,8 +14,24 @@ pub const MAX_GRACE_PERIOD: i64 = 30 * 86_400;
 
 /// Installment schedule bounds.
 pub const MAX_INSTALLMENTS: u32 = 24;
-pub const MIN_INTERVAL_SECONDS: i64 = 3_600;
 pub const MAX_INTERVAL_SECONDS: i64 = 365 * 86_400;
+
+/// Default floor on an installment interval, when the deployer does not pick
+/// one. An hour is right for a consumer book.
+pub const DEFAULT_MIN_INTERVAL_SECONDS: i64 = 3_600;
+
+/// Absolute floor, below which no deployment may go.
+///
+/// The interval floor is per-deployment for exactly the reason the grace period
+/// is: a consumer book wants days between installments, a machine-to-machine
+/// book genuinely wants minutes, and a devnet deployment wants seconds so the
+/// collection and liquidation paths can be demonstrated without waiting a week.
+/// Hard-coding an hour made all three the same book.
+///
+/// It is still a floor rather than a free parameter. Below a minute the
+/// schedule stops being a payment plan and starts being a way to grind a
+/// borrower's balance one transaction at a time.
+pub const ABSOLUTE_MIN_INTERVAL_SECONDS: i64 = 60;
 
 /// Credit score band.
 pub const MIN_SCORE: u16 = 300;

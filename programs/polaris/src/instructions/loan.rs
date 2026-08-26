@@ -88,7 +88,8 @@ pub fn create_handler(
     // interest-free and due in full at origination — liquidatable one grace
     // period later, against a schedule that never existed.
     require!(
-        (MIN_INTERVAL_SECONDS..=MAX_INTERVAL_SECONDS).contains(&interval_seconds),
+        (ctx.accounts.protocol.min_interval_seconds..=MAX_INTERVAL_SECONDS)
+            .contains(&interval_seconds),
         PolarisError::InvalidInterval
     );
 

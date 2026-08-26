@@ -35,6 +35,10 @@ pub struct Protocol {
     /// wants seconds so the liquidation path can be demonstrated without
     /// waiting three days.
     pub grace_period: i64,
+    /// Floor on an installment interval and a subscription period. Fixed at
+    /// initialization, like the grace period, so it cannot be lowered under a
+    /// schedule that is already running.
+    pub min_interval_seconds: i64,
     pub loan_count: u64,
     pub plan_count: u64,
     pub payment_count: u64,

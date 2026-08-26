@@ -42,7 +42,9 @@ export const WEEK = 7 * DAY;
 
 export type Harness = Awaited<ReturnType<typeof setup>>;
 
-export async function setup(opts: { gracePeriod?: number; feeBps?: number } = {}) {
+export async function setup(
+  opts: { gracePeriod?: number; minInterval?: number; feeBps?: number } = {},
+) {
   const context = await startAnchor(process.cwd(), [], []);
   const provider = new BankrunProvider(context);
   const program = new Program<Polaris>(IDL as Polaris, provider);
@@ -217,7 +219,12 @@ export async function setup(opts: { gracePeriod?: number; feeBps?: number } = {}
   const treasury = await tokenAccount(treasuryOwner.publicKey);
 
   await program.methods
-    .initialize(new BN(opts.gracePeriod ?? DAY), opts.feeBps ?? 50, 15_000)
+    .initialize(
+      new BN(opts.gracePeriod ?? DAY),
+      new BN(opts.minInterval ?? HOUR),
+      opts.feeBps ?? 50,
+      15_000,
+    )
     .accountsPartial({
       authority: payer.publicKey,
       protocol,
