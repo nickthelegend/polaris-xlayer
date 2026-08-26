@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, useWindowDimensions, View } from "react-native";
 import Animated from "react-native-reanimated";
 
 import { usePolaris } from "../../src/chain/provider";
@@ -33,6 +33,20 @@ const relativeDays = (unix: number) => {
 
 export default function CreditScreen() {
   const router = useRouter();
+  const { width, height } = useWindowDimensions();
+
+  /*
+   * The orb is sized to the screen, not to a constant.
+   *
+   * At a fixed 252 it filled a small phone edge to edge and took 40% of the
+   * vertical space on a short one, pushing "available to spend" — the number
+   * the screen exists for — below the fold. Bounded by width so it never
+   * touches the gutters, and by height so the figure under it always survives
+   * the fold.
+   */
+  const orbSize = Math.round(
+    Math.max(150, Math.min(252, width * 0.68, height * 0.30)),
+  );
   const { status, data, error, refresh, address } = usePolaris();
   const line = useCreditLine(data);
 
@@ -65,7 +79,7 @@ export default function CreditScreen() {
       ) : null}
 
       <View style={styles.orbWrap}>
-        <CreditOrb score={profile.score} size={252} />
+        <CreditOrb score={profile.score} size={orbSize} />
       </View>
 
       <WalletRow address={address} />

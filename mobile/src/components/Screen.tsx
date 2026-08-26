@@ -123,6 +123,18 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   shell: {
     paddingHorizontal: space.xl,
+    /*
+     * A column, not a wall.
+     *
+     * On a phone this does nothing — the screen is narrower than the cap. On a
+     * tablet or a foldable it stops the content stretching edge to edge, where
+     * a line of prose runs past a comfortable measure and a stat row spreads
+     * so far apart the label loses its figure. The web build caps its column
+     * for the same reason.
+     */
+    width: "100%",
+    maxWidth: 620,
+    alignSelf: "center",
   },
   head: {
     gap: space.sm,

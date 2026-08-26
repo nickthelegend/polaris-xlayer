@@ -296,6 +296,11 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingHorizontal: space.lg,
+    // Matches the content column, so on a tablet the bar sits under the
+    // content rather than spanning away from it.
+    width: "100%",
+    maxWidth: 620 + space.lg * 2,
+    alignSelf: "center",
   },
   bar: {
     flexDirection: "row",

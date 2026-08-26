@@ -79,7 +79,15 @@ export default function PayScreen() {
     transform: [{ translateX: shake.value }],
   }));
 
-  const refuse = () => {
+  /**
+   * Refuse, and say why.
+   *
+   * This used to shake and stop. Safe — nothing was sent — but the user is
+   * left guessing what they did wrong, which is the difference between a form
+   * that validates and a form that just resists.
+   */
+  const refuse = (why: string) => {
+    setResult({ ok: false, message: why });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     shake.value = withSequence(
       withTiming(-8, { duration: 55 }),
@@ -123,8 +131,12 @@ export default function PayScreen() {
 
   const submit = async () => {
     if (inFlight.current) return;
-    if (amount <= 0) return refuse();
-    if (!affordable) return refuse();
+    if (amount <= 0) return refuse("Enter an amount above zero.");
+    if (!affordable) {
+      return refuse(
+        "That is more than your available credit. Repay a plan or lock collateral to raise the limit.",
+      );
+    }
 
     inFlight.current = true;
     setBusy(true);
@@ -178,10 +190,12 @@ export default function PayScreen() {
         });
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Clear the amount. Leaving a completed purchase armed in the field is
+      // how a second tap becomes a second purchase nobody meant to make.
+      setRaw("0");
       await refresh();
     } catch (e: any) {
-      refuse();
-      setResult({ ok: false, message: explainError(e) });
+      refuse(explainError(e));
     } finally {
       inFlight.current = false;
       setBusy(false);
