@@ -21,10 +21,11 @@ custom-panic = []
 
 [dependencies]
 anchor-lang = { version = "0.32.1", features = ["init-if-needed"] }
+# anchor-spl's default features stay on: Anchor's `token::mint = ...` init
+# constraints generate code against the unified token interface, so dropping
+# token_2022 does not compile even for a program that only ever touches classic
+# SPL mints.
 anchor-spl = "0.32.1"
-# Already in the tree via anchor-spl; taken directly so payment PDAs can be
-# seeded by a hash of the merchant order id.
-solana-sha256-hasher = "2.3"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

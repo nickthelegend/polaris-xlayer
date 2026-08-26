@@ -3,10 +3,16 @@
 //! Two things every transfer in this program does, and why:
 //!
 //! **Balance-delta measurement.** What is credited is what the destination
-//! actually received, never what was asked for. Classic SPL USDC has no
-//! transfer fee, but Token-2022 does, and a fee-bearing mint would otherwise
-//! over-credit a borrower for money the protocol never got. One extra account
-//! reload is cheap insurance.
+//! actually received, never what was asked for.
+//!
+//! Nothing can currently make those differ: the program pins
+//! `Program<'info, Token>`, so every mint it touches is a classic SPL mint with
+//! no transfer fee. The measurement is there because the day someone wants a
+//! Token-2022 mint with the transfer-fee extension, that has to be a
+//! configuration change rather than a re-audit of every path that moves money.
+//! The Solidity original reached the same conclusion from the other direction —
+//! USDC supports fee-on-transfer and merely has it disabled — and one account
+//! reload is a cheap way to never find out the hard way.
 //!
 //! **Typed delegation checks.** SPL enforces the delegation itself and would
 //! fail the CPI anyway, but it fails with a generic token error. The dunning

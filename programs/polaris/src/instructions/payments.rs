@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use solana_sha256_hasher::hash;
 use anchor_spl::token::{Token, TokenAccount};
 
 use crate::constants::*;
@@ -10,7 +9,7 @@ use crate::state::{Merchant, Payment, Protocol};
 use crate::token_ops;
 
 #[derive(Accounts)]
-#[instruction(amount: u64, order_id: String, order_hash: [u8; 32])]
+#[instruction(amount: u64, order_ref: [u8; 32])]
 pub struct Pay<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -25,25 +24,21 @@ pub struct Pay<'info> {
     )]
     pub merchant: Account<'info, Merchant>,
 
-    /// Seeded by (merchant, sha256(order id)).
+    /// Seeded by (merchant, order reference).
     ///
     /// On EVM this was `keccak256(merchant, orderId)` used as a mapping key,
     /// with an explicit `if (payments[id].paidAt != 0) revert DuplicatePayment`.
     /// Here the address *is* the guard: a retrying checkout hits an account
-    /// that already exists and `init` fails. The check cannot be forgotten
+    /// that already exists and `init` fails. The check cannot be forgotten,
     /// because it is not a check.
     ///
-    /// The digest arrives as an argument rather than being computed inside the
-    /// seed expression, because Anchor's IDL builder can only represent seeds
-    /// built from plain accounts, constants and arguments — a function call
-    /// there compiles for SBF but cannot be described to a client. The handler
-    /// recomputes it from `order_id` and rejects a mismatch, so passing a
-    /// digest that does not belong to the order is not a way in.
+    /// The reference is the identifier itself rather than a digest of a string
+    /// carried alongside it. Nothing to recompute means nothing to disagree.
     #[account(
         init,
         payer = payer,
         space = 8 + Payment::INIT_SPACE,
-        seeds = [PAYMENT_SEED, merchant.key().as_ref(), &order_hash],
+        seeds = [PAYMENT_SEED, merchant.key().as_ref(), &order_ref],
         bump,
     )]
     pub payment: Account<'info, Payment>,
@@ -72,25 +67,8 @@ pub struct Pay<'info> {
 }
 
 /// Pay a merchant in full, now. The mode that is not credit.
-pub fn pay_handler(
-    ctx: Context<Pay>,
-    amount: u64,
-    order_id: String,
-    order_hash: [u8; 32],
-) -> Result<()> {
+pub fn pay_handler(ctx: Context<Pay>, amount: u64, order_ref: [u8; 32]) -> Result<()> {
     require!(amount > 0, PolarisError::ZeroAmount);
-    require!(
-        order_id.len() <= MAX_ORDER_ID_LEN,
-        PolarisError::StringTooLong
-    );
-    // The digest is what addresses the account, so it has to be the digest of
-    // the order this payment claims to settle. Without this a payer could
-    // occupy an unrelated address and the merchant's "has order X been paid?"
-    // lookup would miss a payment that really happened.
-    require!(
-        hash(order_id.as_bytes()).to_bytes() == order_hash,
-        PolarisError::OrderHashMismatch
-    );
 
     let now = Clock::get()?.unix_timestamp;
     let fee = math::flat_fee(amount, ctx.accounts.protocol.fee_bps)?;
@@ -116,6 +94,7 @@ pub fn pay_handler(
     p.merchant = ctx.accounts.merchant.key();
     p.amount = to_merchant.saturating_add(to_treasury);
     p.fee = to_treasury;
+    p.order_ref = order_ref;
     p.paid_at = now;
     p.bump = ctx.bumps.payment;
 
@@ -129,7 +108,7 @@ pub fn pay_handler(
         merchant: p.merchant,
         amount: p.amount,
         fee: p.fee,
-        order_id,
+        order_ref,
     });
     Ok(())
 }

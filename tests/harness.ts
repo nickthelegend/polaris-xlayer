@@ -42,6 +42,23 @@ export const WEEK = 7 * DAY;
 
 export type Harness = Awaited<ReturnType<typeof setup>>;
 
+/**
+ * A merchant order id as the program sees it: exactly 32 bytes.
+ *
+ * Short ids go in directly, right-aligned; anything longer is hashed. The
+ * program takes only these 32 bytes, so there is no second representation for
+ * it to disagree with.
+ */
+export function orderRef(orderId: string): Buffer {
+  const bytes = Buffer.from(orderId, "utf8");
+  if (bytes.length <= 32) {
+    const out = Buffer.alloc(32);
+    bytes.copy(out, 32 - bytes.length);
+    return out;
+  }
+  return createHash("sha256").update(bytes).digest();
+}
+
 export async function setup(
   opts: { gracePeriod?: number; minInterval?: number; feeBps?: number } = {},
 ) {
@@ -77,10 +94,9 @@ export async function setup(
       [Buffer.from("sub"), subscriber.toBuffer(), plan.toBuffer()],
       pid,
     )[0];
-  const orderHash = (orderId: string) => createHash("sha256").update(orderId).digest();
   const paymentOf = (merchant: PublicKey, orderId: string) =>
     PublicKey.findProgramAddressSync(
-      [Buffer.from("payment"), merchant.toBuffer(), orderHash(orderId)],
+      [Buffer.from("payment"), merchant.toBuffer(), orderRef(orderId)],
       pid,
     )[0];
 
@@ -313,7 +329,7 @@ export async function setup(
     planOf,
     subOf,
     paymentOf,
-    orderHash,
+    orderRef,
     send,
     wallet,
     fundSol,

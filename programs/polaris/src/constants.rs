@@ -76,6 +76,15 @@ pub const PAYMENT_SEED: &[u8] = b"payment";
 /// String caps, so account sizes are fixed at declaration.
 pub const MAX_NAME_LEN: usize = 64;
 pub const MAX_URI_LEN: usize = 128;
-/// Order ids longer than this are rejected rather than silently truncated into
-/// a colliding PDA seed.
-pub const MAX_ORDER_ID_LEN: usize = 64;
+/// An order reference is exactly 32 bytes.
+///
+/// Not a string, and not a digest the program recomputes. Both of those were
+/// tried. A string has to be capped somewhere and then hashed into the seed,
+/// which means carrying a digest alongside it and checking they agree — and a
+/// caller who passes a digest belonging to a different order can occupy the
+/// address a legitimate payment needed. One 32-byte identifier makes that
+/// mismatch unrepresentable.
+///
+/// Short order ids go in directly as UTF-8, left-padded with zeros; anything
+/// longer is hashed to 32 bytes by the caller. The SDK's `orderRef` does both.
+pub const ORDER_REF_LEN: usize = 32;

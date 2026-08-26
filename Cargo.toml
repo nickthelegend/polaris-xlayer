@@ -3,9 +3,17 @@ members = ["programs/*"]
 resolver = "2"
 
 [profile.release]
+# overflow-checks stays on in release. This program is entirely arithmetic on
+# other people's money; a silent wrap is worse than a failed transaction.
 overflow-checks = true
 lto = "fat"
 codegen-units = 1
+# Optimize for size, not speed. On Solana the binary size is paid twice — once
+# in rent, forever, and once in every upgrade's transient buffer — while the
+# compute budget is nowhere near binding for a program that does a handful of
+# integer operations and two token CPIs.
+opt-level = "s"
+strip = true
 
 [profile.release.build-override]
 opt-level = 3

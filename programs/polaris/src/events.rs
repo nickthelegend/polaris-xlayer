@@ -90,7 +90,7 @@ pub struct PaymentMade {
     pub merchant: Pubkey,
     pub amount: u64,
     pub fee: u64,
-    pub order_id: String,
+    pub order_ref: [u8; 32],
 }
 
 #[event]

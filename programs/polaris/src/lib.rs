@@ -146,15 +146,11 @@ pub mod polaris {
 
     // -- pay now ----------------------------------------------------------
 
-    /// `order_hash` must be sha256(`order_id`). It addresses the payment
-    /// account, which is what makes a retried checkout idempotent.
-    pub fn pay(
-        ctx: Context<Pay>,
-        amount: u64,
-        order_id: String,
-        order_hash: [u8; 32],
-    ) -> Result<()> {
-        instructions::payments::pay_handler(ctx, amount, order_id, order_hash)
+    /// `order_ref` is the merchant's 32-byte reference for this order. It
+    /// addresses the payment account, which is what makes a retried checkout
+    /// idempotent without a duplicate check.
+    pub fn pay(ctx: Context<Pay>, amount: u64, order_ref: [u8; 32]) -> Result<()> {
+        instructions::payments::pay_handler(ctx, amount, order_ref)
     }
 
     // -- subscriptions ----------------------------------------------------

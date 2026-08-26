@@ -10,7 +10,7 @@ import { BN } from "@coral-xyz/anchor";
 import { PublicKey, SystemProgram, Keypair } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
-import { setup, expectError, Harness, USDC, HOUR, DAY, WEEK } from "./harness";
+import { setup, expectError, orderRef, Harness, USDC, HOUR, DAY, WEEK } from "./harness";
 
 /** Mirrors `math::interest_for` exactly. */
 function interestFor(principal: number, termSeconds: number): number {
@@ -695,7 +695,7 @@ describe("pay now", () => {
     const fee = Math.floor((amount * 50) / 10_000);
 
     await h.program.methods
-      .pay(new BN(amount), "ORD-1", Array.from(h.orderHash("ORD-1")))
+      .pay(new BN(amount), Array.from(orderRef("ORD-1")))
       .accountsPartial({
         payer: payer.publicKey,
         protocol: h.protocol,
@@ -722,7 +722,7 @@ describe("pay now", () => {
 
     const pay = () =>
       h.program.methods
-        .pay(new BN(25 * USDC), "ORD-DUP", Array.from(h.orderHash("ORD-DUP")))
+        .pay(new BN(25 * USDC), Array.from(orderRef("ORD-DUP")))
         .accountsPartial({
           payer: payer.publicKey,
           protocol: h.protocol,
@@ -741,20 +741,61 @@ describe("pay now", () => {
     await expectError(pay().rpc(), "already in use");
   });
 
-  it("rejects a digest that does not belong to the order", async () => {
+  it("keeps different orders at different addresses", async () => {
+    // The digest-mismatch case this used to test is no longer representable:
+    // the program takes one 32-byte reference and no string to disagree with
+    // it. What still has to hold is that two orders never collide.
     const h = await setup();
     const m = await h.newMerchant();
     const payer = await h.wallet();
     const ata = await h.tokenAccount(payer.publicKey, 1_000 * USDC);
 
-    await expectError(
+    const payFor = (order: string) =>
       h.program.methods
-        .pay(new BN(10 * USDC), "ORD-A", Array.from(h.orderHash("ORD-B")))
+        .pay(new BN(5 * USDC), Array.from(orderRef(order)))
         .accountsPartial({
           payer: payer.publicKey,
           protocol: h.protocol,
           merchant: m.merchant,
-          payment: h.paymentOf(m.merchant, "ORD-B"),
+          payment: h.paymentOf(m.merchant, order),
+          payerTokenAccount: ata,
+          merchantPayout: m.payout,
+          treasury: h.treasury,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([payer]);
+
+    await payFor("ORD-A").rpc();
+    await payFor("ORD-B").rpc();
+
+    const a = await h.program.account.payment.fetch(h.paymentOf(m.merchant, "ORD-A"));
+    const b = await h.program.account.payment.fetch(h.paymentOf(m.merchant, "ORD-B"));
+    assert.notDeepEqual(a.orderRef, b.orderRef);
+    assert.deepEqual(Buffer.from(a.orderRef), orderRef("ORD-A"));
+    assert.equal((await h.readToken(m.payout)).amount, 2 * (5 * USDC) - 2 * Math.floor((5 * USDC * 50) / 10_000));
+  });
+
+  it("an order id too long to fit is hashed, not truncated into a collision", async () => {
+    // Truncation would make two long ids sharing a 32-byte prefix the same
+    // order, and the second payment would be refused as a duplicate.
+    const long1 = "order-" + "x".repeat(40) + "-A";
+    const long2 = "order-" + "x".repeat(40) + "-B";
+    assert.notDeepEqual(orderRef(long1), orderRef(long2));
+
+    const h = await setup();
+    const m = await h.newMerchant();
+    const payer = await h.wallet();
+    const ata = await h.tokenAccount(payer.publicKey, 1_000 * USDC);
+
+    for (const order of [long1, long2]) {
+      await h.program.methods
+        .pay(new BN(1 * USDC), Array.from(orderRef(order)))
+        .accountsPartial({
+          payer: payer.publicKey,
+          protocol: h.protocol,
+          merchant: m.merchant,
+          payment: h.paymentOf(m.merchant, order),
           payerTokenAccount: ata,
           merchantPayout: m.payout,
           treasury: h.treasury,
@@ -762,9 +803,8 @@ describe("pay now", () => {
           systemProgram: SystemProgram.programId,
         })
         .signers([payer])
-        .rpc(),
-      "OrderHashMismatch",
-    );
+        .rpc();
+    }
   });
 });
 

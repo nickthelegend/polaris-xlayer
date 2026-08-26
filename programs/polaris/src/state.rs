@@ -156,6 +156,8 @@ pub struct Subscription {
 pub struct Payment {
     pub payer: Pubkey,
     pub merchant: Pubkey,
+    /// The 32-byte reference this payment settles. Also its PDA seed.
+    pub order_ref: [u8; 32],
     pub amount: u64,
     pub fee: u64,
     pub paid_at: i64,

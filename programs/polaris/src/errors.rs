@@ -55,6 +55,4 @@ pub enum PolarisError {
     TokenOwnerMismatch,
     #[msg("Token account mint is not the protocol stablecoin")]
     MintMismatch,
-    #[msg("Order hash does not match the order id")]
-    OrderHashMismatch,
 }
