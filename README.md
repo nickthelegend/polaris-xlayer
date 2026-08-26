@@ -201,7 +201,7 @@ cannot move the clock can only test origination.
 | Program | `ApAHXF7U1Z8WKDYKM7ZvBMeho7tSkGQZS1LsaTNyzCra` |
 | Devnet | **live** — deployed, initialised, and exercised |
 | Localnet | full lifecycle verified, including a liquidation |
-| Android | verified on device against a live cluster |
+| Android | runs on an emulator against a live cluster — never on physical hardware |
 | Size | 571 KB, clean SBF build |
 
 Devnet carries the current build, an initialised protocol, a funded pool, and a
