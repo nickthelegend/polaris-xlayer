@@ -100,8 +100,61 @@ export async function setup(
       pid,
     )[0];
 
+  // ---- the clock -------------------------------------------------------
+  //
+  // Two jobs, and they fight each other unless they are the same function.
+  //
+  // Bankrun rejects a transaction whose signature it has already seen, and two
+  // identical instructions signed by the same key against the same blockhash
+  // *are* the same signature. Refusing a second subscription, or a second
+  // origination against an exhausted delegation, are real behaviours this suite
+  // has to test — so the bank has to advance between sends or the runtime
+  // refuses the transaction before the program ever runs, and the test passes
+  // for the wrong reason.
+  //
+  // But `warpToSlot` recomputes the clock from the slot, which throws away any
+  // timestamp a previous warp set. So the intended time is tracked here and
+  // re-applied after every advance, and every send goes through it.
+  let simulatedTime: bigint | null = null;
+
+  async function advance(seconds = 0) {
+    const c = await context.banksClient.getClock();
+    const target = (simulatedTime ?? c.unixTimestamp) + BigInt(Math.floor(seconds));
+    context.warpToSlot(c.slot + 1n);
+    const after = await context.banksClient.getClock();
+    context.setClock(
+      new Clock(
+        after.slot,
+        after.epochStartTimestamp,
+        after.epoch,
+        after.leaderScheduleEpoch,
+        target,
+      ),
+    );
+    simulatedTime = target;
+  }
+
+  /** Advance the bank without moving the clock. */
+  const tick = () => advance(0);
+
+  /** Move the chain clock forward. */
+  const warpBy = (seconds: number) => advance(seconds);
+
+  async function now(): Promise<number> {
+    return Number((await context.banksClient.getClock()).unixTimestamp);
+  }
+
+  // Every transaction Anchor sends advances the bank first, so no test has to
+  // remember to do it and none can silently start passing for the wrong reason.
+  const anchorSend = provider.sendAndConfirm!.bind(provider);
+  provider.sendAndConfirm = async (tx: any, signers?: any, opts?: any) => {
+    await advance(0);
+    return anchorSend(tx, signers, opts);
+  };
+
   // ---- transaction plumbing -------------------------------------------
   async function send(ixs: any[], signers: Keypair[] = []) {
+    await advance(0);
     const tx = new Transaction();
     tx.add(...ixs);
     tx.feePayer = payer.publicKey;
@@ -190,44 +243,6 @@ export async function setup(
       delegatedAmount: d.delegateOption === 1 ? Number(d.delegatedAmount) : 0,
       owner: new PublicKey(d.owner),
     };
-  }
-
-  // ---- the clock -------------------------------------------------------
-  async function now(): Promise<number> {
-    return Number((await context.banksClient.getClock()).unixTimestamp);
-  }
-
-  /**
-   * Advance the bank by whole slots.
-   *
-   * Needed independently of the clock: bankrun rejects a transaction whose
-   * signature it has already seen, and two identical instructions signed by the
-   * same key against the same blockhash produce the same signature. Repaying
-   * one base unit four times in a row is a real thing this protocol has to
-   * survive, so the test has to be able to send it four times.
-   */
-  async function tick(slots = 1) {
-    const c = await context.banksClient.getClock();
-    context.warpToSlot(c.slot + BigInt(slots));
-  }
-
-  /** Move the chain clock forward, rotating the blockhash on the way. */
-  async function warpBy(seconds: number) {
-    const c = await context.banksClient.getClock();
-    const target = c.unixTimestamp + BigInt(Math.floor(seconds));
-    // Advance the bank first — warpToSlot recomputes the clock from the slot,
-    // so setting the timestamp before it would be overwritten.
-    context.warpToSlot(c.slot + 1n);
-    const after = await context.banksClient.getClock();
-    context.setClock(
-      new Clock(
-        after.slot,
-        after.epochStartTimestamp,
-        after.epoch,
-        after.leaderScheduleEpoch,
-        target,
-      ),
-    );
   }
 
   // ---- stand the protocol up ------------------------------------------

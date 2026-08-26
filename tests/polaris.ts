@@ -720,25 +720,38 @@ describe("pay now", () => {
     const payer = await h.wallet();
     const ata = await h.tokenAccount(payer.publicKey, 1_000 * USDC);
 
-    const pay = () =>
+    // A second payer, deliberately. Sending the identical transaction twice
+    // proves nothing here: the runtime rejects a repeated signature before the
+    // program ever runs, so the test would pass on replay protection rather
+    // than on the guard it is meant to be checking. The protocol guarantee is
+    // stronger than that — this order is unpayable again by *anyone*.
+    const other = await h.wallet();
+    const otherAta = await h.tokenAccount(other.publicKey, 1_000 * USDC);
+
+    const payAs = (who: Keypair, from: PublicKey) =>
       h.program.methods
         .pay(new BN(25 * USDC), Array.from(orderRef("ORD-DUP")))
         .accountsPartial({
-          payer: payer.publicKey,
+          payer: who.publicKey,
           protocol: h.protocol,
           merchant: m.merchant,
           payment: h.paymentOf(m.merchant, "ORD-DUP"),
-          payerTokenAccount: ata,
+          payerTokenAccount: from,
           merchantPayout: m.payout,
           treasury: h.treasury,
           tokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
         })
-        .signers([payer]);
+        .signers([who]);
 
-    await pay().rpc();
+    await payAs(payer, ata).rpc();
+
     // The address is the guard: the second init hits an account that exists.
-    await expectError(pay().rpc(), "already in use");
+    await expectError(payAs(other, otherAta).rpc(), "already in use");
+
+    // And the merchant was paid exactly once.
+    const fee = Math.floor((25 * USDC * 50) / 10_000);
+    assert.equal((await h.readToken(m.payout)).amount, 25 * USDC - fee);
   });
 
   it("keeps different orders at different addresses", async () => {
