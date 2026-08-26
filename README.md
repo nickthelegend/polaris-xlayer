@@ -282,32 +282,13 @@ cannot move the clock can only test origination.
 | | |
 |---|---|
 | Program | `CpRqbMywzAEKkEALZtrXqPYM36E5RrFewYnRtUYEEvUS` |
-| Devnet | **not currently deployed** — see below |
+| Devnet | **live** — deployed, initialised, and exercised |
 | Localnet | full lifecycle verified, including a liquidation |
 | Android | runs on an emulator against a live cluster — never on physical hardware |
 | Size | 593 KB, clean SBF build |
 
-Devnet is empty right now, and the reason is worth stating plainly rather than
-leaving a stale address in a table.
-
-The build that was on devnet predates underwriting. Upgrading needs a transient
-buffer of about 4.14 SOL, and the deploy wallet held 0.15, so the old program
-was closed to reclaim its rent — which returned 3.98 and left the wallet
-**0.012 SOL short** of the new binary. The devnet faucet is rate-limited by IP
-and refused every request after that. The only other SOL on the wallet is rent
-inside three unrelated programs, which are not this project's to close.
-
-So: closing before confirming the funds was the wrong order, and this is the
-cost of it. Everything below runs against a local validator instead, which is a
-real cluster with real signatures — but it is not a public one, and the table
-says so.
-
-To put it back, with a wallet holding ~4.2 SOL:
-
-```bash
-solana program deploy target/deploy/polaris.so \
-  --program-id target/deploy/polaris-keypair.json --url devnet
-```
+Devnet carries the current build, an initialised protocol, a funded pool and a
+real plan opened against it. One command puts it there, or confirms it:
 
 ```bash
 POLARIS_CLUSTER=devnet pnpm exec tsx scripts/prove.ts

@@ -20,13 +20,14 @@ import { fileURLToPath } from "node:url";
 import { AnchorProvider, BN, Program, type Idl } from "@coral-xyz/anchor";
 import { Connection, Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import {
-
-
+  MINT_SIZE,
   TOKEN_PROGRAM_ID,
   createApproveInstruction,
   createAssociatedTokenAccountInstruction,
+  createInitializeMint2Instruction,
   createMintToInstruction,
   getAssociatedTokenAddressSync,
+  getMinimumBalanceForRentExemptMint,
 } from "@solana/spl-token";
 
 /**
@@ -89,7 +90,83 @@ async function main() {
 
   const protocolPda = pda([Buffer.from("protocol")]);
   const liquidityVault = pda([Buffer.from("liquidity")]);
-  const proto: any = await (program.account as any).protocol.fetch(protocolPda);
+  const collateralVault = pda([Buffer.from("collateral_vault")]);
+
+  /*
+   * Stand the protocol up if it is not there yet.
+   *
+   * This script's job is to prove a deployment, and a freshly deployed program
+   * has nothing to prove yet — it used to fail on "Account does not exist"
+   * against exactly the deployment someone most wants to check. Everything
+   * below is idempotent, so running it against a live protocol skips straight
+   * to opening a plan.
+   */
+  let proto: any = await (program.account as any).protocol.fetchNullable(protocolPda);
+  if (!proto) {
+    const mintKp = Keypair.generate();
+    const rent = await getMinimumBalanceForRentExemptMint(connection);
+    const treasuryAta = getAssociatedTokenAddressSync(mintKp.publicKey, me.publicKey, true);
+
+    await pace();
+    await provider.sendAndConfirm(
+      new Transaction().add(
+        SystemProgram.createAccount({
+          fromPubkey: me.publicKey,
+          newAccountPubkey: mintKp.publicKey,
+          space: MINT_SIZE,
+          lamports: rent,
+          programId: TOKEN_PROGRAM_ID,
+        }),
+        createInitializeMint2Instruction(mintKp.publicKey, 6, me.publicKey, null),
+        createAssociatedTokenAccountInstruction(
+          me.publicKey,
+          treasuryAta,
+          me.publicKey,
+          mintKp.publicKey,
+        ),
+      ),
+      [mintKp],
+    );
+
+    await pace();
+    await program.methods
+      // A 60s grace and a 60s interval floor: this is a demonstration cluster,
+      // and a three-day grace makes the liquidation path unobservable.
+      .initialize(new BN(60), new BN(60), 50, 15_000)
+      .accountsPartial({
+        authority: me.publicKey,
+        protocol: protocolPda,
+        stablecoin: mintKp.publicKey,
+        treasury: treasuryAta,
+        liquidityVault,
+        collateralVault,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+
+    await pace();
+    await provider.sendAndConfirm(
+      new Transaction().add(
+        createMintToInstruction(mintKp.publicKey, treasuryAta, me.publicKey, 10_000 * USDC),
+      ),
+    );
+    await pace();
+    await program.methods
+      .fundLiquidity(new BN(5_000 * USDC))
+      .accountsPartial({
+        funder: me.publicKey,
+        protocol: protocolPda,
+        from: treasuryAta,
+        liquidityVault,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    console.log("0. stood the protocol up and funded the pool");
+    proto = await (program.account as any).protocol.fetch(protocolPda);
+  }
+
   const mint = proto.stablecoin as PublicKey;
 
   console.log(`cluster   ${CLUSTER}`);
