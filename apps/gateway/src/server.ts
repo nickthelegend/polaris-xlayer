@@ -170,6 +170,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
        * fails on a missing profile -- which is exactly the moment a payments
        * product cannot afford to fail.
        */
+      await fetchMerchant(order.merchant);
+
       if (order.mode === "later") {
         await underwrite(customer, chain);
       }
@@ -200,11 +202,11 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       throw new HttpError(400, "Open this with ?merchant=<address>&amount=<base units>");
     }
     const order = parseOrder(url, orderId);
+    const merchantAccount = await fetchMerchant(order.merchant);
+
     const requestUrl = `${PUBLIC_URL}/pay/${encodeURIComponent(orderId)}?merchant=${merchant}&amount=${amount}&mode=${order.mode}&installments=${order.installmentCount}&interval=${order.intervalSeconds}`;
     const solanaPayUrl = `solana:${encodeURIComponent(requestUrl)}`;
     const qr = await QRCode.toString(solanaPayUrl, { type: "svg", margin: 1, width: 320 });
-
-    const merchantAccount: any = await chain.program.account.merchant.fetch(order.merchant);
     const html = checkoutPage({
       qr,
       solanaPayUrl,
@@ -220,6 +222,23 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
 
   throw new HttpError(404, `No route for ${req.method} ${path}`);
+}
+
+/**
+ * The merchant account, or a 404 that says so.
+ *
+ * A well-formed address for a merchant that was never registered -- or one
+ * from a cluster that has since been reset -- is a caller's mistake, not a
+ * fault on our side. Left to Anchor it surfaced as "Account does not exist",
+ * which the catch-all turned into a 500 and the sentence "Something went wrong
+ * on our side." It did not go wrong on our side.
+ */
+async function fetchMerchant(pda: PublicKey): Promise<{ name: unknown; payout: PublicKey }> {
+  const account = await chain.program.account.merchant.fetchNullable(pda);
+  if (!account) {
+    throw new HttpError(404, "That merchant is not registered on this deployment.");
+  }
+  return account as unknown as { name: unknown; payout: PublicKey };
 }
 
 function readName(name: unknown): string {

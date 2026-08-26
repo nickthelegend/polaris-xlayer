@@ -1,4 +1,4 @@
-import * as Haptics from "expo-haptics";
+import { failed, press, selected, succeeded, tap } from "../../src/lib/haptics";
 import { useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Animated, {
@@ -88,7 +88,7 @@ export default function PayScreen() {
    */
   const refuse = (why: string) => {
     setResult({ ok: false, message: why });
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    failed();
     shake.value = withSequence(
       withTiming(-8, { duration: 55 }),
       withTiming(8, { duration: 55 }),
@@ -116,7 +116,7 @@ export default function PayScreen() {
   const affordable = mode !== "later" || plan.totalOwed <= line.available;
 
   const press = (key: string) => {
-    Haptics.selectionAsync();
+    selected();
     setResult(null);
     setRaw((cur) => {
       if (key === "⌫") return cur.length <= 1 ? "0" : cur.slice(0, -1);
@@ -189,7 +189,7 @@ export default function PayScreen() {
           signature,
         });
       }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      succeeded();
       // Clear the amount. Leaving a completed purchase armed in the field is
       // how a second tap becomes a second purchase nobody meant to make.
       setRaw("0");

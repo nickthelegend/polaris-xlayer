@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import * as Haptics from "expo-haptics";
+import { failed, press, selected, succeeded, tap } from "../lib/haptics";
 import React from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View, ViewStyle } from "react-native";
 import Animated, {
@@ -93,11 +93,8 @@ export function Button({
         disabled={inert}
         onPressIn={() => {
           pressed.value = withSpring(1, motion.spring.press);
-          Haptics.impactAsync(
-            isPrimary
-              ? Haptics.ImpactFeedbackStyle.Medium
-              : Haptics.ImpactFeedbackStyle.Light,
-          );
+          if (isPrimary) press();
+          else tap();
         }}
         onPressOut={() => {
           pressed.value = withSpring(0, motion.spring.press);
@@ -118,7 +115,7 @@ export function Button({
       >
         {/* The upper-edge sheen. Same idea as a Surface, brighter on the lime. */}
         {!isGhost && (
-          <Animated.View style={[StyleSheet.absoluteFill, glow]} pointerEvents="none">
+          <Animated.View style={[StyleSheet.absoluteFill, glow, { pointerEvents: "none" }]}>
             <LinearGradient
               colors={[
                 isPrimary ? "rgba(255,255,255,0.28)" : ink.highlight,

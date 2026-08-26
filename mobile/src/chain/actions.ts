@@ -192,9 +192,22 @@ export async function subscribeToPlan(params: {
  * stack of program ids, which tells a user nothing.
  */
 export function explainError(e: any): string {
-  const text = `${e?.message ?? e}\n${(e?.logs ?? []).join("\n")}`;
+  /*
+   * `getLogs()` as well as `.logs`.
+   *
+   * web3.js throws SendTransactionError, whose `logs` are often not populated
+   * until something asks for them — so the program's own error name was
+   * missing from the text this matches on, and every failed simulation
+   * collapsed to the words "Simulation failed", which tells a borrower
+   * nothing. `logs` is a plain property once resolved; reading both covers
+   * the case where it already is.
+   */
+  const fromGetter = typeof e?.getLogs === "function" ? safeLogs(e) : [];
+  const logs: string[] = e?.logs ?? fromGetter ?? [];
+  const text = `${e?.message ?? e}\n${logs.join("\n")}`;
   const code = text.match(/Error Code: (\w+)/)?.[1];
   const map: Record<string, string> = {
+    AccountNotInitialized: "This wallet has no USDC account yet. Add some and try again.",
     ExceedsCreditLimit: "That is more credit than your limit allows.",
     InsufficientDelegation: "Your payment authorisation does not cover this.",
     NotDelegated: "Your account is not authorised for Polaris yet.",
@@ -208,6 +221,9 @@ export function explainError(e: any): string {
   if (code && map[code]) return map[code];
   if (/already in use/i.test(text)) return "That order has already been paid.";
   if (/insufficient funds|0x1\b/.test(text)) return "Your balance does not cover this.";
+  if (/could not find account|AccountNotInitialized|invalid account data/i.test(text)) {
+    return "This wallet has no USDC account yet. Add some and try again.";
+  }
   // Not a borrower's problem, and not something they can retry into working:
   // the app is pointed at an address with no program on it.
   if (/program that does not exist|ProgramAccountNotFound/i.test(text)) {
@@ -234,4 +250,15 @@ export function explainError(e: any): string {
   if (message && message.length <= 120) return message;
   if (__DEV__) console.error("[polaris] unexplained failure:", e);
   return "The transaction was refused. Nothing was charged.";
+}
+
+
+/** `getLogs()` can itself throw when the RPC is gone; a diagnostic must not. */
+function safeLogs(e: any): string[] {
+  try {
+    const logs = e.getLogs();
+    return Array.isArray(logs) ? logs : [];
+  } catch {
+    return [];
+  }
 }

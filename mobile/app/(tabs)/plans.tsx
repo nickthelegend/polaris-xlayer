@@ -1,4 +1,4 @@
-import * as Haptics from "expo-haptics";
+import { failed, press, selected, succeeded, tap } from "../../src/lib/haptics";
 import React, { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, {
@@ -83,7 +83,7 @@ function LoanCard({ loan, index }: { loan: Loan; index: number }) {
       <Surface padded={18}>
         <Pressable
           onPress={() => {
-            Haptics.selectionAsync();
+            selected();
             setOpen((v) => !v);
           }}
         >
@@ -246,7 +246,7 @@ export default function PlansScreen() {
               key={t}
               style={[styles.segmentItem, on && styles.segmentOn]}
               onPress={() => {
-                Haptics.selectionAsync();
+                selected();
                 setTab(t);
               }}
             >

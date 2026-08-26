@@ -46,10 +46,9 @@ export const elevation = {
       android: { elevation: 6 },
       default: {},
     }),
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
+    // boxShadow, not shadow*: the shadow* props are deprecated on the New
+    // Architecture and warn on every render. Same values, CSS spelling.
+    boxShadow: "0px 8px 16px rgba(0, 0, 0, 0.5)",
   } as ViewStyle,
 
   lifted: {
@@ -57,10 +56,7 @@ export const elevation = {
       android: { elevation: 12 },
       default: {},
     }),
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.6,
-    shadowRadius: 24,
+    boxShadow: "0px 16px 24px rgba(0, 0, 0, 0.6)",
   } as ViewStyle,
 
   /** What the lime casts. Used sparingly — it is the loudest thing available. */
@@ -69,10 +65,7 @@ export const elevation = {
       android: { elevation: 10 },
       default: {},
     }),
-    shadowColor: palette.glow,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.45,
-    shadowRadius: 20,
+    boxShadow: "0px 0px 20px rgba(166, 242, 74, 0.45)",
   } as ViewStyle,
 } as const;
 

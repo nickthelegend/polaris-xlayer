@@ -155,10 +155,7 @@ const styles = StyleSheet.create({
   },
   dotDue: {
     // The one that is due gets the light. Nothing else on the ladder does.
-    shadowColor: palette.glow,
-    shadowOpacity: 0.7,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
+    boxShadow: "0px 0px 8px rgba(166, 242, 74, 0.7)",
     elevation: 6,
   },
   tick: {

@@ -10,10 +10,11 @@ against.
 
 | Surface | What it is |
 |---|---|
-| `programs/polaris` | The Anchor program. 21 instructions, 7 account types |
+| `programs/polaris` | The Anchor program. 23 instructions, 7 account types |
 | `keeper-solana` | The crank: doctor, collect, subscriptions, liquidate |
 | `packages/sdk-solana` | `createPolaris()` — pay, payLater, subscribe, repay |
-| `mobile` | The Expo app. The only UI in this build |
+| `mobile` | The Expo app. The customer-facing UI |
+| `apps/gateway` | The underwriter, the Solana Pay endpoint, and the merchant checkout page |
 | `scripts/lifecycle.ts` | Stand-up and end-to-end run |
 
 **Out of scope, and why.** `apps/core`, `apps/merchant`, `keeper/`, and
@@ -227,6 +228,58 @@ The app must read **live on-chain state**. Fixture data is a fail by definition.
 | F1 | Full run | Origination → 4 collections → repaid; then default → liquidation. Every number read back off chain |
 | F2 | Re-run | Idempotent: reuses the existing protocol rather than failing on the second `initialize` |
 | F3 | Fee assertion | Reports fees for the run within the 20% cap, distinguished from lifetime totals |
+
+
+## H. Program — underwriting
+
+The instruction that opens a credit line from a wallet's own history. Every
+item is checked against a real validator, not bankrun.
+
+| # | Item | Correct means |
+|---|---|---|
+| H1 | Fresh wallet scores the floor | A wallet with no history at all scores exactly 520 and gets a 200 USDC line |
+| H2 | Chain agrees with the mirror | For five different evidence shapes, `CreditProfile.score` on chain equals `scoreFrom()` off chain, exactly |
+| H3 | Evidence is recorded | `wallet_age_days`, `transaction_count`, `token_accounts`, `stable_balance` and `underwritten_at` are all stored on the profile and read back equal to what was submitted |
+| H4 | No second attestation | Underwriting an already-underwritten borrower fails `AlreadyUnderwritten`, and the stored score does not move |
+| H5 | Stale evidence refused | Evidence timestamped an hour ago fails `EvidenceStale` |
+| H6 | Future evidence refused | Evidence timestamped an hour ahead fails `EvidenceFromTheFuture` |
+| H7 | Only the underwriter may attest | A funded impostor signing the same instruction fails `NotUnderwriter` |
+| H8 | Earned scores are untouchable | A borrower with repayment history returns `alreadyOpen`, signs nothing, and keeps their score |
+| H9 | Caps hold on every axis | Maxing one input alone reaches exactly that axis's cap and no further |
+| H10 | Attestation cannot reach the top tiers | The best possible evidence scores below 740 — a 1,000 USDC line, never 2,500 or 5,000 |
+| H11 | Saturating arithmetic | `u32::MAX` on every input does not wrap; the score stays inside 300–850 |
+| H12 | Evidence is read, not invented | The gateway's four numbers come from real RPC calls: `getSignaturesForAddress`, `getParsedTokenAccountsByOwner`, `getTokenAccountBalance`, `getBlockTime` |
+
+## I. Gateway — Solana Pay and the underwriting service
+
+| # | Item | Correct means |
+|---|---|---|
+| I1 | `/health` | Returns the cluster, the program id actually in the IDL, the underwriter pubkey and a live slot |
+| I2 | Spec GET | `GET /pay/:order` returns `{label, icon}` with an absolute icon URL, per the Solana Pay transaction-request spec |
+| I3 | Spec POST | `POST /pay/:order` with `{account}` returns base64 `transaction` and a human `message` naming the merchant and terms |
+| I4 | The transaction is real | Deserialising it, adding only the customer's signature, and sending it lands a loan on chain |
+| I5 | Two instructions, atomically | The returned transaction contains exactly the SPL `Approve` and `create_loan` — both or neither |
+| I6 | Fee sponsorship | The gateway is `feePayer`; the customer's SOL balance is byte-identical after the plan opens |
+| I7 | Rent sponsorship | `create_loan`'s `payer` is the gateway, so a customer with no SOL can still open a plan |
+| I8 | Underwrites mid-checkout | A wallet with no profile is underwritten before the plan is built, and the profile exists afterwards |
+| I9 | Over-limit is refused by the chain | A plan larger than the line just underwritten fails — not silently trimmed |
+| I10 | Malformed orders | Missing merchant, missing amount, zero amount, 99 installments and a 5-second interval each return 400 with a readable reason |
+| I11 | Bad addresses | A non-base58 merchant or account returns 400, not a 500 |
+| I12 | Checkout page | Renders a server-side QR encoding a `solana:` URL, with the terms beside it, and no client JavaScript |
+| I13 | Unknown route | Returns 404 with a readable message, not a stack trace |
+| I14 | Internal errors are not leaked | A 500 returns a generic sentence; the chain's account names go to the log only |
+| I15 | CORS | Responds to `OPTIONS` so a wallet can fetch cross-origin |
+
+## J. App — the underwriting surface
+
+| # | Item | Correct means |
+|---|---|---|
+| J1 | Fresh install opens a line | A wallet generated seconds earlier is underwritten on first load and shows a real score from the chain |
+| J2 | No invented score | With the gateway unreachable, the app shows "no credit line yet" — never a fabricated score or limit |
+| J3 | Reasons are shown | Four lines naming age, transactions, tokens and balance, each with the points it contributed |
+| J4 | Reasons survive a cold start | With the gateway down but a line already open, the reasons still render from the profile's stored evidence |
+| J5 | IDL/deployment mismatch | If `idl.json` and `deployment.json` name different programs, the app refuses to start and names both files |
+| J6 | Errors are readable | A failed transaction shows a short sentence, never a simulation dump or a stack trace |
 
 ## G. Out of scope — recorded, not tested
 

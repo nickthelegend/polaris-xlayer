@@ -520,6 +520,21 @@ export async function fetchActivity(limit = 25): Promise<ActivityEvent[]> {
           });
           break;
 
+        case "Underwritten": {
+          // The first thing that happens to a new borrower, and until now the
+          // only row in their feed. It was falling through to the generic
+          // handler and reading "Underwritten · On-chain event", which says
+          // nothing about the one decision the whole product turns on.
+          const held = n(d.stableBalance);
+          out.push({
+            ...base,
+            kind: "score",
+            title: `Credit line opened — score ${d.score}`,
+            detail: `From ${Number(d.transactionCount).toLocaleString()} transactions, ${d.tokenAccounts} token${Number(d.tokenAccounts) === 1 ? "" : "s"} held and ${usd(held)} on hand`,
+          });
+          break;
+        }
+
         // Protocol-operator events. Real, but not the borrower's business, so
         // they are dropped deliberately rather than by omission.
         case "LiquidityFunded":

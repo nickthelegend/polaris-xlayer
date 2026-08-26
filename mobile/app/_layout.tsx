@@ -83,6 +83,12 @@ export default function RootLayout() {
                 }}
               >
                 <Stack.Screen name="(tabs)" />
+                {/* Scanning is something you do and come back from, so it
+                    arrives over the tabs rather than replacing them. */}
+                <Stack.Screen
+                  name="scan"
+                  options={{ presentation: "modal", animation: "slide_from_bottom" }}
+                />
               </Stack>
             </PolarisProvider>
           </ThemeProvider>

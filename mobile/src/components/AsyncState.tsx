@@ -31,15 +31,18 @@ export function Loading({ label = "Reading the chain" }: { label?: string }) {
  */
 export function ErrorState({
   message,
+  title,
   onRetry,
 }: {
   message: string;
+  /** Overrides the heading when the failure is not a network one. */
+  title?: string;
   onRetry?: () => void;
 }) {
   return (
     <View style={styles.wrap}>
       <Text variant="heading" tone="danger">
-        Could not reach the network
+        {title ?? headingFor(message)}
       </Text>
       <Text variant="bodySmall" tone="soft" style={styles.text}>
         {message}
@@ -49,6 +52,20 @@ export function ErrorState({
       ) : null}
     </View>
   );
+}
+
+/**
+ * Name the failure, rather than calling everything a network problem.
+ *
+ * "Could not reach the network" over a configuration mismatch sends whoever is
+ * reading it to check their RPC, their wifi and their validator — none of which
+ * is the fault. The detail line was already right; the heading was arguing
+ * with it.
+ */
+function headingFor(message: string): string {
+  if (/idl\.json|deployment\.json/i.test(message)) return "This build is misconfigured";
+  if (/wallet/i.test(message)) return "Still setting up";
+  return "Could not reach the network";
 }
 
 const styles = StyleSheet.create({

@@ -1,4 +1,4 @@
-import * as Haptics from "expo-haptics";
+import { failed, press, selected, succeeded, tap } from "../../src/lib/haptics";
 import { Linking, Pressable, StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
 
@@ -44,7 +44,7 @@ function Row({ event, index }: { event: ActivityEvent; index: number }) {
     >
       <Pressable
         onPress={() => {
-          Haptics.selectionAsync();
+          selected();
           Linking.openURL(explorer).catch(() => {});
         }}
         style={styles.row}

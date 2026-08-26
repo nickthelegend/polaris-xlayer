@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import * as Haptics from "expo-haptics";
+import { failed, press, succeeded, tap } from "../lib/haptics";
 import {
   Pressable, StyleProp, StyleSheet, View, ViewProps, ViewStyle
 } from "react-native";
@@ -86,17 +86,15 @@ export function Surface({
             : [ink.wash, "transparent"]
         }
         locations={[0, isSelected ? 0.55 : 0.4]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
       />
 
       {/* The edge light. One pixel, and it does most of the work. */}
       {!isPlate && (
         <View
-          pointerEvents="none"
           style={[
             styles.edgeLight,
-            { backgroundColor: isSelected ? lime.rim : ink.highlight },
+            { backgroundColor: isSelected ? lime.rim : ink.highlight, pointerEvents: "none" },
           ]}
         />
       )}
@@ -124,7 +122,7 @@ export function Surface({
       style={[shell, animated]}
       onPressIn={() => {
         pressed.value = withSpring(1, motion.spring.press);
-        if (haptic) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (haptic) tap();
       }}
       onPressOut={() => {
         pressed.value = withSpring(0, motion.spring.press);

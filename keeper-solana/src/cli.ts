@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 import { PolarisKeeperClient } from "./client.ts";
-import { loadConfig } from "./config.ts";
+import { assertDeployed, loadConfig } from "./config.ts";
 import { formatUsdc } from "./book.ts";
 import { runCollection, runLiquidation, runSubscriptions, type JobResult } from "./jobs.ts";
 
@@ -77,6 +77,9 @@ async function main() {
   if (cmd === "doctor") return doctor();
 
   const cfg = loadConfig(IDL);
+  // Before any pass. A wrong-cluster keeper reporting "0 due" is worse than
+  // one that refuses to start.
+  await assertDeployed(cfg);
   const client = new PolarisKeeperClient(cfg.connection, cfg.keeper);
   const ctx = { cfg, client };
 

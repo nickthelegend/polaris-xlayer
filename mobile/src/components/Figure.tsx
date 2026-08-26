@@ -159,7 +159,6 @@ export function Figure({
         editable={false}
         underlineColorAndroid="transparent"
         scrollEnabled={false}
-        pointerEvents="none"
         animatedProps={animatedProps}
         defaultValue={animate ? `${prefix}${formatUnits(0, decimals, group)}${suffix}` : settled}
         accessible
@@ -168,7 +167,7 @@ export function Figure({
           styles.reset,
           StyleSheet.absoluteFill,
           type[variant],
-          { color: tones[tone] },
+          { color: tones[tone], pointerEvents: "none" },
           style,
         ]}
       />

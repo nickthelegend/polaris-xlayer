@@ -1,5 +1,5 @@
 import * as Clipboard from "expo-clipboard";
-import * as Haptics from "expo-haptics";
+import { failed, press, succeeded, tap } from "../lib/haptics";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import type { PublicKey } from "@solana/web3.js";
@@ -31,7 +31,7 @@ export function WalletRow({ address }: { address: PublicKey | null }) {
       padded={14}
       onPress={async () => {
         await Clipboard.setStringAsync(value);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        succeeded();
         setCopied(true);
         setTimeout(() => setCopied(false), 1600);
       }}

@@ -92,3 +92,37 @@ export function loadConfig(idl: Idl): KeeperConfig {
     pdas: derivePdas(programId),
   };
 }
+
+/**
+ * Refuse to run against a cluster this protocol is not on.
+ *
+ * Without this the keeper pointed wherever `solana config get` happened to say
+ * -- devnet, on a machine that had been deploying there -- ran a full
+ * collection pass and a full subscription pass against a chain with no program
+ * on it, and reported "0 due · 0 collected · 0 failed" for both. That is the
+ * worst possible failure for a crank: it looks exactly like a healthy, quiet
+ * book. It only crashed later, on a protocol fetch, with "Account does not
+ * exist" and a pubkey that means nothing to anyone.
+ *
+ * A keeper that cannot see its own protocol has nothing to say about what is
+ * due, so it says that instead of saying zero.
+ */
+export async function assertDeployed(cfg: KeeperConfig): Promise<void> {
+  const program = await cfg.connection.getAccountInfo(cfg.programId);
+  if (!program) {
+    throw new Error(
+      `No program at ${cfg.programId.toBase58()} on ${cfg.cluster} (${cfg.connection.rpcEndpoint}).\n` +
+        "The keeper follows `solana config get` unless POLARIS_CLUSTER or POLARIS_RPC_URL says otherwise.\n" +
+        "For a local run:  POLARIS_CLUSTER=localnet pnpm --filter @polaris/keeper-solana start",
+    );
+  }
+
+  const protocol = await cfg.connection.getAccountInfo(cfg.pdas.protocol);
+  if (!protocol) {
+    throw new Error(
+      `The program is deployed on ${cfg.cluster} but has never been initialised there.\n` +
+        `No protocol account at ${cfg.pdas.protocol.toBase58()}.\n` +
+        "Run scripts/prove.ts or ./scripts/reset-local.sh against that cluster first.",
+    );
+  }
+}

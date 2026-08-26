@@ -28,7 +28,7 @@ export function AmbientBackground() {
   const h = height * 1.1;
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+    <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
       <Svg width={width} height={h} style={StyleSheet.absoluteFill}>
         <Defs>
           <Pattern
