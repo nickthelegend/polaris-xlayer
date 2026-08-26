@@ -23,6 +23,23 @@ function thresholdFor(totalOwed: number, count: number, k: number): number {
   return Math.ceil((totalOwed * k) / count);
 }
 
+/**
+ * A distinct order reference per call.
+ *
+ * The program refuses to finance the same (merchant, order) twice, so every
+ * helper call needs its own — except where a test is deliberately proving the
+ * duplicate is refused, which passes `orderRef` explicitly.
+ */
+let orderCounter = 0;
+function nextOrderRef(): number[] {
+  const bytes = new Uint8Array(32);
+  const n = ++orderCounter;
+  bytes[0] = n & 0xff;
+  bytes[1] = (n >> 8) & 0xff;
+  bytes[2] = (n >> 16) & 0xff;
+  return Array.from(bytes);
+}
+
 async function createLoan(
   h: Harness,
   borrower: { kp: Keypair; ata: PublicKey; profile: PublicKey },
@@ -30,13 +47,14 @@ async function createLoan(
   principal: number,
   installments: number,
   interval: number,
+  orderRef: number[] = nextOrderRef(),
 ) {
   const p = await h.program.account.protocol.fetch(h.protocol);
   const loanId = p.loanCount.toNumber();
   const loan = h.loanOf(loanId);
 
   await h.program.methods
-    .createLoan(new BN(principal), installments, new BN(interval))
+    .createLoan(new BN(principal), installments, new BN(interval), orderRef)
     .accountsPartial({
       borrower: borrower.kp.publicKey,
       payer: borrower.kp.publicKey,
@@ -383,6 +401,34 @@ describe("the exploits the Solidity build was hardened against", () => {
       // And the pool is whole: principal back, plus interest.
       assert.equal((await h.readToken(h.liquidityVault)).amount, 10_000 * USDC + interest);
     }
+  });
+
+  it("the same basket cannot be financed twice", async () => {
+    /*
+     * Found by scanning a Solana Pay code twice.
+     *
+     * `pay` was safe from the start — its payment account is seeded by
+     * (merchant, order) and `init` fails the second time. Plans had no such
+     * guard, and a re-scan opened a second loan: one basket, two debts, and a
+     * customer charged twice. Reproduced against a live validator before this
+     * existed; loan count went 11 → 12 → 13 for one order.
+     */
+    const h = await setup();
+    await h.fundLiquidity(10_000 * USDC);
+    const m = await h.newMerchant();
+    const b = await h.newBorrower(1_000 * USDC, 1_000 * USDC);
+
+    const basket = Array.from({ length: 32 }, (_, i) => (i === 0 ? 7 : 0));
+
+    await createLoan(h, b, m, 100 * USDC, 4, 7 * DAY, basket);
+    await expectError(
+      createLoan(h, b, m, 100 * USDC, 4, 7 * DAY, basket),
+      "already in use",
+    );
+
+    // A different basket from the same merchant is a different order, and must
+    // still go through — the guard is per order, not a rate limit.
+    await createLoan(h, b, m, 50 * USDC, 4, 7 * DAY);
   });
 
   it("one delegation cannot back more loans than it covers", async () => {

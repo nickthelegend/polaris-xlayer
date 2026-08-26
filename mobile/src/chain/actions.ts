@@ -16,6 +16,19 @@ import { Buffer } from "buffer";
 import { getProgram, getProvider, getTokenAccount, getWallet } from "./client";
 import { TREASURY } from "./config";
 import { pdas } from "./pdas";
+
+/**
+ * 32 random bytes, from the platform's own CSPRNG.
+ *
+ * `react-native-get-random-values` is installed by the polyfill above, so
+ * `crypto.getRandomValues` is real on device as well as on web. Not
+ * `node:crypto` — that does not exist here.
+ */
+function randomOrderRef(): Uint8Array {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return bytes;
+}
 import { interestFor } from "./math";
 import { fetchProfile, fetchProtocol } from "./queries";
 
@@ -115,7 +128,21 @@ export async function payLater(params: {
   );
 
   const originate = await getProgram().methods
-    .createLoan(new BN(params.amount), installmentCount, new BN(intervalSeconds))
+    /*
+     * A reference unique to this checkout.
+     *
+     * The program refuses to finance the same (merchant, order) twice, which
+     * is what stops a re-scanned Solana Pay code opening a second plan. A
+     * checkout typed into this app has no merchant basket id, so it gets a
+     * random one — two taps are two orders here, and the double-submit guard
+     * in the screen is what stops the second one.
+     */
+    .createLoan(
+      new BN(params.amount),
+      installmentCount,
+      new BN(intervalSeconds),
+      Array.from(randomOrderRef()),
+    )
     .accountsPartial({
       borrower: getWallet().publicKey,
       payer: getWallet().publicKey,

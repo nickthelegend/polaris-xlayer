@@ -370,6 +370,10 @@
     },
     {
       "name": "create_loan",
+      "docs": [
+        "`order_ref` is the merchant's basket id, and financing it twice is",
+        "impossible: it seeds an account that `init` refuses to create again."
+      ],
       "discriminator": [
         166,
         131,
@@ -505,6 +509,40 @@
           }
         },
         {
+          "name": "financed_order",
+          "docs": [
+            "Makes financing the same order twice unrepresentable.",
+            "",
+            "`init`, seeded by (merchant, order reference) — so a second plan against",
+            "the same basket fails on the address rather than on a check somebody",
+            "has to remember to write. `pay` has had this since the beginning; plans",
+            "did not, and scanning one Solana Pay code twice opened two loans."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant"
+              },
+              {
+                "kind": "arg",
+                "path": "order_ref"
+              }
+            ]
+          }
+        },
+        {
           "name": "borrower_token_account",
           "docs": [
             "The account every installment will be drawn from. Pinned into the loan",
@@ -559,6 +597,15 @@
         {
           "name": "interval_seconds",
           "type": "i64"
+        },
+        {
+          "name": "order_ref",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
         }
       ]
     },
@@ -2429,6 +2476,19 @@
       ]
     },
     {
+      "name": "FinancedOrder",
+      "discriminator": [
+        40,
+        5,
+        141,
+        141,
+        250,
+        46,
+        80,
+        28
+      ]
+    },
+    {
       "name": "Loan",
       "discriminator": [
         20,
@@ -3131,6 +3191,53 @@
           {
             "name": "amount",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FinancedOrder",
+      "docs": [
+        "The record that an order has already been financed.",
+        "",
+        "Exists for its address, in exactly the way `Payment` does. A direct payment",
+        "could never be taken twice because the payment account is seeded by",
+        "(merchant, order) and `init` fails the second time — but an installment",
+        "plan had no such guard, so scanning the same Solana Pay code twice opened",
+        "two loans and charged the customer twice for one basket. Verified: it did.",
+        "",
+        "The check cannot be forgotten here either, because it is not a check."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "order_ref",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "loan_id",
+            "docs": [
+              "The plan that settled it, so the guard is a receipt rather than a lock."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "financed_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }

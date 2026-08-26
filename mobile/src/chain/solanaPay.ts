@@ -37,11 +37,28 @@ export function parseSolanaPayUrl(raw: string): string {
   return decoded;
 }
 
+/**
+ * A fetch that blames the right thing when it fails.
+ *
+ * A dead checkout endpoint and a dead cluster both surface as "Failed to
+ * fetch", and the generic handler read that as the RPC being down — so
+ * scanning a code whose merchant was offline told the borrower to check their
+ * validator. The merchant's server is the only thing being contacted here, so
+ * it is the only thing that can be at fault.
+ */
+async function checkoutFetch(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch {
+    throw new Error("That merchant's checkout is not answering. The code may be stale.");
+  }
+}
+
 /** The spec's GET: what the code says it is, before any account is revealed. */
 export async function describeRequest(url: string): Promise<ScannedRequest> {
-  const res = await fetch(url, { headers: { accept: "application/json" } });
+  const res = await checkoutFetch(url, { headers: { accept: "application/json" } });
   if (!res.ok) throw new Error(`That merchant's checkout is not answering (${res.status}).`);
-  const body = await res.json();
+  const body = await res.json().catch(() => null);
   return { url, label: String(body?.label ?? "Unknown merchant"), icon: body?.icon ?? null };
 }
 
@@ -59,7 +76,7 @@ export type PreparedPayment = {
  * it recognises a code is a scanner that can be pointed at a wall.
  */
 export async function preparePayment(url: string): Promise<PreparedPayment> {
-  const res = await fetch(url, {
+  const res = await checkoutFetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ account: getWallet().publicKey.toBase58() }),

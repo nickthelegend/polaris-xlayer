@@ -20,12 +20,28 @@ import { fileURLToPath } from "node:url";
 import { AnchorProvider, BN, Program, type Idl } from "@coral-xyz/anchor";
 import { Connection, Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import {
+
+
   TOKEN_PROGRAM_ID,
   createApproveInstruction,
   createAssociatedTokenAccountInstruction,
   createMintToInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
+
+/**
+ * A distinct order reference per plan.
+ *
+ * The program refuses to finance the same (merchant, order) twice, so a script
+ * that opens several plans needs a different one each time.
+ */
+function orderRefFor(label: string): number[] {
+  const bytes = new Uint8Array(32);
+  const utf8 = new TextEncoder().encode(label);
+  bytes.set(utf8.slice(0, 32), Math.max(0, 32 - utf8.length));
+  return Array.from(bytes);
+}
+
 
 const here = dirname(fileURLToPath(import.meta.url));
 const CLUSTER = process.env.POLARIS_CLUSTER ?? "localnet";
@@ -142,7 +158,7 @@ async function main() {
 
   await pace();
   const originate = await program.methods
-    .createLoan(new BN(principal), 4, new BN(interval))
+    .createLoan(new BN(principal), 4, new BN(interval), orderRefFor("prove-0"))
     .accountsPartial({
       borrower: me.publicKey,
       payer: me.publicKey,

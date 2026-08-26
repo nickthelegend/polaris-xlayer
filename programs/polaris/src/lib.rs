@@ -147,13 +147,22 @@ pub mod polaris {
 
     // -- credit -----------------------------------------------------------
 
+    /// `order_ref` is the merchant's basket id, and financing it twice is
+    /// impossible: it seeds an account that `init` refuses to create again.
     pub fn create_loan(
         ctx: Context<CreateLoan>,
         principal: u64,
         installment_count: u32,
         interval_seconds: i64,
+        order_ref: [u8; 32],
     ) -> Result<()> {
-        instructions::loan::create_handler(ctx, principal, installment_count, interval_seconds)
+        instructions::loan::create_handler(
+            ctx,
+            principal,
+            installment_count,
+            interval_seconds,
+            order_ref,
+        )
     }
 
     /// Permissionless. Collects exactly the installment that is due.

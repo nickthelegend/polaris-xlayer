@@ -72,6 +72,8 @@ pub const MERCHANT_SEED: &[u8] = b"merchant";
 pub const PLAN_SEED: &[u8] = b"plan";
 pub const SUB_SEED: &[u8] = b"sub";
 pub const PAYMENT_SEED: &[u8] = b"payment";
+/// Seeds the account that makes a duplicate installment plan unrepresentable.
+pub const ORDER_SEED: &[u8] = b"order";
 
 /// String caps, so account sizes are fixed at declaration.
 pub const MAX_NAME_LEN: usize = 64;

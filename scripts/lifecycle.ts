@@ -38,6 +38,22 @@ import {
 } from "@solana/spl-token";
 import { createHash } from "node:crypto";
 
+/**
+ * A distinct order reference per plan.
+ *
+ * The program refuses to finance the same (merchant, order) twice, so a script
+ * that opens several plans needs a different one each time.
+ */
+function orderRefFor(label: string): number[] {
+  const bytes = new Uint8Array(32);
+  const utf8 = new TextEncoder().encode(label);
+  bytes.set(utf8.slice(0, 32), Math.max(0, 32 - utf8.length));
+  return Array.from(bytes);
+}
+
+
+
+
 const here = dirname(fileURLToPath(import.meta.url));
 const IDL = JSON.parse(readFileSync(resolve(here, "../target/idl/polaris.json"), "utf8")) as Idl;
 
@@ -308,7 +324,7 @@ async function main() {
     BigInt(totalOwed),
   );
   const originate = await program.methods
-    .createLoan(new BN(principal), INSTALLMENTS, new BN(INTERVAL))
+    .createLoan(new BN(principal), INSTALLMENTS, new BN(INTERVAL), orderRefFor("lifecycle-good"))
     .accountsPartial({
       borrower: borrower.publicKey,
       payer: borrower.publicKey,
@@ -475,7 +491,7 @@ async function main() {
       [
         createApproveInstruction(defaulterAta, protocolPda, defaulter.publicKey, BigInt(badOwed)),
         await program.methods
-          .createLoan(new BN(badPrincipal), INSTALLMENTS, new BN(INTERVAL))
+          .createLoan(new BN(badPrincipal), INSTALLMENTS, new BN(INTERVAL), orderRefFor("lifecycle-default"))
           .accountsPartial({
             borrower: defaulter.publicKey,
             payer: defaulter.publicKey,

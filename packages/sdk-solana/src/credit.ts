@@ -1,5 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 /**
  * A merchant order id as the program sees it: exactly 32 bytes.
@@ -17,6 +17,17 @@ export function orderRef(orderId: string): Buffer {
     return out;
   }
   return createHash("sha256").update(bytes).digest();
+}
+
+/**
+ * A reference for a plan that is not against a merchant basket.
+ *
+ * Random rather than derived: two callers without an order id must not collide
+ * into each other's guard account and refuse each other's perfectly valid
+ * loans.
+ */
+export function randomOrderRef(): Buffer {
+  return randomBytes(32);
 }
 
 export function derivePdas(programId: PublicKey) {

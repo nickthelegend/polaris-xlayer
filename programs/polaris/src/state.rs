@@ -181,6 +181,26 @@ pub struct Payment {
     pub bump: u8,
 }
 
+/// The record that an order has already been financed.
+///
+/// Exists for its address, in exactly the way `Payment` does. A direct payment
+/// could never be taken twice because the payment account is seeded by
+/// (merchant, order) and `init` fails the second time — but an installment
+/// plan had no such guard, so scanning the same Solana Pay code twice opened
+/// two loans and charged the customer twice for one basket. Verified: it did.
+///
+/// The check cannot be forgotten here either, because it is not a check.
+#[account]
+#[derive(InitSpace)]
+pub struct FinancedOrder {
+    pub merchant: Pubkey,
+    pub order_ref: [u8; 32],
+    /// The plan that settled it, so the guard is a receipt rather than a lock.
+    pub loan_id: u64,
+    pub financed_at: i64,
+    pub bump: u8,
+}
+
 impl CreditProfile {
     /// Credit limit from score alone, in stablecoin base units.
     ///

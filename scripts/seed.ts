@@ -29,6 +29,8 @@ import {
   Transaction,
 } from "@solana/web3.js";
 import {
+
+
   MINT_SIZE,
   TOKEN_PROGRAM_ID,
   createApproveInstruction,
@@ -38,6 +40,20 @@ import {
   getAssociatedTokenAddressSync,
   getMinimumBalanceForRentExemptMint,
 } from "@solana/spl-token";
+
+/**
+ * A distinct order reference per plan.
+ *
+ * The program refuses to finance the same (merchant, order) twice, so a script
+ * that opens several plans needs a different one each time.
+ */
+function orderRefFor(label: string): number[] {
+  const bytes = new Uint8Array(32);
+  const utf8 = new TextEncoder().encode(label);
+  bytes.set(utf8.slice(0, 32), Math.max(0, 32 - utf8.length));
+  return Array.from(bytes);
+}
+
 
 const here = dirname(fileURLToPath(import.meta.url));
 const IDL = JSON.parse(readFileSync(resolve(here, "../target/idl/polaris.json"), "utf8")) as Idl;
@@ -289,7 +305,7 @@ async function main() {
     const id = Number(p.loanCount.toString());
     const loanPda = pda([Buffer.from("loan"), u64(id)]);
     await program.methods
-      .createLoan(new BN(principal), count, new BN(interval))
+      .createLoan(new BN(principal), count, new BN(interval), orderRefFor(`seed-loan-${id}`))
       .accountsPartial({
         borrower: borrower.publicKey,
         payer: borrower.publicKey,

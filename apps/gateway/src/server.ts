@@ -18,6 +18,7 @@ import { PublicKey } from "@solana/web3.js";
 import QRCode from "qrcode";
 
 import { CLUSTER, connect, type Chain } from "./chain.ts";
+import { orderRef } from "./order.ts";
 import { buildPaymentTransaction, totalOwed, type Order } from "./solana-pay.ts";
 import { underwrite } from "./underwrite.ts";
 import { checkoutPage } from "./page.ts";
@@ -172,6 +173,19 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
        */
       await fetchMerchant(order.merchant);
 
+      /*
+       * Refuse an order that has already been financed, here rather than at
+       * the chain.
+       *
+       * The program stops it either way — the guard account cannot be created
+       * twice — but only after the customer has read the terms and approved
+       * them. Being told "already paid" before you approve is a different
+       * experience from being told it after.
+       */
+      if (order.mode === "later" && (await alreadyFinanced(order))) {
+        throw new HttpError(409, "That order has already been paid.");
+      }
+
       if (order.mode === "later") {
         await underwrite(customer, chain);
       }
@@ -233,6 +247,16 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
  * which the catch-all turned into a 500 and the sentence "Something went wrong
  * on our side." It did not go wrong on our side.
  */
+/** True once a plan has been opened against this exact basket. */
+async function alreadyFinanced(order: Order): Promise<boolean> {
+  const pda = chain.pda([
+    Buffer.from("order"),
+    order.merchant.toBuffer(),
+    orderRef(order.orderId),
+  ]);
+  return (await chain.connection.getAccountInfo(pda)) !== null;
+}
+
 async function fetchMerchant(pda: PublicKey): Promise<{ name: unknown; payout: PublicKey }> {
   const account = await chain.program.account.merchant.fetchNullable(pda);
   if (!account) {

@@ -38,6 +38,7 @@ import {
   creditLimitFor,
   derivePdas,
   orderRef,
+  randomOrderRef,
   quoteInstallments,
   type CreditLine,
   type Quote,
@@ -172,6 +173,15 @@ export function createPolaris(config: PolarisConfig) {
     installmentCount?: number;
     intervalSeconds?: number;
     borrowerTokenAccount?: PublicKey;
+    /**
+     * The merchant's basket id. Financing the same one twice is impossible —
+     * it seeds an account the program refuses to create again — so a checkout
+     * that retries cannot open a second plan for one order.
+     *
+     * Omitted means "this is not a merchant order", and a random reference is
+     * used so the call still succeeds. A real checkout should always pass one.
+     */
+    orderId?: string;
   }): Promise<{ signature: string; loanId: number; quote: Quote }> {
     const installmentCount = params.installmentCount ?? 4;
     const intervalSeconds = params.intervalSeconds ?? 7 * 86_400;
@@ -193,11 +203,14 @@ export function createPolaris(config: PolarisConfig) {
       required,
     );
 
+    const ref = params.orderId ? orderRef(params.orderId) : randomOrderRef();
+
     const originate = await program.methods
       .createLoan(
         new BN(params.amount.toString()),
         installmentCount,
         new BN(intervalSeconds),
+        Array.from(ref),
       )
       .accountsPartial({
         borrower: me(),

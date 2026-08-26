@@ -5,7 +5,7 @@ use crate::constants::*;
 use crate::errors::PolarisError;
 use crate::events::*;
 use crate::math;
-use crate::state::{CreditProfile, Loan, LoanStatus, Merchant, Protocol};
+use crate::state::{CreditProfile, FinancedOrder, Loan, LoanStatus, Merchant, Protocol};
 use crate::token_ops;
 
 // ---------------------------------------------------------------------------
@@ -13,6 +13,7 @@ use crate::token_ops;
 // ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
+#[instruction(principal: u64, installment_count: u32, interval_seconds: i64, order_ref: [u8; 32])]
 pub struct CreateLoan<'info> {
     /// The borrower signs their own origination.
     ///
@@ -61,6 +62,21 @@ pub struct CreateLoan<'info> {
     )]
     pub loan: Account<'info, Loan>,
 
+    /// Makes financing the same order twice unrepresentable.
+    ///
+    /// `init`, seeded by (merchant, order reference) — so a second plan against
+    /// the same basket fails on the address rather than on a check somebody
+    /// has to remember to write. `pay` has had this since the beginning; plans
+    /// did not, and scanning one Solana Pay code twice opened two loans.
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + FinancedOrder::INIT_SPACE,
+        seeds = [ORDER_SEED, merchant.key().as_ref(), &order_ref],
+        bump,
+    )]
+    pub financed_order: Account<'info, FinancedOrder>,
+
     /// The account every installment will be drawn from. Pinned into the loan
     /// so a keeper cannot later point collection at a different one.
     #[account(
@@ -90,6 +106,7 @@ pub fn create_handler(
     principal: u64,
     installment_count: u32,
     interval_seconds: i64,
+    order_ref: [u8; 32],
 ) -> Result<()> {
     require!(principal > 0, PolarisError::ZeroAmount);
     require!(
@@ -170,6 +187,15 @@ pub fn create_handler(
     loan.interval_seconds = interval_seconds;
     loan.status = LoanStatus::Active;
     loan.bump = ctx.bumps.loan;
+
+    // The guard is a receipt as well as a lock: it names the plan that
+    // financed this order, so a merchant reconciling a basket can find it.
+    let financed = &mut ctx.accounts.financed_order;
+    financed.merchant = ctx.accounts.merchant.key();
+    financed.order_ref = order_ref;
+    financed.loan_id = loan_id;
+    financed.financed_at = now;
+    financed.bump = ctx.bumps.financed_order;
 
     ctx.accounts.profile.active_debt = new_debt;
     ctx.accounts.protocol.loan_count = loan_id

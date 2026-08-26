@@ -1,5 +1,5 @@
 import { failed, press, selected, succeeded, tap } from "../../src/lib/haptics";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Animated, {
   LinearTransition,
@@ -41,12 +41,37 @@ const MODES: { id: Mode; title: string; note: string }[] = [
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"];
 
+/**
+ * A round opening amount that fits the borrower's actual credit.
+ *
+ * Round because a checkout that opens on 187.43 looks like a bug, and capped
+ * because one that opens on an amount the program will refuse is worse than
+ * one that opens on nothing.
+ */
+function openingAmount(available: number | null): string {
+  if (available === null) return "0";
+  const units = Math.floor(available / USDC);
+  for (const step of [240, 200, 150, 100, 50, 20, 10]) {
+    if (units >= step) return String(step);
+  }
+  return units > 0 ? String(units) : "0";
+}
+
 export default function PayScreen() {
   const { status, data, error, refresh } = usePolaris();
   const line = useCreditLine(data);
 
   const [mode, setMode] = useState<Mode>("later");
-  const [raw, setRaw] = useState("240");
+  /*
+   * The opening amount, derived rather than hardcoded.
+   *
+   * This was a flat "240". A wallet underwritten from an empty history opens a
+   * 200 line, so every new user's first sight of this screen was an amount
+   * they could not afford, and their first tap was a refusal. The default is
+   * now the largest round number that actually fits their credit — and 0 when
+   * nothing does, which is honest rather than a number that cannot be sent.
+   */
+  const [raw, setRaw] = useState(() => openingAmount(null));
   const [merchant, setMerchant] = useState<MerchantRef>(merchants[0]);
   const [planIndex, setPlanIndex] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -67,6 +92,21 @@ export default function PayScreen() {
   const [result, setResult] = useState<{ ok: boolean; message: string; signature?: string } | null>(
     null,
   );
+
+  /*
+   * Seeded once, when the line first arrives.
+   *
+   * A ref rather than an effect that watches `line`: re-deriving on every
+   * change would overwrite what the user had typed the moment a refresh
+   * landed, which is the worst possible time to move a number they are about
+   * to send.
+   */
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current || !line) return;
+    seeded.current = true;
+    setRaw(openingAmount(line.available));
+  }, [line]);
 
   const amount = Math.round((parseFloat(raw || "0") || 0) * USDC);
   const plan = useMemo(

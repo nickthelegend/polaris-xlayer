@@ -133,8 +133,22 @@ async function splitIntoInstallments(
     return b;
   };
 
+  /*
+   * The basket's own reference, not a fresh one per request.
+   *
+   * This is what makes re-scanning a code safe: the second plan seeds the same
+   * guard account and the program refuses to create it twice. A random
+   * reference here would have defeated the whole thing.
+   */
+  const ref = orderRef(order.orderId);
+
   const originate = await chain.program.methods
-    .createLoan(new BN(order.amount.toString()), order.installmentCount, new BN(order.intervalSeconds))
+    .createLoan(
+      new BN(order.amount.toString()),
+      order.installmentCount,
+      new BN(order.intervalSeconds),
+      Array.from(ref),
+    )
     .accountsPartial({
       borrower: customer,
       // The gateway pays the rent as well as the fee. That is the difference
