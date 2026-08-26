@@ -231,9 +231,21 @@ address on the home screen; fund that address on a test cluster with:
 pnpm exec tsx scripts/fund.ts <address>
 ```
 
+Mobile Wallet Adapter needs native code, so the app runs from a development
+build rather than Expo Go:
+
 ```bash
-pnpm --filter polaris-mobile android
+pnpm --filter polaris-mobile exec expo prebuild --platform android --clean
 ```
+
+```bash
+pnpm --filter polaris-mobile exec expo run:android
+```
+
+An emulator on a machine with little free memory will hang on the GPU path;
+`-no-window -gpu off -memory 2048` boots it headless, and `adb screencap` is
+enough to see the app.
+
 
 Every instruction is built in `mobile/src/chain`, never in a screen, so the
 signer is the one piece a shipped build has to replace — see *What is not done*.
@@ -284,7 +296,7 @@ cannot move the clock can only test origination.
 | Program | `CpRqbMywzAEKkEALZtrXqPYM36E5RrFewYnRtUYEEvUS` |
 | Devnet | **live** — deployed, initialised, and exercised |
 | Localnet | full lifecycle verified, including a liquidation |
-| Android | runs on an emulator against a live cluster — never on physical hardware |
+| Android | native dev build, running on an emulator against devnet |
 | Size | 593 KB, clean SBF build |
 
 Devnet carries the current build, an initialised protocol, a funded pool and a
@@ -323,14 +335,14 @@ credit score     600 -> 450
 
 ## What is not done
 
-**Mobile Wallet Adapter.** The app signs with a keypair it generates on the
-device. Those are real signed transactions against the real program, but the
-key belongs to the app rather than to a wallet the user already trusts. A
-shipped build swaps `mobile/src/chain/wallet.ts` for MWA and nothing else
-moves — every instruction is already built by the chain layer.
-
-**Devnet, until the faucet lets go.** See *Status* above — the binary and the
-command are ready, the wallet is 0.012 SOL short.
+**Signing with a wallet app has been exercised only as far as the wallet
+chooser.** The Mobile Wallet Adapter path is built and runs on a real Android
+build: tapping *Connect a wallet app* fires the `solana-wallet:` intent, and
+with no wallet installed the emulator's `ActivityNotFoundException` comes back
+as "No Solana wallet app is installed on this device." What has not been
+watched is a wallet actually signing — that needs a device with Phantom or
+Solflare on it, and the honest limit of this repository is that nobody has seen
+the approval sheet. Everything up to it is real.
 
 **The Solidity side is the reference, not the deliverable.** `packages/contracts`
 and the Next.js apps around it are the original build, kept so the port can be
