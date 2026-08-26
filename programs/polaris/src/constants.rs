@@ -88,3 +88,41 @@ pub const MAX_URI_LEN: usize = 128;
 /// Short order ids go in directly as UTF-8, left-padded with zeros; anything
 /// longer is hashed to 32 bytes by the caller. The SDK's `orderRef` does both.
 pub const ORDER_REF_LEN: usize = 32;
+
+/// Underwriting the first loan.
+///
+/// The hardest problem in an undercollateralized book is the borrower with no
+/// history *with us*. Starting everyone at 600 answers it by ignoring it: a
+/// wallet funded an hour ago and a wallet that has been paying for things for
+/// three years open the same 500 USDC line.
+///
+/// They are not the same risk, and on Solana the difference is public. These
+/// weights turn four observable facts about a wallet into an opening score.
+/// The facts are attested by the underwriter; the arithmetic below is applied
+/// by the program, so an underwriter cannot simply assert a score it likes.
+pub const UNDERWRITING_FLOOR: u16 = 520;
+
+/// Points per 30 days of wallet age, and the most age alone can be worth.
+pub const AGE_POINTS_PER_MONTH: u16 = 2;
+pub const MAX_AGE_POINTS: u16 = 60;
+
+/// Points per 25 transactions signed, and the cap. Activity is evidence of a
+/// wallet in real use rather than one stood up to farm a credit line.
+pub const ACTIVITY_POINTS_PER_25_TX: u16 = 1;
+pub const MAX_ACTIVITY_POINTS: u16 = 50;
+
+/// Points per distinct token account held, and the cap. Breadth of holdings is
+/// the closest thing Solana has to the roadmap's "DeFi tenure".
+pub const BREADTH_POINTS_PER_ACCOUNT: u16 = 2;
+pub const MAX_BREADTH_POINTS: u16 = 40;
+
+/// Points per 100 stablecoin units held, and the cap. A balance that is there
+/// is not collateral — it is never locked or seized — but it is evidence the
+/// borrower can service an installment.
+pub const BALANCE_POINTS_PER_100: u16 = 1;
+pub const MAX_BALANCE_POINTS: u16 = 50;
+
+/// Nothing older than this is treated as evidence. An attestation has to be
+/// fresh, or an underwriter could sit on a favourable reading of a wallet and
+/// submit it long after the wallet emptied.
+pub const MAX_EVIDENCE_AGE: i64 = 15 * 60;

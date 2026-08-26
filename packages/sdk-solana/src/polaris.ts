@@ -201,6 +201,9 @@ export function createPolaris(config: PolarisConfig) {
       )
       .accountsPartial({
         borrower: me(),
+        // The borrower pays their own rent here. A sponsored checkout passes a
+        // different payer; see apps/gateway.
+        payer: me(),
         protocol: pdas.protocol,
         profile: pdas.profileOf(me()),
         merchant: params.merchant,

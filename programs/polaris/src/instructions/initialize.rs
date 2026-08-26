@@ -102,6 +102,10 @@ pub fn handler(
     p.bad_debt = 0;
     p.fee_bps = fee_bps;
     p.credit_multiplier_bps = credit_multiplier_bps;
+    // The deployer underwrites until it hands the role to a service key. A
+    // zero here would mean "nobody", which reads as a disabled feature rather
+    // than the un-delegated default it actually is.
+    p.underwriter = ctx.accounts.authority.key();
     p.bump = ctx.bumps.protocol;
     p.liquidity_bump = ctx.bumps.liquidity_vault;
     p.collateral_bump = ctx.bumps.collateral_vault;

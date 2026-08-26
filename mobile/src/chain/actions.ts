@@ -116,6 +116,7 @@ export async function payLater(params: {
     .createLoan(new BN(params.amount), installmentCount, new BN(intervalSeconds))
     .accountsPartial({
       borrower: getWallet().publicKey,
+      payer: getWallet().publicKey,
       protocol: pdas.protocol,
       profile: pdas.profileOf(getWallet().publicKey),
       merchant: params.merchant,

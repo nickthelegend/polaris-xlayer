@@ -39,6 +39,7 @@ async function createLoan(
     .createLoan(new BN(principal), installments, new BN(interval))
     .accountsPartial({
       borrower: borrower.kp.publicKey,
+      payer: borrower.kp.publicKey,
       protocol: h.protocol,
       profile: borrower.profile,
       merchant: m.merchant,

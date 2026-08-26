@@ -311,6 +311,7 @@ async function main() {
     .createLoan(new BN(principal), INSTALLMENTS, new BN(INTERVAL))
     .accountsPartial({
       borrower: borrower.publicKey,
+      payer: borrower.publicKey,
       protocol: protocolPda,
       profile: profilePda,
       merchant: merchantPda,
@@ -477,6 +478,7 @@ async function main() {
           .createLoan(new BN(badPrincipal), INSTALLMENTS, new BN(INTERVAL))
           .accountsPartial({
             borrower: defaulter.publicKey,
+            payer: defaulter.publicKey,
             protocol: protocolPda,
             profile: badProfilePda,
             merchant: merchantPda,

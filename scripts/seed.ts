@@ -292,6 +292,7 @@ async function main() {
       .createLoan(new BN(principal), count, new BN(interval))
       .accountsPartial({
         borrower: borrower.publicKey,
+        payer: borrower.publicKey,
         protocol: protocolPda,
         profile: profilePda,
         merchant: m.pda,
@@ -313,6 +314,7 @@ async function main() {
       .repay(new BN(amount))
       .accountsPartial({
         borrower: borrower.publicKey,
+        payer: borrower.publicKey,
         protocol: protocolPda,
         profile: profilePda,
         loan: loanPda,

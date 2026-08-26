@@ -71,6 +71,34 @@ pub mod polaris {
         instructions::initialize::set_config_handler(ctx, fee_bps, credit_multiplier_bps)
     }
 
+    /// Open a credit line from what the wallet's own history shows.
+    ///
+    /// The underwriter attests to four facts it read off the cluster; the
+    /// program turns them into a score. Only ever valid for a borrower with no
+    /// record of their own — after the first repayment their behaviour is
+    /// better evidence than their wallet age.
+    pub fn underwrite(
+        ctx: Context<Underwrite>,
+        wallet_age_days: u32,
+        transaction_count: u32,
+        token_accounts: u32,
+        stable_balance: u64,
+        observed_at: i64,
+    ) -> Result<()> {
+        instructions::underwrite::underwrite_handler(
+            ctx,
+            wallet_age_days,
+            transaction_count,
+            token_accounts,
+            stable_balance,
+            observed_at,
+        )
+    }
+
+    pub fn set_underwriter(ctx: Context<SetUnderwriter>) -> Result<()> {
+        instructions::underwrite::set_underwriter_handler(ctx)
+    }
+
     // -- liquidity --------------------------------------------------------
 
     pub fn fund_liquidity(ctx: Context<FundLiquidity>, amount: u64) -> Result<()> {

@@ -25,12 +25,24 @@ pub struct CreateLoan<'info> {
     #[account(mut)]
     pub borrower: Signer<'info>,
 
+    /// Who pays rent for the accounts this opens.
+    ///
+    /// Normally the borrower, and passing the borrower here is the ordinary
+    /// case. A sponsored checkout passes the gateway instead, which is what
+    /// lets a customer with no SOL at all open a plan: the fee payer already
+    /// differs from the token authority on Solana, and rent is the only other
+    /// thing standing between a shopper and a wallet that has never held the
+    /// native token. Both still sign, so nobody is opening a loan in someone
+    /// else's name.
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
     #[account(mut, seeds = [PROTOCOL_SEED], bump = protocol.bump)]
     pub protocol: Account<'info, Protocol>,
 
     #[account(
         init_if_needed,
-        payer = borrower,
+        payer = payer,
         space = 8 + CreditProfile::INIT_SPACE,
         seeds = [PROFILE_SEED, borrower.key().as_ref()],
         bump,
@@ -42,7 +54,7 @@ pub struct CreateLoan<'info> {
 
     #[account(
         init,
-        payer = borrower,
+        payer = payer,
         space = 8 + Loan::INIT_SPACE,
         seeds = [LOAN_SEED, &protocol.loan_count.to_le_bytes()],
         bump,

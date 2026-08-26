@@ -5,6 +5,7 @@ pub mod loan;
 pub mod merchant;
 pub mod payments;
 pub mod subscription;
+pub mod underwrite;
 
 pub use collateral::*;
 pub use initialize::*;
@@ -13,3 +14,4 @@ pub use loan::*;
 pub use merchant::*;
 pub use payments::*;
 pub use subscription::*;
+pub use underwrite::*;

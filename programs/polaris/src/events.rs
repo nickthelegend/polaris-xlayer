@@ -163,3 +163,22 @@ pub struct FeesSwept {
     pub to: Pubkey,
     pub amount: u64,
 }
+
+/// Emitted when a line is opened from chain history rather than a flat score.
+///
+/// Carries the evidence, not just the result. An indexer, a borrower disputing
+/// their limit, or anyone auditing the underwriter can recompute the score from
+/// this event and the on-chain weights, and check the facts against the same
+/// cluster the underwriter read.
+#[event]
+pub struct Underwritten {
+    pub user: Pubkey,
+    pub score: u16,
+    pub credit_limit: u64,
+    pub wallet_age_days: u32,
+    pub transaction_count: u32,
+    pub token_accounts: u32,
+    pub stable_balance: u64,
+    pub observed_at: i64,
+    pub underwritten_at: i64,
+}
