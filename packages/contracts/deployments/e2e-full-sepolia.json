@@ -1,0 +1,41 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "ranAt": "2026-08-04T05:44:50.109Z",
+  "loanId": "1",
+  "subId": "3",
+  "transactions": [
+    {
+      "label": "pay 25.00 in full",
+      "hash": "0xb41c3b4035733622cbaee82d5a25af5db8a0e661c97674fc2dd7d0a8b7c2c999"
+    },
+    {
+      "label": "create plan",
+      "hash": "0xd6d27f0a21f8ac18ccc382f6cf290190d2e6e22aee300b7c7482b4b132b4a9f6"
+    },
+    {
+      "label": "subscribe",
+      "hash": "0x422736780e32c28a2150ef0e330ee0169f798be242d20ff0ffac8047e0e50bfd"
+    },
+    {
+      "label": "cancel (subscriber-initiated)",
+      "hash": "0xeead130809cabf8669bb9f2abbdd275a84e21f9cb75e18a4d81e75be66f81d57"
+    },
+    {
+      "label": "lock 300.00 collateral",
+      "hash": "0x784b1a5098d0dfc58b802e848288d95a739490694306c4d7a53c5ef466ae369e"
+    },
+    {
+      "label": "open BNPL above base limit",
+      "hash": "0x4fb174a963077339bd961033ff1fcb85be538b0530f68ec24df1987136290021"
+    },
+    {
+      "label": "collect instalment 1",
+      "hash": "0xa4fbba4b971803f9d794281d7d8d42696595710c04a2fe7ddf9b9d94a6224624"
+    },
+    {
+      "label": "dust repayment (1 unit)",
+      "hash": "0x9546c0b336b284010cd7e3d3ffb375a90a02729f46437f3d6ca8bc20b133b624"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "name": "PolarisPay - Instalment Collection",
+  "description": "Hourly. Reads the borrower's outstanding debt on chain and repays through LoanEngine when there is something to collect. The hosted twin of `pnpm keeper:collect`, so the schedule outlives the CLI process and its runs show in the KeeperHub dashboard.",
+  "nodes": [
+    {
+      "id": "trigger-hourly",
+      "type": "trigger",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "label": "Hourly",
+        "type": "trigger",
+        "config": {
+          "triggerType": "Schedule",
+          "cron": "0 * * * *"
+        }
+      }
+    },
+    {
+      "id": "read-outstanding",
+      "type": "action",
+      "position": { "x": 0, "y": 160 },
+      "data": {
+        "label": "Read outstanding",
+        "type": "action",
+        "config": {
+          "actionType": "web3/read-contract",
+          "network": "11155111",
+          "contractAddress": "0x21E9740DDe241f0653F699DAa206AfCE1FA25405",
+          "abi": "[{\"type\":\"function\",\"name\":\"activeDebtOf\",\"stateMutability\":\"view\",\"inputs\":[{\"name\":\"user\",\"type\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}]}]",
+          "abiFunction": "activeDebtOf",
+          "functionArgs": "[\"0x7A2E11B3ECEBaB8Ea46966eDaDD4092583809b67\"]"
+        }
+      }
+    },
+    {
+      "id": "collect",
+      "type": "action",
+      "position": { "x": 0, "y": 320 },
+      "data": {
+        "label": "Collect instalment",
+        "type": "action",
+        "config": {
+          "actionType": "web3/write-contract",
+          "network": "11155111",
+          "contractAddress": "0x21E9740DDe241f0653F699DAa206AfCE1FA25405",
+          "abi": "[{\"type\":\"function\",\"name\":\"repay\",\"stateMutability\":\"nonpayable\",\"inputs\":[{\"name\":\"loanId\",\"type\":\"uint256\"},{\"name\":\"amount\",\"type\":\"uint256\"}],\"outputs\":[]}]",
+          "abiFunction": "repay",
+          "functionArgs": "[\"6\",\"105002740\"]",
+          "gasLimitMultiplier": "1.2"
+        }
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "trigger-hourly", "target": "read-outstanding" },
+    { "id": "e2", "source": "read-outstanding", "target": "collect" }
+  ]
+}

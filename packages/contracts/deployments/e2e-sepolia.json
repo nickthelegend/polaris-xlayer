@@ -1,0 +1,49 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "loanId": "1",
+  "borrower": "0x7A2E11B3ECEBaB8Ea46966eDaDD4092583809b67",
+  "merchant": "0x000000000000000000000000000000000000dEaD",
+  "principalRaw": "200000000",
+  "totalOwedRaw": "200000152",
+  "totalRepaidRaw": "50000038",
+  "installmentCount": 4,
+  "installmentsPaid": 1,
+  "intervalSeconds": 60,
+  "startedAt": 1785799644,
+  "scoreBefore": 600,
+  "scoreAfter": 612,
+  "steps": [
+    {
+      "label": "Merchant registered",
+      "detail": "Polaris Demo Store",
+      "hash": "0x28bf9a1b39454a13929964981b502a0aebbe0983a5bbc112d034ca378ac47230"
+    },
+    {
+      "label": "Merchant activated",
+      "detail": "active=true",
+      "hash": "0x6a79d83da0fcf3bd18e6a8f30ec2e7e7765d644e16d9b1fbcaef078bfe31b11d"
+    },
+    {
+      "label": "Checkout approval",
+      "detail": "10000.00 pUSDC to LoanEngine",
+      "hash": "0x1723ff03de9f6257faa04b81ea6a3097f61759709909964484bf020b73bbff15"
+    },
+    {
+      "label": "Plan opened",
+      "detail": "loan #1, 200.00 principal, 4 installments",
+      "hash": "0x455c957e7414f7556009f4a0ba55287428352fd875482114d9de69637d4fe750"
+    },
+    {
+      "label": "Installment 1 collected",
+      "detail": "50.00 pUSDC pulled by a third party",
+      "hash": "0xee2ec476acf4ba9ab6e9499da17bf931c01d96e95dea995f673aa69e622c7570"
+    }
+  ],
+  "contracts": {
+    "MockUSDC": "0x49C86277a91002c4943837bf20F6ED41976Db09F",
+    "ScoreManager": "0x4e9e7EEF855BFE2c44608A9613E955fC67035312",
+    "MerchantRegistry": "0xb2eCAD5bE07971deE1be161C39569705186AdFD6",
+    "PolarisLoanEngine": "0xF8DA73d32778f623D33C5D75c7359CbA1DA584ED"
+  }
+}

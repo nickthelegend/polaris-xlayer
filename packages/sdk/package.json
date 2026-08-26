@@ -1,0 +1,85 @@
+{
+  "name": "polarispay-sdk",
+  "version": "0.2.1",
+  "description": "One object, three payment modes: pay now, subscribe, or split into instalments. On-chain BNPL for any EVM checkout.",
+  "license": "MIT",
+  "author": "Polaris Team",
+  "homepage": "https://github.com/nickthelegend/polarispay-keeperhub/tree/main/packages/sdk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nickthelegend/polarispay-keeperhub.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/nickthelegend/polarispay-keeperhub/issues"
+  },
+  "keywords": [
+    "bnpl",
+    "buy-now-pay-later",
+    "payments",
+    "ethereum",
+    "evm",
+    "stablecoin",
+    "subscriptions",
+    "checkout",
+    "web3",
+    "polaris"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js",
+      "default": "./dist/esm/index.js"
+    },
+    "./react": {
+      "types": "./dist/types/react.d.ts",
+      "import": "./dist/esm/react.js",
+      "require": "./dist/cjs/react.js",
+      "default": "./dist/esm/react.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/mark-dist.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "ethers": ">=6",
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.2.0",
+    "ethers": "^6.17.0",
+    "typescript": "^5.9.3"
+  }
+}

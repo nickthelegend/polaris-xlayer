@@ -1,0 +1,38 @@
+{
+  "name": "polarispay-keeperhub",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "PolarisPay: undercollateralized BNPL and crypto payments, with KeeperHub as the execution and reliability layer for collection, liquidation, dunning and settlement.",
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "packageManager": "pnpm@10.29.2",
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/**\" build",
+    "typecheck": "pnpm -r --filter \"./packages/**\" --filter \"./keeper\" typecheck",
+    "test": "pnpm --filter @polarispay/keeperhub test && pnpm --filter @polarispay/db test && pnpm --filter @polarispay/mcp test && pnpm --filter @polarispay/underwriting test && pnpm --filter @polarispay/contracts test",
+    "contracts:compile": "pnpm --filter @polarispay/contracts compile",
+    "contracts:test": "pnpm --filter @polarispay/contracts test",
+    "contracts:deploy": "pnpm --filter @polarispay/contracts deploy:sepolia",
+    "contracts:e2e": "pnpm --filter @polarispay/contracts e2e:sepolia",
+    "db:migrate": "pnpm --filter @polarispay/db migrate",
+    "db:seed": "pnpm --filter @polarispay/db seed",
+    "db:sync": "pnpm --filter @polarispay/db sync",
+    "keeper:collect": "pnpm --filter @polarispay/keeper collect",
+    "keeper:liquidate": "pnpm --filter @polarispay/keeper liquidate",
+    "keeper:settle": "pnpm --filter @polarispay/keeper settle",
+    "keeper:all": "pnpm --filter @polarispay/keeper start",
+    "workflows:push": "pnpm --filter @polarispay/keeper workflows:push",
+    "db:purge": "pnpm --filter @polarispay/db purge",
+    "db:reconcile": "pnpm --filter @polarispay/db reconcile",
+    "db:index": "pnpm --filter @polarispay/db index",
+    "mcp:start": "pnpm --filter @polarispay/mcp start",
+    "keeper:health": "pnpm --filter @polarispay/keeper health",
+    "keeper:subscriptions": "pnpm --filter @polarispay/keeper subscriptions",
+    "keeper:close-out": "pnpm --filter @polarispay/keeper close-out"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

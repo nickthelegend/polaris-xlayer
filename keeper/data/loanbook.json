@@ -1,0 +1,58 @@
+[
+  {
+    "loanId": "1",
+    "borrower": "0x1111111111111111111111111111111111111111",
+    "merchantId": "merch_demo_sneakers",
+    "installments": [
+      {
+        "index": 1,
+        "dueAt": "2026-08-03T00:00:00.000Z",
+        "amountRaw": "50000000",
+        "amountDisplay": "50.00 USDC",
+        "state": "paid",
+        "attempts": 1
+      },
+      {
+        "index": 2,
+        "dueAt": "2026-08-17T00:00:00.000Z",
+        "amountRaw": "50000000",
+        "amountDisplay": "50.00 USDC",
+        "state": "scheduled",
+        "attempts": 0
+      },
+      {
+        "index": 3,
+        "dueAt": "2026-08-31T00:00:00.000Z",
+        "amountRaw": "50000000",
+        "amountDisplay": "50.00 USDC",
+        "state": "scheduled",
+        "attempts": 0
+      },
+      {
+        "index": 4,
+        "dueAt": "2026-09-14T00:00:00.000Z",
+        "amountRaw": "50000000",
+        "amountDisplay": "50.00 USDC",
+        "state": "scheduled",
+        "attempts": 0
+      }
+    ]
+  },
+  {
+    "loanId": "2",
+    "borrower": "0x2222222222222222222222222222222222222222",
+    "merchantId": "merch_demo_electronics",
+    "installments": [
+      {
+        "index": 1,
+        "dueAt": "2026-08-01T00:00:00.000Z",
+        "amountRaw": "120000000",
+        "amountDisplay": "120.00 USDC",
+        "state": "dunning",
+        "attempts": 2,
+        "nextAttemptAt": "2026-08-02T06:00:00.000Z",
+        "lastFailureKind": "insufficient_funds"
+      }
+    ]
+  }
+]

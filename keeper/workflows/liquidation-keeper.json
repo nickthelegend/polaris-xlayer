@@ -1,0 +1,58 @@
+{
+  "name": "PolarisPay - Liquidation Keeper",
+  "description": "Every 15 minutes, ask LoanEngine.checkLiquidatable whether a loan qualifies and liquidate only if it says yes. The decision is made on chain rather than from a cached read, so a borrower who repays a second earlier is not liquidated on stale state. The hosted twin of `pnpm keeper:liquidate`.",
+  "nodes": [
+    {
+      "id": "trigger-quarter-hour",
+      "type": "trigger",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "label": "Every 15 minutes",
+        "type": "trigger",
+        "config": {
+          "triggerType": "Schedule",
+          "cron": "*/15 * * * *"
+        }
+      }
+    },
+    {
+      "id": "check-liquidatable",
+      "type": "action",
+      "position": { "x": 0, "y": 160 },
+      "data": {
+        "label": "Is it liquidatable",
+        "type": "action",
+        "config": {
+          "actionType": "web3/read-contract",
+          "network": "11155111",
+          "contractAddress": "0x21E9740DDe241f0653F699DAa206AfCE1FA25405",
+          "abi": "[{\"type\":\"function\",\"name\":\"checkLiquidatable\",\"stateMutability\":\"view\",\"inputs\":[{\"name\":\"loanId\",\"type\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}]}]",
+          "abiFunction": "checkLiquidatable",
+          "functionArgs": "[\"6\"]"
+        }
+      }
+    },
+    {
+      "id": "liquidate",
+      "type": "action",
+      "position": { "x": 0, "y": 320 },
+      "data": {
+        "label": "Liquidate",
+        "type": "action",
+        "config": {
+          "actionType": "web3/write-contract",
+          "network": "11155111",
+          "contractAddress": "0x21E9740DDe241f0653F699DAa206AfCE1FA25405",
+          "abi": "[{\"type\":\"function\",\"name\":\"liquidate\",\"stateMutability\":\"nonpayable\",\"inputs\":[{\"name\":\"loanId\",\"type\":\"uint256\"}],\"outputs\":[]}]",
+          "abiFunction": "liquidate",
+          "functionArgs": "[\"6\"]",
+          "gasLimitMultiplier": "1.2"
+        }
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "trigger-quarter-hour", "target": "check-liquidatable" },
+    { "id": "e2", "source": "check-liquidatable", "target": "liquidate" }
+  ]
+}

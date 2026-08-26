@@ -1,0 +1,28 @@
+{
+  "name": "@polarispay/keeper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The PolarisPay keeper: collects installments, liquidates defaulted loans, settles merchants. Every on-chain action runs through KeeperHub.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node --experimental-strip-types src/cli.ts run",
+    "collect": "node --experimental-strip-types src/cli.ts collect",
+    "liquidate": "node --experimental-strip-types src/cli.ts liquidate",
+    "settle": "node --experimental-strip-types src/cli.ts settle",
+    "doctor": "node --experimental-strip-types src/cli.ts doctor",
+    "workflows:push": "node --experimental-strip-types src/cli.ts workflows:push",
+    "health": "node --experimental-strip-types src/cli.ts health",
+    "subscriptions": "node --experimental-strip-types src/cli.ts subscriptions",
+    "close-out": "node --experimental-strip-types src/cli.ts close-out"
+  },
+  "dependencies": {
+    "@polarispay/db": "workspace:*",
+    "@polarispay/keeperhub": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "typescript": "^5.9.3"
+  }
+}

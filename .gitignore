@@ -1,0 +1,42 @@
+node_modules/
+dist/
+build/
+.next/
+out/
+cache/
+artifacts/
+typechain-types/coverage/
+coverage/
+*.tsbuildinfo
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+*.log
+npm-debug.log*
+.pnpm-debug.log*
+
+.vercel
+.turbo
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# keeper run artifacts
+keeper/.runs/
+keeper/receipts/*.json
+!keeper/receipts/.gitkeep
+
+# hardhat
+packages/contracts/artifacts/
+packages/contracts/cache/
+packages/contracts/typechain-types/
+
+# Anchor / Solana
+.anchor
+target/
+!target/deploy/*-keypair.json
+test-ledger/
+.program-id.txt

@@ -1,0 +1,664 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.13 0.02 260);
+  /* near-black */
+  --foreground: oklch(0.98 0.01 260);
+  /* near-white */
+  --card: oklch(0.16 0.02 260);
+  --card-foreground: oklch(0.98 0.01 260);
+  --popover: oklch(0.16 0.02 260);
+  --popover-foreground: oklch(0.98 0.01 260);
+  --primary: oklch(0.88 0.2 128);
+  /* neon-lime */
+  --primary-foreground: oklch(0.18 0.02 260);
+  /* dark text on lime */
+  --secondary: oklch(0.22 0.02 260);
+  /* deeper surface */
+  --secondary-foreground: oklch(0.98 0.01 260);
+  --muted: oklch(0.22 0.02 260);
+  --muted-foreground: oklch(0.72 0.01 260);
+  --accent: oklch(0.72 0.08 210);
+  /* cool accent if needed */
+  --accent-foreground: oklch(0.13 0.02 260);
+  --border: oklch(0.28 0.02 260);
+  --input: oklch(0.28 0.02 260);
+  --ring: oklch(0.55 0.08 210);
+  --sidebar: oklch(0.18 0.02 260);
+  --sidebar-foreground: oklch(0.98 0.01 260);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.22 0.02 260);
+  --sidebar-accent-foreground: oklch(0.98 0.01 260);
+  --sidebar-border: oklch(0.28 0.02 260);
+  --sidebar-ring: var(--ring);
+}
+
+@theme inline {
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Glass helpers */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.step-line {
+  position: absolute;
+  left: 1.5rem;
+  top: 2rem;
+  bottom: -2rem;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--primary) 0%, rgba(167, 242, 74, 0.1) 100%);
+  z-index: 0;
+}
+
+@media (min-width: 768px) {
+  .step-line {
+    left: 2.5rem;
+  }
+}
+
+.glass-sidebar {
+  background: rgba(26, 34, 17, 0.4);
+  backdrop-filter: blur(12px);
+  border-right: 1px solid rgba(167, 242, 74, 0.1);
+}
+
+.terminal-block {
+  background: #0d1117;
+  border: 1px solid rgba(167, 242, 74, 0.2);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(167, 242, 74, 0.2);
+  border-radius: 10px;
+}
+
+
+.core-container {
+  perspective: 2000px;
+}
+
+.orb-wrapper {
+  position: relative;
+  transform-style: preserve-3d;
+  animation: rotateOrb 30s linear infinite;
+}
+
+.ring {
+  position: absolute;
+  border: 2px solid #A6F24A;
+  border-radius: 50%;
+  opacity: 0.6;
+  box-shadow: 0 0 15px rgba(166, 242, 74, 0.4);
+}
+
+.ring-1 {
+  width: 400px;
+  height: 400px;
+  transform: rotateX(75deg) rotateY(0deg);
+}
+
+.ring-2 {
+  width: 350px;
+  height: 350px;
+  transform: rotateX(45deg) rotateY(45deg);
+  opacity: 0.4;
+}
+
+.ring-3 {
+  width: 300px;
+  height: 300px;
+  transform: rotateX(-45deg) rotateY(60deg);
+  opacity: 0.3;
+}
+
+.ring-4 {
+  width: 450px;
+  height: 450px;
+  transform: rotateX(90deg) rotateY(15deg);
+  border-style: dashed;
+  opacity: 0.2;
+}
+
+.core-data-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, #A6F24A 0%, rgba(166, 242, 74, 0) 70%);
+  border-radius: 50%;
+  filter: blur(20px);
+  animation: pulse 4s ease-in-out infinite;
+}
+
+@keyframes rotateOrb {
+  from {
+    transform: rotateY(0deg) rotateZ(0deg);
+  }
+
+  to {
+    transform: rotateY(360deg) rotateZ(360deg);
+  }
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.5;
+  }
+
+  50% {
+    transform: translate(-50%, -50%) scale(1.4);
+    opacity: 0.9;
+  }
+}
+
+.circular-text {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  animation: rotateCounter 60s linear infinite;
+}
+
+@keyframes rotateCounter {
+  from {
+    transform: rotate(360deg);
+  }
+
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+.text-ring {
+  font-family: 'monospace';
+  font-weight: 900;
+  text-transform: uppercase;
+  fill: rgba(255, 255, 255, 0.05);
+  font-size: 42px;
+  letter-spacing: 12px;
+}
+
+
+.energy-ring {
+  border: 4px solid transparent;
+  border-top-color: #A6F24A;
+  border-bottom-color: #A6F24A;
+  border-radius: 50%;
+  position: absolute;
+  animation: ringPulse 4s ease-in-out infinite alternate;
+}
+
+@keyframes ringPulse {
+  0% {
+    transform: scale(0.8) rotate(0deg);
+    opacity: 0.2;
+  }
+
+  100% {
+    transform: scale(1.2) rotate(180deg);
+    opacity: 0.8;
+  }
+}
+
+.core-glow {
+  background: radial-gradient(circle, #A6F24A 0%, transparent 70%);
+  filter: blur(40px);
+}
+.marquee-container {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.marquee-content {
+  display: inline-block;
+  animation: obolus-marquee 30s linear infinite;
+}
+
+@keyframes obolus-marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Mesh Wallet Overrides - Force Black on Lime */
+.mesh-wallet-wrapper .mesh-button,
+.landing-wallet-wrapper .mesh-button {
+  background-color: var(--primary) !important;
+  color: #000000 !important;
+  border-radius: 9999px !important;
+  font-family: inherit !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+  font-size: 10px !important;
+  border: none !important;
+  box-shadow: 0 0 20px rgba(166, 242, 74, 0.3) !important;
+}
+
+.mesh-wallet-wrapper .mesh-button *,
+.landing-wallet-wrapper .mesh-button * {
+  color: #000000 !important;
+}
+
+.mesh-wallet-wrapper .mesh-dropdown {
+  background-color: #0a0f18 !important;
+  border: 1px solid rgba(166, 242, 74, 0.2) !important;
+  backdrop-filter: blur(16px) !important;
+  border-radius: 12px !important;
+}
+
+/* Active Nav Header Fix */
+header nav a.bg-primary {
+  color: #000000 !important;
+}
+/* ---------------------------------------------------------------------------
+ * Surfaces, rules and figures.
+ *
+ * The palette is unchanged. What was missing is everything between a colour and
+ * a screen: a card that reads as a physical plane, a divider quiet enough to
+ * organise without boxing, and numerals that line up in a column of money.
+ *
+ * The old UI expressed every relationship as a 1px rounded rectangle, so a
+ * summary figure, a form and a table all carried the same weight. These give
+ * grouping a range: a plane when something is genuinely a distinct object, a
+ * rule when it is merely the next section, and nothing at all when proximity
+ * already says it.
+ * ------------------------------------------------------------------------ */
+
+@layer components {
+  /*
+   * A raised plane. The top highlight is what sells it: real cards catch light
+   * on their upper edge, and a border alone reads as an outline drawn on glass.
+   * The shadow carries an offset as well as a blur, so the plane sits above the
+   * page rather than glowing on it.
+   */
+  .surface {
+    background:
+      linear-gradient(
+        to bottom,
+        color-mix(in oklab, var(--color-foreground) 4%, transparent),
+        transparent 40%
+      ),
+      var(--color-card);
+    border: 1px solid color-mix(in oklab, var(--color-foreground) 8%, transparent);
+    border-radius: var(--radius);
+    box-shadow:
+      inset 0 1px 0 0 color-mix(in oklab, var(--color-foreground) 7%, transparent),
+      0 1px 2px -1px rgb(0 0 0 / 0.4),
+      0 8px 24px -12px rgb(0 0 0 / 0.5);
+  }
+
+  /* Interactive planes lift toward the light rather than changing colour. */
+  .surface-interactive {
+    transition:
+      border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1),
+      transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .surface-interactive:hover {
+    border-color: color-mix(in oklab, var(--color-foreground) 16%, transparent);
+    box-shadow:
+      inset 0 1px 0 0 color-mix(in oklab, var(--color-foreground) 10%, transparent),
+      0 2px 4px -2px rgb(0 0 0 / 0.4),
+      0 16px 32px -16px rgb(0 0 0 / 0.6);
+  }
+
+  /*
+   * Selected state carries the accent on the edge and a wash inside, so a
+   * chosen option is legible without the lime shouting over the content.
+   */
+  .surface-selected {
+    border-color: color-mix(in oklab, var(--color-primary) 45%, transparent);
+    background:
+      linear-gradient(
+        to bottom,
+        color-mix(in oklab, var(--color-primary) 8%, transparent),
+        transparent 55%
+      ),
+      var(--color-card);
+    box-shadow:
+      inset 0 1px 0 0 color-mix(in oklab, var(--color-primary) 22%, transparent),
+      0 1px 2px -1px rgb(0 0 0 / 0.4),
+      0 12px 28px -14px color-mix(in oklab, var(--color-primary) 22%, black);
+  }
+
+  /* A divider that organises without drawing a box. */
+  .rule {
+    border: 0;
+    border-top: 1px solid color-mix(in oklab, var(--color-foreground) 8%, transparent);
+  }
+
+  /*
+   * Money. Tabular figures so digits sit in a column and a changing value does
+   * not shift the ones beside it, and a tighter track because large numerals
+   * carry more built-in sidebearing than letters do.
+   */
+  .figure {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1, "ss01" 1;
+    letter-spacing: -0.02em;
+  }
+
+  .figure-lg {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    letter-spacing: -0.035em;
+    line-height: 0.95;
+  }
+
+  /*
+   * The quiet label that names a figure.
+   *
+   * 60% rather than the 45% this started at: uppercase at 11px is the smallest
+   * text on the page, and the lighter tint measured about 3.7:1 against this
+   * background -- under the 4.5:1 that small text needs. Quiet has to stop
+   * where legible ends.
+   */
+  .label {
+    font-size: 0.6875rem;
+    line-height: 1.2;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: color-mix(in oklab, var(--color-foreground) 60%, transparent);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Layout layer.
+ *
+ * The tokens above solved colour and surface. What was still missing was the
+ * page: every route put its objects straight onto flat black, so a single card
+ * read as debris rather than as content, and a sparse page read as a bug.
+ *
+ * Three things fix that, and they are all here rather than repeated per route:
+ * an ambient ground that gives the black somewhere to be, a page shell that
+ * gives every route the same opening rhythm, and grids that stay composed when
+ * they hold one item instead of nine.
+ * ------------------------------------------------------------------------ */
+
+/*
+ * Ambient ground.
+ *
+ * A hairline grid plus one soft lime bloom, both fixed, both far below the
+ * content. This is doing perceptual work rather than decoration: a plane needs
+ * a surface behind it to read as raised, and pure #0b0b0b gives it none. Kept
+ * under 4% opacity so it never competes with a figure.
+ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(
+      60rem 40rem at 78% -8%,
+      color-mix(in oklab, var(--color-primary) 9%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(color-mix(in oklab, var(--color-foreground) 3%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--color-foreground) 3%, transparent) 1px, transparent 1px);
+  background-size: 100% 100%, 64px 64px, 64px 64px;
+  /* Fade the grid out downward so it frames the fold and then gets out of the way. */
+  mask-image: linear-gradient(to bottom, black, black 40rem, transparent 70rem);
+}
+
+/* Content has to sit above the ground. */
+body > * {
+  position: relative;
+  z-index: 1;
+}
+
+@layer components {
+  /* The column every route shares. One max-width, one gutter, one rhythm. */
+  .shell {
+    width: 100%;
+    max-width: 78rem;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+
+  @media (min-width: 768px) {
+    .shell {
+      padding-inline: 2rem;
+    }
+  }
+
+  /*
+   * Page opening. An eyebrow, a title, a line of prose, and optionally an
+   * action on the right. Every route using the same block is most of what
+   * makes a set of pages feel like one product.
+   */
+  .page-head {
+    display: grid;
+    gap: 0.75rem;
+    padding-block: 3rem 2rem;
+  }
+
+  @media (min-width: 900px) {
+    .page-head[data-actions] {
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      column-gap: 2rem;
+    }
+  }
+
+  .page-title {
+    font-size: clamp(2rem, 1.2rem + 2.6vw, 3.25rem);
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+    font-weight: 500;
+    text-wrap: balance;
+  }
+
+  .page-lede {
+    max-width: 52ch;
+    color: color-mix(in oklab, var(--color-foreground) 62%, transparent);
+    line-height: 1.6;
+    text-wrap: pretty;
+  }
+
+  /*
+   * Auto-fit grid with a floor.
+   *
+   * `auto-fill` with a minimum is what stops one merchant from rendering as a
+   * lonely third of a row: the track sizes to the content it has instead of
+   * reserving space for content it does not.
+   */
+  .grid-cards {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(min(19rem, 100%), 1fr));
+  }
+
+  /* Asymmetric split for a primary object beside its supporting column. */
+  .split {
+    display: grid;
+    gap: 1.25rem;
+    align-items: start;
+  }
+
+  @media (min-width: 960px) {
+    .split {
+      grid-template-columns: minmax(0, 1.62fr) minmax(20rem, 1fr);
+    }
+  }
+
+  /*
+   * Stat tile. The label sits above the figure, not beside it, because a column
+   * of money is read down the digits and anything to the left of them breaks
+   * that column.
+   */
+  .stat {
+    display: grid;
+    gap: 0.375rem;
+    padding: 1.125rem 1.25rem;
+  }
+
+  .stat-value {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    font-size: clamp(1.5rem, 1.1rem + 1.2vw, 2rem);
+  }
+
+  .stat-note {
+    font-size: 0.75rem;
+    color: color-mix(in oklab, var(--color-foreground) 55%, transparent);
+  }
+
+  /*
+   * Empty state.
+   *
+   * The version this replaces was a sentence and a button centred in a void,
+   * which reads as a page that failed to load rather than one with nothing in
+   * it yet. A hatched plane at least says "this is the container, and it is
+   * empty" -- the shape of the thing survives its own emptiness.
+   */
+  .empty {
+    display: grid;
+    place-items: center;
+    gap: 0.75rem;
+    padding: clamp(2.5rem, 6vw, 4.5rem) 1.5rem;
+    text-align: center;
+    border: 1px dashed color-mix(in oklab, var(--color-foreground) 14%, transparent);
+    border-radius: var(--radius);
+    background-image: repeating-linear-gradient(
+      -45deg,
+      color-mix(in oklab, var(--color-foreground) 2.5%, transparent) 0 1px,
+      transparent 1px 9px
+    );
+  }
+
+  /* A hairline plate for grouped rows -- lighter than a surface, still an object. */
+  .plate {
+    border: 1px solid color-mix(in oklab, var(--color-foreground) 8%, transparent);
+    border-radius: var(--radius);
+    overflow: clip;
+  }
+
+  .plate > * + * {
+    border-top: 1px solid color-mix(in oklab, var(--color-foreground) 8%, transparent);
+  }
+}

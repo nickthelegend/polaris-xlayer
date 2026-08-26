@@ -1,0 +1,21 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "demoEngine": "0x032d5241F0761a593fe3595c7418153dA7d5f70d",
+  "gracePeriodSeconds": 45,
+  "intervalSeconds": 45,
+  "loanId": "1",
+  "scoreBefore": 624,
+  "scoreAfter": 474,
+  "writtenDownRaw": "100000057",
+  "transactions": [
+    {
+      "label": "Plan opened (loan #1)",
+      "hash": "0x7acf5b53f908390e671019eac1fcaadf85880c1539cff452c1556442fa756daf"
+    },
+    {
+      "label": "Liquidated",
+      "hash": "0x466507ef8f973349bb9110c749175c935e50cb3718e16f2e25c5530342542cd2"
+    }
+  ]
+}
