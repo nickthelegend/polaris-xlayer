@@ -284,23 +284,25 @@ export async function fetchActivity(limit = 25): Promise<ActivityEvent[]> {
     const at = meta.blockTime ?? tx.blockTime ?? 0;
 
     /*
-     * Who paid for this transaction.
+     * Who moved this installment.
      *
      * The `InstallmentPaid` event does not carry the caller — the program does
-     * not care, because the money can only move one way regardless. But the
-     * borrower does care: "collected by the keeper" and "you paid this early"
-     * are different facts, and this said the former for both until it was read
-     * back against a feed of seeded early repayments.
+     * not care, since the money can only travel one way regardless. But the
+     * borrower does: "collected by the keeper" and "you paid this early" are
+     * different facts about their own account.
      *
-     * The fee payer is always the first account key.
+     * The first attempt at this compared the fee payer against the borrower,
+     * which is a proxy and a bad one. Anchor's `.rpc()` pays fees from the
+     * provider wallet, so a repayment the borrower signed themselves can be
+     * fee-paid by somebody else entirely — and every early repayment was
+     * captioned as a keeper collection.
+     *
+     * The instruction name is not a proxy. `Repay` is borrower-signed by
+     * construction; `CollectInstallment` is the permissionless keeper path.
      */
-    let feePayer: string | null = null;
-    try {
-      feePayer = tx.transaction.message.getAccountKeys().get(0)?.toBase58() ?? null;
-    } catch {
-      feePayer = null;
-    }
-    const byKeeper = feePayer !== null && feePayer !== wallet.publicKey.toBase58();
+    const byKeeper = tx.meta.logMessages.some((l) =>
+      l.includes("Instruction: CollectInstallment"),
+    );
 
     let idx = 0;
     for (const event of parser.parseLogs(tx.meta.logMessages)) {
