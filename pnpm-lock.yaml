@@ -80,6 +80,9 @@ importers:
       '@morpho-org/blue-api-sdk':
         specifier: ^2.17.3
         version: 2.17.3(@morpho-org/blue-sdk@5.23.3(@morpho-org/morpho-ts@2.8.0))(@morpho-org/morpho-ts@2.8.0)
+      '@polarispay/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@radix-ui/react-accordion':
         specifier: 1.2.2
         version: 1.2.2(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -210,8 +213,8 @@ importers:
         specifier: 1.4.1
         version: 1.4.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       lucide-react:
-        specifier: ^0.454.0
-        version: 0.454.0(react@19.2.3)
+        specifier: ^1.34.0
+        version: 1.34.0(react@19.2.3)
       mongodb:
         specifier: ^7.1.1
         version: 7.5.0
@@ -7583,13 +7586,13 @@ packages:
   ltgt@2.2.1:
     resolution: {integrity: sha512-AI2r85+4MquTw9ZYqabu4nMwy9Oftlfa/e/52t9IjtfG+mGBbTNdAoZ3RQKLHR6r0wQnwZnPIEh/Ya6XTWAKNA==}
 
-  lucide-react@0.454.0:
-    resolution: {integrity: sha512-hw7zMDwykCLnEzgncEEjHeA6+45aeEzRYuKHuyRSOPkhko+J3ySGjGIzu+mmMfDFG1vazHepMaYFYHbTFAZAAQ==}
-    peerDependencies:
-      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0-rc
-
   lucide-react@0.563.0:
     resolution: {integrity: sha512-8dXPB2GI4dI8jV4MgUDGBeLdGk8ekfqVZ0BdLcrRzocGgG75ltNEmWS+gE7uokKF/0oSUuczNDT+g9hFJ23FkA==}
+    peerDependencies:
+      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  lucide-react@1.34.0:
+    resolution: {integrity: sha512-vnjGJNI7Htk5+oWW8gXGuaLgwgAb0T6/iZbBrp9JCfRFwdNWZ0YTm3eyxjOLgwN6r8iyAf3UA70zNmBRBNv7yg==}
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
@@ -17960,11 +17963,11 @@ snapshots:
 
   ltgt@2.2.1: {}
 
-  lucide-react@0.454.0(react@19.2.3):
+  lucide-react@0.563.0(react@19.2.3):
     dependencies:
       react: 19.2.3
 
-  lucide-react@0.563.0(react@19.2.3):
+  lucide-react@1.34.0(react@19.2.3):
     dependencies:
       react: 19.2.3
 

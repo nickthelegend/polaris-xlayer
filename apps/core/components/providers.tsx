@@ -3,7 +3,14 @@
 import { PropsWithChildren } from "react";
 import { createConfig, http, WagmiProvider } from "wagmi";
 import { sepolia } from "wagmi/chains";
-import { injected } from "wagmi/connectors";
+// Imported from its own subpath, not the `wagmi/connectors` barrel.
+//
+// The barrel re-exports every connector wagmi ships — Safe, WalletConnect,
+// Coinbase, Base — and each of those imports an optional peer dependency that
+// is not installed, because this app uses none of them. Next resolved the
+// barrel and logged a module-not-found for all four on every page load. Only
+// `injected` is used, so only `injected` is imported.
+import { injected } from "wagmi/connectors/injected";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";

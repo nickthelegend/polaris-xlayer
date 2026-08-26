@@ -44,8 +44,17 @@ than marked pass.
 
 **82 of 82 in-scope items pass** — A (24), B (12), C (16), D (9), E (18), F (3).
 
-**4 items (section G) are out of scope and recorded as untestable**, each with
-the specific missing credential. They are the EVM build, not this one.
+**Verified twice over on the app**: in a browser against the live cluster, and
+on a real Android emulator over `adb reverse`, which is the actual target and
+which caught a fault no browser run could have.
+
+**Section G was re-opened rather than left as "untestable".** `mongod` is
+installed on this machine and the repository carries the real deployed Sepolia
+addresses, so G1 was stood up for real: local MongoDB, a public Sepolia RPC,
+and the genuinely deployed contracts. `GET /api/credit/me?address=0x7A2E…`
+returns **score 648, limit 1850.00** read off the live ScoreManager, and
+`/api/limits` reports **900 USDC of real locked collateral**. G1 now passes.
+G2–G4 remain untestable and are listed with their exact blocker.
 
 Every fix below was made at the root cause and re-verified against the same
 item. The full plan was then re-run top to bottom.
@@ -83,6 +92,25 @@ item. The full plan was then re-run top to bottom.
 | Console errors remaining | 0 |
 | Failed network requests remaining | 0 |
 | Mocks / stubs / fallback data remaining | 0 |
+
+### Found only by running on the device
+
+The browser cannot surface these, and all four were real:
+
+| Found | Fix |
+|---|---|
+| **Every account decode failed on Android.** `Buffer.prototype.subarray` is inherited from `Uint8Array` and built through the species constructor; under Hermes that resolves to `Uint8Array`, so the view loses every Buffer method. Anchor strips the 8-byte discriminator with `subarray(8)`, and buffer-layout then calls `b.readUIntLE(...)` — thrown deep inside a borsh decode with nothing in the stack naming Buffer | Re-attach the prototype in the polyfill |
+| The chain modules trusted the root layout to import polyfills first — an order expo-router's `require.context` does not promise | Each module imports them itself |
+| `app.json` referenced `./assets/adaptive-icon.png`, which the SDK 57 template does not create | Points at the three files it does ship |
+| `plans.tsx` animated its expand with `LayoutAnimation`, a **no-op on the New Architecture** — it did nothing and printed a warning toast over the UI | Reanimated layout transition |
+
+### Found in the EVM app while re-opening G1
+
+| Found | Fix |
+|---|---|
+| `apps/core` imports `@polarispay/db` in five API routes and **never declared it as a dependency** — a clean install could not run it | Declared `workspace:*` |
+| `components/providers.tsx` imported `injected` from the `wagmi/connectors` barrel, which re-exports Safe, WalletConnect, Coinbase and Base, each pulling an uninstalled optional peer — four module-not-found errors on every page load | Import from `wagmi/connectors/injected` |
+| lucide-react 0.454 against React 19 produced a hydration mismatch on every icon's `aria-hidden` | Upgraded |
 
 ---
 
@@ -204,7 +232,7 @@ The app must read **live on-chain state**. Fixture data is a fail by definition.
 
 | # | Item | Blocker |
 |---|---|---|
-| G1 | `apps/core` (5 pages, 5 API routes) | EVM build. Needs `MONGODB_URI`, `NEXT_PUBLIC_SEPOLIA_RPC_URL`, five deployed Sepolia addresses. No `.env` in repo |
+| G1 | `apps/core` (5 pages, 5 API routes) | **PASS.** Stood up against a real local MongoDB, a public Sepolia RPC and the real deployed contracts recorded in `packages/contracts/deployments/sepolia.json`. `eth_getCode` confirms the LoanEngine is live. Pages render, five API routes verified, console clean |
 | G2 | `apps/merchant` (4 pages, 7 API routes) | EVM build. Additionally needs `KEEPERHUB_API_KEY`, `POLARIS_STORE_API_KEY`, `SUPABASE_URL`/`SUPABASE_KEY` |
 | G3 | `keeper/` (EVM) | Needs a KeeperHub organisation key |
 | G4 | `packages/*` EVM packages | Same credential set |
