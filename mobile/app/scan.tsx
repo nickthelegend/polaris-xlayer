@@ -79,8 +79,20 @@ export default function ScanScreen() {
     [],
   );
 
+  /*
+   * The same lock the checkout screen needs, for the same reason.
+   *
+   * `stage` is React state, and a second tap 100ms later runs this again
+   * before the re-render — reading the stale "review" and sending the
+   * transaction twice. Solana would dedupe two identical signatures, but the
+   * two in-flight confirmations race to set the final stage, so a success can
+   * be overwritten by the loser's error. A ref updates synchronously.
+   */
+  const approving = useRef(false);
+
   const approve = useCallback(async () => {
-    if (stage.name !== "review") return;
+    if (stage.name !== "review" || approving.current) return;
+    approving.current = true;
     const { prepared } = stage;
     setStage({ name: "sending" });
     try {
@@ -90,6 +102,8 @@ export default function ScanScreen() {
       setStage({ name: "done", signature, summary: prepared.message });
     } catch (e: any) {
       setStage({ name: "failed", message: explainError(e) });
+    } finally {
+      approving.current = false;
     }
   }, [stage, refresh]);
 
@@ -99,6 +113,7 @@ export default function ScanScreen() {
 
   const scanAgain = useCallback(() => {
     latched.current = false;
+    approving.current = false;
     setStage({ name: "scanning" });
   }, []);
 

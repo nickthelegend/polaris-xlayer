@@ -322,11 +322,18 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingHorizontal: space.lg,
-    // Matches the content column, so on a tablet the bar sits under the
-    // content rather than spanning away from it.
+    /*
+     * Matches the content column, and stays under it.
+     *
+     * `alignSelf` does nothing here: this is absolutely positioned with
+     * left and right both pinned to 0, so it is sized by those and anchored
+     * left, and `maxWidth` just made it a narrow bar hugging the left edge on
+     * any screen wider than the column. Auto margins are what centre a
+     * constrained absolute box.
+     */
     width: "100%",
     maxWidth: 620 + space.lg * 2,
-    alignSelf: "center",
+    marginHorizontal: "auto",
   },
   bar: {
     flexDirection: "row",
