@@ -206,6 +206,17 @@ not sponsorship — it still leaves them unable to check out.
 
 Both still sign, so nobody opens a loan in another name.
 
+**The app reads them too.** The scanner in the middle of the tab bar decodes
+the code, asks the endpoint what it is, fetches the transaction and shows the
+merchant's own terms — *40.00 USDC in 4 payments of 10.08* — before anything is
+signed. A scanner that signs the moment it recognises a code is a scanner that
+can be pointed at a wall.
+
+It also takes a request directly, which is how Solana Pay reaches a wallet on a
+phone most of the time: the checkout page's *Open in a wallet* link is a
+`solana:` URL and the OS hands it over. The camera is for when the code is on
+someone else's screen.
+
 ## The app
 
 An Expo app that opens a plan against the deployed program from an Android

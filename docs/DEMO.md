@@ -86,7 +86,17 @@ transaction.
 
 Merchant PDAs are in `deployments/localnet-seed.json`.
 
-**5. The keeper collects.** Loan #2 in the seed runs on a 60-second interval
+**5. And the app reads the code.** Tap the scanner in the middle of the tab
+bar and point it at the checkout page on another screen. It decodes the code,
+fetches the transaction and shows the merchant's terms before anything is
+signed. Without a second screen, hand the request straight to the app the way
+a phone's OS would when the *Open in a wallet* link is tapped:
+
+```bash
+open "http://localhost:8085/scan?request=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote('solana:'+urllib.parse.quote(sys.argv[1],safe=''),safe=''))" "http://localhost:4100/pay/demo?merchant=<merchant PDA>&amount=40000000")"
+```
+
+**6. The keeper collects.** Loan #2 in the seed runs on a 60-second interval
 precisely so a collection can happen inside a recording.
 
 ```bash
@@ -97,7 +107,7 @@ It reads what is due with one `getProgramAccounts` call — there is no database
 behind it — simulates, then sends. The Activity tab updates, and the borrower
 never signed anything.
 
-**6. Default and liquidation.** The full arc, unattended, in about five
+**7. Default and liquidation.** The full arc, unattended, in about five
 minutes: origination, four collections, then a second borrower who revokes
 their delegation and is liquidated.
 
