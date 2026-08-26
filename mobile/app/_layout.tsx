@@ -18,7 +18,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { PolarisProvider } from "../src/chain/provider";
-import { AmbientBackground } from "../src/components";
 import { ink, palette } from "../src/theme";
 
 /**
@@ -74,13 +73,6 @@ export default function RootLayout() {
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <View style={styles.root}>
-          {/*
-            The ground is mounted once here, above the navigator, so it does not
-            re-render or re-animate when a route changes. It is the floor: it
-            must not move when you walk across it.
-          */}
-          <AmbientBackground />
-
           <ThemeProvider value={polarisTheme}>
             <PolarisProvider>
               <Stack

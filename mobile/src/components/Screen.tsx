@@ -5,7 +5,8 @@ import Animated from "react-native-reanimated";
 import { enterFade, enterUpAfter } from "./motion";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { space } from "../theme";
+import { palette, space } from "../theme";
+import { AmbientBackground } from "./AmbientBackground";
 import { Label, Text } from "./Text";
 
 /**
@@ -69,16 +70,26 @@ export function Screen({
     </Animated.View>
   );
 
-  if (!scroll) {
-    return (
-      <View style={[styles.shell, { paddingTop: insets.top + space.sm }]}>
-        {head}
-        {body}
-      </View>
-    );
-  }
-
-  return (
+  /*
+   * The ground is drawn per screen, and it is what makes the screen opaque.
+   *
+   * React Navigation does not hide an inactive scene on web — it drops it to
+   * `z-index: -1` behind the active one. That only conceals it if the active
+   * scene actually paints something, and these were transparent so the ambient
+   * ground mounted at the root could show through. The result was every route
+   * rendering on top of every other one at once.
+   *
+   * So the ground moves inside the screen. It is a static SVG with no
+   * animation, identical on every route, so drawing it per screen costs a
+   * little and changes nothing visually — and it gives each scene the opaque
+   * base the navigator is relying on.
+   */
+  const content = !scroll ? (
+    <View style={[styles.shell, { paddingTop: insets.top + space.sm }]}>
+      {head}
+      {body}
+    </View>
+  ) : (
     <ScrollView
       style={styles.scroll}
       contentContainerStyle={[
@@ -95,9 +106,20 @@ export function Screen({
       {body}
     </ScrollView>
   );
+
+  return (
+    <View style={styles.ground}>
+      <AmbientBackground />
+      {content}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
+  ground: {
+    flex: 1,
+    backgroundColor: palette.background,
+  },
   scroll: { flex: 1 },
   shell: {
     paddingHorizontal: space.xl,
