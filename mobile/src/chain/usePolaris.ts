@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { getWallet, isReady } from "./client";
+import { getPublicKey, isReady } from "./client";
 import {
   fetchActivity,
   fetchAvailablePlans,
@@ -84,7 +84,7 @@ export function usePolarisState(
       let underwriting: Underwriting | null = null;
       if (!profile) {
         try {
-          underwriting = await requestUnderwriting(getWallet().publicKey.toBase58());
+          underwriting = await requestUnderwriting(getPublicKey().toBase58());
           profile = await fetchProfile();
         } catch (e: any) {
           if (__DEV__) console.warn("[polaris] underwriting unavailable:", e?.message ?? e);

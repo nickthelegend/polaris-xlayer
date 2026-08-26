@@ -14,7 +14,7 @@ import { useCreditLine } from "../../src/chain/usePolaris";
 import { DAY, USDC, plural, quote } from "../../src/chain/math";
 import { merchants, type MerchantRef } from "../../src/chain/config";
 import { PublicKey } from "@solana/web3.js";
-import { explainError, payLater, payNow, subscribeToPlan } from "../../src/chain/actions";
+import { describeError, payLater, payNow, subscribeToPlan } from "../../src/chain/actions";
 import {
   Button,
   ErrorState,
@@ -235,7 +235,7 @@ export default function PayScreen() {
       setRaw("0");
       await refresh();
     } catch (e: any) {
-      refuse(explainError(e));
+      refuse(await describeError(e));
     } finally {
       inFlight.current = false;
       setBusy(false);

@@ -7,67 +7,41 @@ import "./polyfills";
 
 import { AnchorProvider, Program, type Idl } from "@coral-xyz/anchor";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import {
-  Connection,
-  Keypair,
-  PublicKey,
-  Transaction,
-  VersionedTransaction,
-} from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 
 import idl from "./idl.json";
+import type { ChainSigner } from "./signing/types.ts";
 import { PROGRAM_ID, RPC_URL, STABLECOIN } from "./config";
 
 /**
- * A signer Anchor will accept.
+ * Anchor needs a wallet object with three members. `ChainSigner` is that
+ * interface plus enough identity for the UI to say whose key is signing, so it
+ * is handed to the provider directly — there is nothing to adapt.
  *
- * Anchor's own `Wallet` export is `NodeWallet` — it loads a keypair off the
- * filesystem, so it is stripped from browser and React Native bundles by the
- * package's `browser` field. Importing it compiles and then throws
- * "Wallet is not a constructor" at runtime, a fault that only shows up when the
- * app actually runs.
- *
- * The interface is three members, so it is implemented here rather than pulling
- * in a wallet-adapter package the app does not otherwise need.
+ * Anchor's own `Wallet` export is `NodeWallet`, which reads a keypair off the
+ * filesystem and is stripped from React Native bundles by the package's
+ * `browser` field. Importing it compiles and then throws "Wallet is not a
+ * constructor" at runtime, which is why this app has never used it.
  */
-class KeypairWallet {
-  constructor(readonly payer: Keypair) {}
-
-  get publicKey(): PublicKey {
-    return this.payer.publicKey;
-  }
-
-  async signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T> {
-    if (tx instanceof VersionedTransaction) tx.sign([this.payer]);
-    else tx.partialSign(this.payer);
-    return tx;
-  }
-
-  async signAllTransactions<T extends Transaction | VersionedTransaction>(
-    txs: T[],
-  ): Promise<T[]> {
-    return Promise.all(txs.map((tx) => this.signTransaction(tx)));
-  }
-}
-
 export type Client = {
   connection: Connection;
   provider: AnchorProvider;
   program: Program<Idl>;
-  wallet: Keypair;
+  signer: ChainSigner;
   tokenAccount: PublicKey;
 };
 
 /**
  * The client is built once the signer is known, not at module load.
  *
- * The wallet now comes from the device keystore, which is an async read, so
- * there is nothing to construct until it resolves. Holding the instance here
- * rather than threading it through every call keeps the query layer unchanged.
+ * Which signer that is now depends on the platform and on whether the user has
+ * connected a wallet app, both of which are async, so there is nothing to
+ * construct until they resolve. Holding the instance here rather than
+ * threading it through every call keeps the query layer unchanged.
  */
 let client: Client | null = null;
 
-export function initClient(wallet: Keypair): Client {
+export function initClient(signer: ChainSigner): Client {
   /*
    * The IDL and the deployment have to name the same program.
    *
@@ -96,7 +70,7 @@ export function initClient(wallet: Keypair): Client {
     confirmTransactionInitialTimeout: 20_000,
   });
 
-  const provider = new AnchorProvider(connection, new KeypairWallet(wallet), {
+  const provider = new AnchorProvider(connection, signer, {
     commitment: "confirmed",
     preflightCommitment: "confirmed",
   });
@@ -105,10 +79,15 @@ export function initClient(wallet: Keypair): Client {
     connection,
     provider,
     program: new Program(idl as Idl, provider),
-    wallet,
-    tokenAccount: getAssociatedTokenAddressSync(STABLECOIN, wallet.publicKey, true),
+    signer,
+    tokenAccount: getAssociatedTokenAddressSync(STABLECOIN, signer.publicKey, true),
   };
   return client;
+}
+
+/** Drop the client so a different wallet can be connected in its place. */
+export function clearClient(): void {
+  client = null;
 }
 
 function require_(): Client {
@@ -125,6 +104,7 @@ export const getClient = require_;
 export const getProgram = () => require_().program;
 export const getConnection = () => require_().connection;
 export const getProvider = () => require_().provider;
-export const getWallet = () => require_().wallet;
+export const getSigner = () => require_().signer;
+export const getPublicKey = () => require_().signer.publicKey;
 export const getTokenAccount = () => require_().tokenAccount;
 export const isReady = () => client !== null;

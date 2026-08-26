@@ -1,4 +1,15 @@
-export { initClient, getClient, getProgram, getConnection, getProvider, getWallet, getTokenAccount, isReady } from "./client";
+export {
+  initClient,
+  clearClient,
+  getClient,
+  getProgram,
+  getConnection,
+  getProvider,
+  getSigner,
+  getPublicKey,
+  getTokenAccount,
+  isReady,
+} from "./client";
 export { loadOrCreateWallet, resetWallet } from "./wallet";
 export { CLUSTER, RPC_URL, PROGRAM_ID, STABLECOIN, TREASURY, explorerTx, merchantDirectory, merchants } from "./config";
 export { pdas } from "./pdas";

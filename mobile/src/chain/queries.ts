@@ -2,7 +2,7 @@ import { BorshCoder, EventParser } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 
 import { merchantDirectory } from "./config";
-import { getConnection, getProgram, getTokenAccount, getWallet } from "./client";
+import { getConnection, getProgram, getPublicKey, getTokenAccount } from "./client";
 import { pdas } from "./pdas";
 import idl from "./idl.json";
 
@@ -98,7 +98,7 @@ export async function fetchProtocol(): Promise<ProtocolConfig> {
 
 /** `null` when this wallet has no line yet, rather than an invented one. */
 export async function fetchProfile(
-  user = getWallet().publicKey,
+  user = getPublicKey(),
 ): Promise<CreditProfile | null> {
   const info = await getConnection().getAccountInfo(pdas.profileOf(user));
   if (!info) return null;
@@ -128,7 +128,7 @@ export async function fetchProfile(
  * filtered here — the discriminator is 8 bytes and `borrower` is the second
  * field, so the offset is 8 + 8 (the u64 id).
  */
-export async function fetchLoans(user = getWallet().publicKey): Promise<Loan[]> {
+export async function fetchLoans(user = getPublicKey()): Promise<Loan[]> {
   const raw = await (getProgram().account as any).loan.all([
     { memcmp: { offset: 8 + 8, bytes: user.toBase58() } },
   ]);
@@ -154,7 +154,7 @@ export async function fetchLoans(user = getWallet().publicKey): Promise<Loan[]> 
     .sort((a: Loan, b: Loan) => b.startedAt - a.startedAt);
 }
 
-export async function fetchSubscriptions(user = getWallet().publicKey): Promise<Plan[]> {
+export async function fetchSubscriptions(user = getPublicKey()): Promise<Plan[]> {
   const subs = await (getProgram().account as any).subscription.all([
     { memcmp: { offset: 8, bytes: user.toBase58() } },
   ]);
@@ -199,7 +199,7 @@ export async function fetchSubscriptions(user = getWallet().publicKey): Promise<
  * subscription to. Subscribing twice to the same plan is refused on chain by
  * `AlreadySubscribed`, so offering it is offering a guaranteed failure.
  */
-export async function fetchAvailablePlans(user = getWallet().publicKey): Promise<Plan[]> {
+export async function fetchAvailablePlans(user = getPublicKey()): Promise<Plan[]> {
   const [plans, subs] = await Promise.all([
     (getProgram().account as any).plan.all(),
     (getProgram().account as any).subscription.all([
@@ -309,7 +309,7 @@ function camelize<T = any>(value: any): T {
  * transaction usually touches both.
  */
 export async function fetchActivity(limit = 25): Promise<ActivityEvent[]> {
-  const sources = [pdas.profileOf(getWallet().publicKey), getTokenAccount()];
+  const sources = [pdas.profileOf(getPublicKey()), getTokenAccount()];
 
   const perSource = await Promise.all(
     sources.map((address) =>

@@ -13,7 +13,7 @@ import {
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { Buffer } from "buffer";
 
-import { getProgram, getProvider, getTokenAccount, getWallet } from "./client";
+import { getProgram, getProvider, getPublicKey, getTokenAccount } from "./client";
 import { TREASURY } from "./config";
 import { pdas } from "./pdas";
 
@@ -75,7 +75,7 @@ export async function payNow(params: {
   const signature = await getProgram().methods
     .pay(new BN(params.amount), Array.from(ref))
     .accountsPartial({
-      payer: getWallet().publicKey,
+      payer: getPublicKey(),
       protocol: pdas.protocol,
       merchant: params.merchant,
       payment: pdas.paymentOf(params.merchant, ref),
@@ -85,7 +85,13 @@ export async function payNow(params: {
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: new PublicKey("11111111111111111111111111111111"),
     })
-    .signers([getWallet()])
+    /*
+     * No `signers` array.
+     *
+     * The provider's wallet is this same account and Anchor already signs with
+     * it. Passing a keypair here as well was redundant with a device key and
+     * impossible with a wallet app, which never exposes one.
+     */
     .rpc();
   return { signature };
 }
@@ -123,7 +129,7 @@ export async function payLater(params: {
   const approve = createApproveInstruction(
     getTokenAccount(),
     pdas.protocol,
-    getWallet().publicKey,
+    getPublicKey(),
     BigInt(required),
   );
 
@@ -144,10 +150,10 @@ export async function payLater(params: {
       Array.from(randomOrderRef()),
     )
     .accountsPartial({
-      borrower: getWallet().publicKey,
-      payer: getWallet().publicKey,
+      borrower: getPublicKey(),
+      payer: getPublicKey(),
       protocol: pdas.protocol,
-      profile: pdas.profileOf(getWallet().publicKey),
+      profile: pdas.profileOf(getPublicKey()),
       merchant: params.merchant,
       loan: pdas.loanOf(loanId),
       borrowerTokenAccount: getTokenAccount(),
@@ -159,7 +165,7 @@ export async function payLater(params: {
     .instruction();
 
   const tx = new Transaction().add(approve, originate);
-  const signature = await getProvider().sendAndConfirm(tx, [getWallet()]);
+  const signature = await getProvider().sendAndConfirm(tx);
   return { signature, loanId };
 }
 
@@ -185,18 +191,18 @@ export async function subscribeToPlan(params: {
   const approve = createApproveInstruction(
     getTokenAccount(),
     pdas.protocol,
-    getWallet().publicKey,
+    getPublicKey(),
     BigInt(authorize),
   );
 
   const sub = await getProgram().methods
     .subscribe()
     .accountsPartial({
-      subscriber: getWallet().publicKey,
+      subscriber: getPublicKey(),
       protocol: pdas.protocol,
       merchant: params.merchant,
       plan: params.plan,
-      subscription: pdas.subOf(getWallet().publicKey, params.plan),
+      subscription: pdas.subOf(getPublicKey(), params.plan),
       subscriberTokenAccount: getTokenAccount(),
       merchantPayout: params.merchantPayout,
       treasury: TREASURY,
@@ -207,7 +213,6 @@ export async function subscribeToPlan(params: {
 
   const signature = await getProvider().sendAndConfirm(
     new Transaction().add(approve, sub),
-    [getWallet()],
   );
   return { signature };
 }
@@ -274,6 +279,14 @@ export function explainError(e: any): string {
    * gets something true and short.
    */
   const message = String(e?.message ?? "").split("\n")[0]?.trim() ?? "";
+  /*
+   * "Simulation failed." names nothing a borrower can act on, and it is
+   * exactly the message that reaches here when the logs could not be found.
+   * Better to say what is actually true.
+   */
+  if (/^simulation failed\.?$/i.test(message)) {
+    return "The cluster refused that. Nothing was charged — check your balance and try again.";
+  }
   if (message && message.length <= 120) return message;
   if (__DEV__) console.error("[polaris] unexplained failure:", e);
   return "The transaction was refused. Nothing was charged.";
@@ -288,4 +301,48 @@ function safeLogs(e: any): string[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Resolve a failure's logs, then explain it.
+ *
+ * `SendTransactionError.getLogs()` returns a **promise** on a fresh error, so
+ * the synchronous reader above sees nothing and every simulation failure
+ * collapsed to a bare "Simulation failed." — which names no cause and offers
+ * no action. Awaiting once, here, is what lets `explainError` find the
+ * program's own error name in the logs.
+ *
+ * Screens call this; `explainError` stays synchronous for the cases that
+ * already carry their logs.
+ */
+export async function describeError(e: any): Promise<string> {
+  /*
+   * The logs are not always on the error you were handed.
+   *
+   * Anchor wraps the RPC's failure, so a simulation error can arrive as a bare
+   * `Error("Simulation failed.")` with the program's own logs sitting on a
+   * `cause`, on a `simulationResponse`, or behind an async `getLogs()`. Reading
+   * only the outer `.logs` is why "no USDC account yet" — a case this file has
+   * a sentence for — reached the screen as "Simulation failed." instead.
+   */
+  const carriers = [e, e?.cause, e?.simulationResponse, e?.cause?.simulationResponse];
+  for (const carrier of carriers) {
+    if (!carrier) continue;
+    if (Array.isArray(carrier.logs) && carrier.logs.length > 0) {
+      e.logs = carrier.logs;
+      break;
+    }
+    if (typeof carrier.getLogs === "function") {
+      try {
+        const resolved = await carrier.getLogs();
+        if (Array.isArray(resolved) && resolved.length > 0) {
+          e.logs = resolved;
+          break;
+        }
+      } catch {
+        /* the RPC is gone; fall through to the next carrier */
+      }
+    }
+  }
+  return explainError(e);
 }

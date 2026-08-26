@@ -1,6 +1,6 @@
 import { Transaction } from "@solana/web3.js";
 
-import { getConnection, getWallet } from "./client";
+import { getConnection, getPublicKey, getSigner } from "./client";
 
 /**
  * A Solana Pay transaction request, as the spec defines it.
@@ -79,7 +79,7 @@ export async function preparePayment(url: string): Promise<PreparedPayment> {
   const res = await checkoutFetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ account: getWallet().publicKey.toBase58() }),
+    body: JSON.stringify({ account: getPublicKey().toBase58() }),
   });
 
   const body = await res.json().catch(() => null);
@@ -125,7 +125,7 @@ export async function preparePayment(url: string): Promise<PreparedPayment> {
  * authority's — and send the bytes untouched.
  */
 export async function approvePayment(tx: Transaction): Promise<string> {
-  tx.partialSign(getWallet());
+  await getSigner().signTransaction(tx);
 
   const connection = getConnection();
   const signature = await connection.sendRawTransaction(tx.serialize(), {

@@ -15,7 +15,7 @@ import {
   preparePayment,
   type PreparedPayment,
 } from "../src/chain/solanaPay";
-import { explainError } from "../src/chain/actions";
+import { describeError } from "../src/chain/actions";
 import { Button, Label, Surface, Text } from "../src/components";
 import { ink, palette, space } from "../src/theme";
 
@@ -73,7 +73,7 @@ export default function ScanScreen() {
         const prepared = await preparePayment(url);
         setStage({ name: "review", label: described.label, prepared });
       } catch (e: any) {
-        setStage({ name: "failed", message: explainError(e) });
+        setStage({ name: "failed", message: await describeError(e) });
       }
     },
     [],
@@ -101,7 +101,7 @@ export default function ScanScreen() {
       await refresh();
       setStage({ name: "done", signature, summary: prepared.message });
     } catch (e: any) {
-      setStage({ name: "failed", message: explainError(e) });
+      setStage({ name: "failed", message: await describeError(e) });
     } finally {
       approving.current = false;
     }
