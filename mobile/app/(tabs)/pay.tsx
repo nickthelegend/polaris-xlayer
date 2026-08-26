@@ -1,5 +1,5 @@
 import * as Haptics from "expo-haptics";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Animated, {
   LinearTransition,
@@ -50,6 +50,20 @@ export default function PayScreen() {
   const [merchant, setMerchant] = useState<MerchantRef>(merchants[0]);
   const [planIndex, setPlanIndex] = useState(0);
   const [busy, setBusy] = useState(false);
+  /*
+   * The real double-submit guard.
+   *
+   * `busy` drives the button's disabled state, but React state is not a lock:
+   * a second tap 120ms later runs `submit` again before the re-render, reads
+   * the stale `false`, and sends a second transaction. Tested by tapping three
+   * times in quick succession — it opened two loans for one purchase and
+   * charged the borrower twice.
+   *
+   * A ref updates synchronously, so the second tap sees the flag the first one
+   * set. The state is still there because the button needs something to
+   * render from.
+   */
+  const inFlight = useRef(false);
   const [result, setResult] = useState<{ ok: boolean; message: string; signature?: string } | null>(
     null,
   );
@@ -108,9 +122,11 @@ export default function PayScreen() {
   };
 
   const submit = async () => {
+    if (inFlight.current) return;
     if (amount <= 0) return refuse();
     if (!affordable) return refuse();
 
+    inFlight.current = true;
     setBusy(true);
     setResult(null);
     try {
@@ -142,13 +158,11 @@ export default function PayScreen() {
             ok: false,
             message: "You already subscribe to every plan on offer.",
           });
-          setBusy(false);
           return;
         }
         const payout = merchants.find((m) => m.pda.toBase58() === target.merchantPda)?.payout;
         if (!payout) {
           setResult({ ok: false, message: "That merchant has no payout account." });
-          setBusy(false);
           return;
         }
         const { signature } = await subscribeToPlan({
@@ -169,6 +183,7 @@ export default function PayScreen() {
       refuse();
       setResult({ ok: false, message: explainError(e) });
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   };

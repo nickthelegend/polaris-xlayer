@@ -41,7 +41,10 @@ export type PolarisState =
  * A failure keeps the last good data and surfaces the error alongside it — the
  * alternative is throwing away a correct balance because a refresh timed out.
  */
-export function usePolarisState(): PolarisState & { refresh: () => Promise<void> } {
+export function usePolarisState(
+  /** Nothing is read until the signer is loaded from the device keystore. */
+  ready: boolean,
+): PolarisState & { refresh: () => Promise<void> } {
   const [state, setState] = useState<PolarisState>({
     status: "loading",
     data: null,
@@ -68,7 +71,9 @@ export function usePolarisState(): PolarisState & { refresh: () => Promise<void>
       // Keep the stack. A caught error that only survives as a sentence is
       // untraceable on a device, where there is no console to expand — and the
       // first failure this hid was a Hermes-only one the browser never saw.
-      console.error("[polaris] chain read failed:", e?.stack ?? e);
+      // Development only. A caught error that survives as a sentence is
+      // untraceable on a device; a production build should not print stacks.
+      if (__DEV__) console.error("[polaris] chain read failed:", e?.stack ?? e);
       const message =
         e?.message?.includes("fetch") || e?.message?.includes("Failed to fetch")
           ? "Cannot reach the network. Check the RPC endpoint is running."
@@ -78,8 +83,8 @@ export function usePolarisState(): PolarisState & { refresh: () => Promise<void>
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (ready) void load();
+  }, [ready, load]);
 
   return useMemo(() => ({ ...state, refresh: load }), [state, load]);
 }

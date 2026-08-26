@@ -1,8 +1,8 @@
 import { BorshCoder, EventParser } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 
-import { WALLET_TOKEN_ACCOUNT, merchantDirectory, wallet } from "./config";
-import { connection, program } from "./client";
+import { merchantDirectory } from "./config";
+import { getConnection, getProgram, getTokenAccount, getWallet } from "./client";
 import { pdas } from "./pdas";
 import idl from "./idl.json";
 
@@ -80,7 +80,7 @@ const FRESH_PROFILE: CreditProfile = {
 };
 
 export async function fetchProtocol(): Promise<ProtocolConfig> {
-  const p: any = await (program.account as any).protocol.fetch(pdas.protocol);
+  const p: any = await (getProgram().account as any).protocol.fetch(pdas.protocol);
   return {
     stablecoin: p.stablecoin.toBase58(),
     gracePeriod: n(p.gracePeriod),
@@ -93,10 +93,10 @@ export async function fetchProtocol(): Promise<ProtocolConfig> {
   };
 }
 
-export async function fetchProfile(user = wallet.publicKey): Promise<CreditProfile> {
-  const info = await connection.getAccountInfo(pdas.profileOf(user));
+export async function fetchProfile(user = getWallet().publicKey): Promise<CreditProfile> {
+  const info = await getConnection().getAccountInfo(pdas.profileOf(user));
   if (!info) return FRESH_PROFILE;
-  const p: any = (program.account as any).creditProfile.coder.accounts.decode(
+  const p: any = (getProgram().account as any).creditProfile.coder.accounts.decode(
     "creditProfile",
     info.data,
   );
@@ -117,8 +117,8 @@ export async function fetchProfile(user = wallet.publicKey): Promise<CreditProfi
  * filtered here — the discriminator is 8 bytes and `borrower` is the second
  * field, so the offset is 8 + 8 (the u64 id).
  */
-export async function fetchLoans(user = wallet.publicKey): Promise<Loan[]> {
-  const raw = await (program.account as any).loan.all([
+export async function fetchLoans(user = getWallet().publicKey): Promise<Loan[]> {
+  const raw = await (getProgram().account as any).loan.all([
     { memcmp: { offset: 8 + 8, bytes: user.toBase58() } },
   ]);
   return raw
@@ -143,15 +143,15 @@ export async function fetchLoans(user = wallet.publicKey): Promise<Loan[]> {
     .sort((a: Loan, b: Loan) => b.startedAt - a.startedAt);
 }
 
-export async function fetchSubscriptions(user = wallet.publicKey): Promise<Plan[]> {
-  const subs = await (program.account as any).subscription.all([
+export async function fetchSubscriptions(user = getWallet().publicKey): Promise<Plan[]> {
+  const subs = await (getProgram().account as any).subscription.all([
     { memcmp: { offset: 8, bytes: user.toBase58() } },
   ]);
   if (!subs.length) return [];
 
   // One read for the plan directory rather than one per subscription.
   const plans = new Map<string, any>(
-    (await (program.account as any).plan.all()).map((p: any) => [
+    (await (getProgram().account as any).plan.all()).map((p: any) => [
       p.publicKey.toBase58(),
       p.account,
     ]),
@@ -188,10 +188,10 @@ export async function fetchSubscriptions(user = wallet.publicKey): Promise<Plan[
  * subscription to. Subscribing twice to the same plan is refused on chain by
  * `AlreadySubscribed`, so offering it is offering a guaranteed failure.
  */
-export async function fetchAvailablePlans(user = wallet.publicKey): Promise<Plan[]> {
+export async function fetchAvailablePlans(user = getWallet().publicKey): Promise<Plan[]> {
   const [plans, subs] = await Promise.all([
-    (program.account as any).plan.all(),
-    (program.account as any).subscription.all([
+    (getProgram().account as any).plan.all(),
+    (getProgram().account as any).subscription.all([
       { memcmp: { offset: 8, bytes: user.toBase58() } },
     ]),
   ]);
@@ -238,7 +238,9 @@ export type ActivityEvent = {
 };
 
 const coder = new BorshCoder(idl as any);
-const parser = new EventParser(program.programId, coder);
+// Built lazily: the program id is only known once the client is initialised.
+let _parser: EventParser | null = null;
+const parser = () => (_parser ??= new EventParser(getProgram().programId, coder));
 
 /**
  * Truncate rather than round.
@@ -296,11 +298,11 @@ function camelize<T = any>(value: any): T {
  * transaction usually touches both.
  */
 export async function fetchActivity(limit = 25): Promise<ActivityEvent[]> {
-  const sources = [pdas.profileOf(wallet.publicKey), WALLET_TOKEN_ACCOUNT];
+  const sources = [pdas.profileOf(getWallet().publicKey), getTokenAccount()];
 
   const perSource = await Promise.all(
     sources.map((address) =>
-      connection.getSignaturesForAddress(address, { limit }).catch(() => []),
+      getConnection().getSignaturesForAddress(address, { limit }).catch(() => []),
     ),
   );
 
@@ -317,7 +319,7 @@ export async function fetchActivity(limit = 25): Promise<ActivityEvent[]> {
 
   if (!sigs.length) return [];
 
-  const txs = await connection.getTransactions(
+  const txs = await getConnection().getTransactions(
     sigs.map((s) => s.signature),
     { maxSupportedTransactionVersion: 0, commitment: "confirmed" },
   );
@@ -351,7 +353,7 @@ export async function fetchActivity(limit = 25): Promise<ActivityEvent[]> {
     );
 
     let idx = 0;
-    for (const event of parser.parseLogs(tx.meta.logMessages)) {
+    for (const event of parser().parseLogs(tx.meta.logMessages)) {
       const d: any = camelize(event.data);
       const base = {
         id: `${meta.signature}:${idx++}`,

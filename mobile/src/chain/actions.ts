@@ -13,8 +13,8 @@ import {
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { Buffer } from "buffer";
 
-import { program, provider } from "./client";
-import { TREASURY, WALLET_TOKEN_ACCOUNT, wallet } from "./config";
+import { getProgram, getProvider, getTokenAccount, getWallet } from "./client";
+import { TREASURY } from "./config";
 import { pdas } from "./pdas";
 import { interestFor } from "./math";
 import { fetchProfile, fetchProtocol } from "./queries";
@@ -59,20 +59,20 @@ export async function payNow(params: {
   orderId: string;
 }): Promise<ActionResult> {
   const ref = orderRef(params.orderId);
-  const signature = await program.methods
+  const signature = await getProgram().methods
     .pay(new BN(params.amount), Array.from(ref))
     .accountsPartial({
-      payer: wallet.publicKey,
+      payer: getWallet().publicKey,
       protocol: pdas.protocol,
       merchant: params.merchant,
       payment: pdas.paymentOf(params.merchant, ref),
-      payerTokenAccount: WALLET_TOKEN_ACCOUNT,
+      payerTokenAccount: getTokenAccount(),
       merchantPayout: params.merchantPayout,
       treasury: TREASURY,
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: new PublicKey("11111111111111111111111111111111"),
     })
-    .signers([wallet])
+    .signers([getWallet()])
     .rpc();
   return { signature };
 }
@@ -106,21 +106,21 @@ export async function payLater(params: {
   const loanId = protocol.loanCount;
 
   const approve = createApproveInstruction(
-    WALLET_TOKEN_ACCOUNT,
+    getTokenAccount(),
     pdas.protocol,
-    wallet.publicKey,
+    getWallet().publicKey,
     BigInt(required),
   );
 
-  const originate = await program.methods
+  const originate = await getProgram().methods
     .createLoan(new BN(params.amount), installmentCount, new BN(intervalSeconds))
     .accountsPartial({
-      borrower: wallet.publicKey,
+      borrower: getWallet().publicKey,
       protocol: pdas.protocol,
-      profile: pdas.profileOf(wallet.publicKey),
+      profile: pdas.profileOf(getWallet().publicKey),
       merchant: params.merchant,
       loan: pdas.loanOf(loanId),
-      borrowerTokenAccount: WALLET_TOKEN_ACCOUNT,
+      borrowerTokenAccount: getTokenAccount(),
       liquidityVault: pdas.liquidityVault,
       merchantPayout: params.merchantPayout,
       tokenProgram: TOKEN_PROGRAM_ID,
@@ -129,7 +129,7 @@ export async function payLater(params: {
     .instruction();
 
   const tx = new Transaction().add(approve, originate);
-  const signature = await provider.sendAndConfirm(tx, [wallet]);
+  const signature = await getProvider().sendAndConfirm(tx, [getWallet()]);
   return { signature, loanId };
 }
 
@@ -153,21 +153,21 @@ export async function subscribeToPlan(params: {
   const authorize = profile.activeDebt + params.pricePerPeriod * periods;
 
   const approve = createApproveInstruction(
-    WALLET_TOKEN_ACCOUNT,
+    getTokenAccount(),
     pdas.protocol,
-    wallet.publicKey,
+    getWallet().publicKey,
     BigInt(authorize),
   );
 
-  const sub = await program.methods
+  const sub = await getProgram().methods
     .subscribe()
     .accountsPartial({
-      subscriber: wallet.publicKey,
+      subscriber: getWallet().publicKey,
       protocol: pdas.protocol,
       merchant: params.merchant,
       plan: params.plan,
-      subscription: pdas.subOf(wallet.publicKey, params.plan),
-      subscriberTokenAccount: WALLET_TOKEN_ACCOUNT,
+      subscription: pdas.subOf(getWallet().publicKey, params.plan),
+      subscriberTokenAccount: getTokenAccount(),
       merchantPayout: params.merchantPayout,
       treasury: TREASURY,
       tokenProgram: TOKEN_PROGRAM_ID,
@@ -175,9 +175,9 @@ export async function subscribeToPlan(params: {
     })
     .instruction();
 
-  const signature = await provider.sendAndConfirm(
+  const signature = await getProvider().sendAndConfirm(
     new Transaction().add(approve, sub),
-    [wallet],
+    [getWallet()],
   );
   return { signature };
 }

@@ -5,7 +5,7 @@
 // borsh decode, nowhere near the cause.
 import "./polyfills";
 
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 
 import deployment from "./deployment.json";
 
@@ -16,22 +16,15 @@ import deployment from "./deployment.json";
  * it ran on, so the app is always pointed at a program that actually exists
  * rather than at an address someone typed.
  *
- * The keypair is a demo signer for a test cluster. It produces **real** signed
- * transactions against a **real** deployed program — it is not standing in for
- * signing. A shipped build replaces it with Mobile Wallet Adapter; nothing else
- * about the transaction path changes, because every instruction is already
- * built by the SDK rather than by the screen.
+ * There is deliberately no key here. The signer is generated on the device and
+ * kept in the platform keystore — see `wallet.ts`. This file carries public
+ * configuration only, so it is safe to commit and safe to read.
  */
 export const RPC_URL = deployment.rpc;
 export const CLUSTER = deployment.cluster;
 export const PROGRAM_ID = new PublicKey(deployment.programId);
 export const STABLECOIN = new PublicKey(deployment.stablecoin);
 export const TREASURY = new PublicKey(deployment.treasury);
-
-export const wallet = Keypair.fromSecretKey(
-  Uint8Array.from(deployment.borrower.secretKey),
-);
-export const WALLET_TOKEN_ACCOUNT = new PublicKey(deployment.borrower.tokenAccount);
 
 export type MerchantRef = {
   name: string;

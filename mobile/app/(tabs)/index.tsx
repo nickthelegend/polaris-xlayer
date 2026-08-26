@@ -18,6 +18,7 @@ import {
   StatTile,
   Surface,
   Text,
+  WalletRow,
 } from "../../src/components";
 import { enterUpAfter } from "../../src/components/motion";
 import { ink, space } from "../../src/theme";
@@ -32,7 +33,7 @@ const relativeDays = (unix: number) => {
 
 export default function CreditScreen() {
   const router = useRouter();
-  const { status, data, error, refresh } = usePolaris();
+  const { status, data, error, refresh, address } = usePolaris();
   const line = useCreditLine(data);
 
   if (status === "loading") {
@@ -66,6 +67,8 @@ export default function CreditScreen() {
       <View style={styles.orbWrap}>
         <CreditOrb score={profile.score} size={252} />
       </View>
+
+      <WalletRow address={address} />
 
       <Animated.View entering={enterUpAfter(120)}>
         <Surface padded={20} style={styles.hero}>

@@ -365,22 +365,19 @@ async function main() {
     liquidityVault: liquidityVault.toBase58(),
     collateralVault: collateralVault.toBase58(),
     treasury: treasury.toBase58(),
-    borrower: {
-      publicKey: borrower.publicKey.toBase58(),
-      // The app signs with this. A demo keypair on a test cluster produces real
-      // signed transactions against a real program — it is not a stub for one.
-      secretKey: Array.from(borrower.secretKey),
-      tokenAccount: borrowerAta.toBase58(),
-    },
+    // The seeded borrower's *address* only.
+    //
+    // Its key is deliberately not written. The app generates its own signer on
+    // the device and keeps it in the platform keystore, so no secret belongs in
+    // a file that gets committed. This address exists so the seeded history can
+    // be inspected, not so anything can spend from it.
+    seededBorrower: borrower.publicKey.toBase58(),
     merchants: merchants.map((m) => ({
       name: m.name,
       icon: m.icon,
       pda: m.pda.toBase58(),
       payout: m.payout.toBase58(),
       authority: m.kp.publicKey.toBase58(),
-      // Kept so a later script can act as the merchant — creating a plan,
-      // deactivating one — without re-seeding the whole cluster.
-      authoritySecretKey: Array.from(m.kp.secretKey),
     })),
     loans: [done, kettle, northline].map((l) => ({ id: l.id, pda: l.pda.toBase58() })),
     plans: [meridian, relay, offered].map((p) => ({ id: p.id, pda: p.pda.toBase58() })),
