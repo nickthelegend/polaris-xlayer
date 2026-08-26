@@ -65,6 +65,10 @@ export function usePolarisState(): PolarisState & { refresh: () => Promise<void>
         error: null,
       });
     } catch (e: any) {
+      // Keep the stack. A caught error that only survives as a sentence is
+      // untraceable on a device, where there is no console to expand — and the
+      // first failure this hid was a Hermes-only one the browser never saw.
+      console.error("[polaris] chain read failed:", e?.stack ?? e);
       const message =
         e?.message?.includes("fetch") || e?.message?.includes("Failed to fetch")
           ? "Cannot reach the network. Check the RPC endpoint is running."

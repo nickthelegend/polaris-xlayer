@@ -1,3 +1,10 @@
+// Side-effect import, and it must come first: these modules pull in
+// @solana/web3.js, which captures the global Buffer as it evaluates. If it
+// loads before the polyfill, account data arrives as a plain Uint8Array and
+// buffer-layout dies on `b.readUIntLE is not a function` — deep inside a
+// borsh decode, nowhere near the cause.
+import "./polyfills";
+
 import { BN } from "@coral-xyz/anchor";
 import {
   TOKEN_PROGRAM_ID,

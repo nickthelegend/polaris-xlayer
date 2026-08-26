@@ -1,7 +1,8 @@
 import * as Haptics from "expo-haptics";
 import React, { useState } from "react";
-import { LayoutAnimation, Platform, Pressable, StyleSheet, UIManager, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import Animated, {
+  LinearTransition,
   useAnimatedStyle, useSharedValue, withSpring
 } from "react-native-reanimated";
 
@@ -19,10 +20,6 @@ import {
 } from "../../src/chain/math";
 import type { Loan, Plan } from "../../src/chain/queries";
 import { ink, motion, palette, radius, space } from "../../src/theme";
-
-if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 /**
  * Build the ladder a borrower sees from the two counters the program stores.
@@ -73,18 +70,20 @@ function LoanCard({ loan, index }: { loan: Loan; index: number }) {
     <Animated.View
       entering={enterUp(index)}
       style={{ marginBottom: space.lg }}
+      /*
+       * The card resizes itself when the schedule opens.
+       *
+       * This used LayoutAnimation, which is a no-op on the New Architecture —
+       * it silently did nothing on device and printed a warning toast over the
+       * UI to say so. Reanimated's layout transition runs on the UI thread and
+       * works on both architectures.
+       */
+      layout={LinearTransition.springify().damping(20).stiffness(180)}
     >
       <Surface padded={18}>
         <Pressable
           onPress={() => {
             Haptics.selectionAsync();
-            LayoutAnimation.configureNext(
-              LayoutAnimation.create(
-                motion.duration.base,
-                LayoutAnimation.Types.easeInEaseOut,
-                LayoutAnimation.Properties.opacity,
-              ),
-            );
             setOpen((v) => !v);
           }}
         >
