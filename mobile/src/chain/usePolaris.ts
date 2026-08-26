@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   fetchActivity,
+  fetchAvailablePlans,
   fetchLoans,
   fetchProfile,
   fetchProtocol,
@@ -19,6 +20,8 @@ export type ChainState = {
   profile: CreditProfile;
   loans: Loan[];
   subscriptions: Plan[];
+  /** Plans on offer that this borrower does not already hold. */
+  availablePlans: Plan[];
   activity: ActivityEvent[];
 };
 
@@ -47,16 +50,18 @@ export function usePolarisState(): PolarisState & { refresh: () => Promise<void>
 
   const load = useCallback(async () => {
     try {
-      const [protocol, profile, loans, subscriptions, activity] = await Promise.all([
-        fetchProtocol(),
-        fetchProfile(),
-        fetchLoans(),
-        fetchSubscriptions(),
-        fetchActivity(30),
-      ]);
+      const [protocol, profile, loans, subscriptions, availablePlans, activity] =
+        await Promise.all([
+          fetchProtocol(),
+          fetchProfile(),
+          fetchLoans(),
+          fetchSubscriptions(),
+          fetchAvailablePlans(),
+          fetchActivity(30),
+        ]);
       setState({
         status: "ready",
-        data: { protocol, profile, loans, subscriptions, activity },
+        data: { protocol, profile, loans, subscriptions, availablePlans, activity },
         error: null,
       });
     } catch (e: any) {

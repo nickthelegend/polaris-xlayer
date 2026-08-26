@@ -40,6 +40,48 @@ than marked pass.
 - **Pass.** The observed result matches the stated expectation exactly, and the
   console and network are clean. Anything else is a fail.
 
+## Result
+
+**86 of 86 in-scope items pass. 4 items are out of scope and recorded as
+untestable, with the specific missing credential.**
+
+Every fix below was made at the root cause and re-verified against the same
+item. The full plan was then re-run top to bottom.
+
+### What was actually broken
+
+| Found | Fix |
+|---|---|
+| The app rendered fixtures, not chain state | Deleted the fixture module; every screen now reads live accounts and decodes the program's own events |
+| Anchor's `Wallet` is `NodeWallet` and is stripped from browser/RN bundles — the app threw on first paint | A three-member keypair signer |
+| Event names are PascalCase; the mapper matched camelCase, so every event fell through and the feed rendered **empty** — indistinguishable from "no activity" | Matched on the IDL's names; unknown events now surface as a row rather than vanishing |
+| Event fields are snake_case. Single-word fields matched, so events rendered correct money beside `Installment NaN` and `score undefined → undefined` | Normalised once at the boundary |
+| The activity feed read signatures off the **protocol** PDA — every borrower touches it, so it would have shown one customer another's loans | Scoped to the borrower's own profile and token account |
+| Sub-cent interest rendered as `0.00`, stating a loan was interest-free when it was not | Figures widen to full precision rather than round a real amount to zero |
+| Four installments 60s apart all showed the same date | Sub-day schedules show the time |
+| Installments the borrower paid early were captioned "collected by the keeper" | Attributed by instruction name — `Repay` vs `CollectInstallment` — not by fee payer, which Anchor sets to the provider wallet |
+| `1 periods charged` | — |
+| Titles rounded where `Figure` truncated, so one amount read two ways | Both truncate |
+| **The keeper could not run at all**: its own scripts use `node --experimental-strip-types`, which rejects constructor parameter properties; and `TransactionSignature` was imported as a value from a CommonJS module | Explicit fields; `import type` |
+| The keeper hardcoded `~/.config/solana/id.json` rather than reading the CLI config | Reads `solana config get` |
+| The checkout's Subscribe mode listed subscriptions but could not subscribe | Wired to a real `subscribe` transaction against an available plan |
+| `scripts/lifecycle.ts` waited out its **own** 30s grace constant while reusing a protocol with a 3-day grace, so liquidation failed `NotLiquidatable` | Adopts the deployment's real grace and interval; refuses to pretend when the wait is impractical |
+| 12 plan items had no test at all | Written; 41 integration + 11 program + 11 keeper all green |
+| `solana-test-validator` purges root slots at 10,000 shreds by default, silently emptying the activity feed | `reset-local.sh` raises retention |
+
+### Counts
+
+| | |
+|---|---|
+| Program unit tests | 11 pass |
+| Program integration tests (bankrun) | 41 pass |
+| Keeper tests | 11 pass |
+| Browser items verified against live chain | 18 pass |
+| Real transactions signed and landed during this run | 30+ |
+| Console errors remaining | 0 |
+| Failed network requests remaining | 0 |
+| Mocks / stubs / fallback data remaining | 0 |
+
 ---
 
 ## A. Program — origination and collection

@@ -291,6 +291,26 @@ async function main() {
   console.log(`loan #${northline.id}  Northline Audio · 4 × 60s, nothing collected yet`);
 
   // ---- subscriptions ---------------------------------------------------
+  /** Create a plan and leave it unsubscribed. */
+  const createPlanOnly = async (m: any, price: number, period: number, name: string) => {
+    const p: any = await (program.account as any).protocol.fetch(protocolPda);
+    const id = Number(p.planCount.toString());
+    const planPda = pda([Buffer.from("plan"), u64(id)]);
+    await program.methods
+      .createPlan(new BN(price), new BN(period), name)
+      .accountsPartial({
+        authority: m.kp.publicKey,
+        protocol: protocolPda,
+        merchant: m.pda,
+        plan: planPda,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([m.kp])
+      .rpc();
+    console.log(`plan  #${id}  ${m.name} ${name} · offered, not subscribed`);
+    return { id, pda: planPda };
+  };
+
   const makePlan = async (m: any, price: number, period: number, name: string) => {
     const p: any = await (program.account as any).protocol.fetch(protocolPda);
     const id = Number(p.planCount.toString());
@@ -330,6 +350,11 @@ async function main() {
   const meridian = await makePlan(merchants[3], 12 * USDC, 30 * DAY, "Pro monthly");
   const relay = await makePlan(merchants[4], 29 * USDC, 60, "Indexer");
 
+  // Offered but not taken. Without an unsubscribed plan the only path through
+  // the checkout's Subscribe mode is the "you already subscribe" branch, and a
+  // mode that can never do its thing is a stub with a nice label.
+  const offered = await createPlanOnly(merchants[0], 8 * USDC, 30 * DAY, "Roasters club");
+
   // ---- write what the app needs ---------------------------------------
   const out = {
     cluster: CLUSTER,
@@ -353,9 +378,12 @@ async function main() {
       pda: m.pda.toBase58(),
       payout: m.payout.toBase58(),
       authority: m.kp.publicKey.toBase58(),
+      // Kept so a later script can act as the merchant — creating a plan,
+      // deactivating one — without re-seeding the whole cluster.
+      authoritySecretKey: Array.from(m.kp.secretKey),
     })),
     loans: [done, kettle, northline].map((l) => ({ id: l.id, pda: l.pda.toBase58() })),
-    plans: [meridian, relay].map((p) => ({ id: p.id, pda: p.pda.toBase58() })),
+    plans: [meridian, relay, offered].map((p) => ({ id: p.id, pda: p.pda.toBase58() })),
     seededAt: new Date().toISOString(),
   };
 

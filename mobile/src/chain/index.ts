@@ -3,6 +3,7 @@ export { CLUSTER, RPC_URL, PROGRAM_ID, STABLECOIN, TREASURY, wallet, explorerTx,
 export { pdas } from "./pdas";
 export {
   fetchActivity,
+  fetchAvailablePlans,
   fetchLoans,
   fetchProfile,
   fetchProtocol,

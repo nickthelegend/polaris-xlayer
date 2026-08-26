@@ -47,9 +47,23 @@ const RPC =
   (CLUSTER === "localnet" ? "http://127.0.0.1:8899" : `https://api.${CLUSTER}.solana.com`);
 
 const USDC = 1_000_000;
-const INTERVAL = 60; // seconds
-const GRACE = 30; // seconds
+/** What this script asks for when it stands a protocol up itself. */
+const WANT_INTERVAL = 60; // seconds
+const WANT_GRACE = 30; // seconds
 const INSTALLMENTS = 4;
+
+/*
+ * The effective schedule, resolved after the protocol is read.
+ *
+ * These start as the requested values and are overwritten by whatever the
+ * deployment actually carries. When the script reuses an existing protocol —
+ * which it is built to do — the grace period and the interval floor are
+ * already fixed and are not this script's to choose. Waiting out its own
+ * 30-second constant against a three-day grace is how the liquidation step
+ * came to fail with NotLiquidatable while every number above it was right.
+ */
+let INTERVAL = WANT_INTERVAL;
+let GRACE = WANT_GRACE;
 
 const explorer = (sig: string) =>
   `https://explorer.solana.com/tx/${sig}?cluster=${CLUSTER === "localnet" ? "custom" : CLUSTER}`;
@@ -154,6 +168,9 @@ async function main() {
   if (existing) {
     mint = existing.stablecoin;
     treasury = existing.treasury;
+    // Adopt the deployment's schedule rather than this script's preferences.
+    GRACE = Number(existing.gracePeriod.toString());
+    INTERVAL = Math.max(WANT_INTERVAL, Number(existing.minIntervalSeconds.toString()));
     console.log("1. stablecoin");
     console.log(`   reusing ${mint.toBase58()}\n`);
     console.log("2. protocol");
@@ -188,7 +205,7 @@ async function main() {
     record(
       "initialize",
       await program.methods
-        .initialize(new BN(GRACE), new BN(INTERVAL), 50, 15_000)
+        .initialize(new BN(WANT_GRACE), new BN(WANT_INTERVAL), 50, 15_000)
         .accountsPartial({
           authority: authority.publicKey,
           protocol: protocolPda,
@@ -390,6 +407,46 @@ async function main() {
   console.log(`   keeper spent     ${keeperSpent.toFixed(6)} SOL in fees`);
   console.log(`   keeper USDC      ${keeperUsdc === 0 ? "none — it never held any" : "HELD SOME"}`);
 
+  // The run's record. Defined here so the liquidation step can return early
+  // on a deployment whose grace period is too long to wait out, and still
+  // leave behind everything it did prove.
+  const writeSummary = (liq: any | null) => {
+    const out: any = {
+      cluster: CLUSTER,
+      programId: program.programId.toBase58(),
+      stablecoin: mint.toBase58(),
+      protocol: protocolPda.toBase58(),
+      liquidityVault: liquidityVault.toBase58(),
+      collateralVault: collateralVault.toBase58(),
+      treasury: treasury.toBase58(),
+      merchant: merchantPda.toBase58(),
+      borrower: borrower.publicKey.toBase58(),
+      keeper: keeper.publicKey.toBase58(),
+      loan: loanPda.toBase58(),
+      settings: { gracePeriod: GRACE, minInterval: INTERVAL, feeBps: 50 },
+      result: {
+        status: Object.keys(loan.status)[0],
+        principal: principal.toString(),
+        totalOwed: totalOwed.toString(),
+        totalRepaid: loan.totalRepaid.toString(),
+        score: profile.score,
+        protocolFeesThisRun: feesThisRun.toString(),
+        protocolFeesLifetime: p1.protocolFeesAccrued.toString(),
+        interest: interest.toString(),
+        feeCap: feeCap.toString(),
+      },
+      liquidation: liq,
+      transactions: sigs,
+      ranAt: new Date().toISOString(),
+    };
+    writeFileSync(deploymentFile, JSON.stringify(out, null, 2) + "\n");
+    console.log(`\nwrote ${deploymentFile}`);
+    if (CLUSTER !== "localnet") {
+      console.log(`\nexplorer:`);
+      for (const x of sigs) console.log(`  ${x.step.padEnd(40)} ${explorer(x.signature)}`);
+    }
+  };
+
   // ---- 7. a default, and the liquidation ---------------------------------
   console.log("\n7. a second borrower defaults");
   const defaulter = Keypair.generate();
@@ -455,8 +512,25 @@ async function main() {
     ),
   );
 
+  // A consumer-grade grace period is measured in days, and no demo waits that
+  // out. Say so and stop, rather than sleeping for three days or sending a
+  // transaction that is guaranteed to be refused.
+  const waitSeconds = INTERVAL + GRACE + 5;
+  if (waitSeconds > 15 * 60) {
+    console.log(
+      `   this deployment's grace period is ${GRACE}s (${(GRACE / 86_400).toFixed(1)} days).`,
+    );
+    console.log(
+      `   the loan above is real and will become liquidatable then; not waiting.`,
+    );
+    console.log(`   for the liquidation path end to end, run against a fresh cluster:`);
+    console.log(`     ./scripts/reset-local.sh   # stands one up with a 3s grace`);
+    writeSummary(null);
+    return;
+  }
+
   console.log(`   waiting out the first installment plus ${GRACE}s of grace...`);
-  await sleep((INTERVAL + GRACE + 5) * 1000);
+  await sleep(waitSeconds * 1000);
 
   // The condition is checked inside the instruction that acts on it. On EVM
   // this pair needed a platform call to be atomic; here there is no window.
@@ -492,50 +566,15 @@ async function main() {
   );
   console.log(`   credit score     600 → ${badProfile.score}`);
 
-  // ---- 8. write it down -------------------------------------------------
-  const out = {
-    cluster: CLUSTER,
-    programId: program.programId.toBase58(),
-    stablecoin: mint.toBase58(),
-    protocol: protocolPda.toBase58(),
-    liquidityVault: liquidityVault.toBase58(),
-    collateralVault: collateralVault.toBase58(),
-    treasury: treasury.toBase58(),
-    merchant: merchantPda.toBase58(),
-    borrower: borrower.publicKey.toBase58(),
-    keeper: keeper.publicKey.toBase58(),
-    loan: loanPda.toBase58(),
-    settings: { gracePeriod: GRACE, minInterval: INTERVAL, feeBps: 50 },
-    result: {
-      status: Object.keys(loan.status)[0],
-      principal: principal.toString(),
-      totalOwed: totalOwed.toString(),
-      totalRepaid: loan.totalRepaid.toString(),
-      score: profile.score,
-      protocolFeesThisRun: feesThisRun.toString(),
-      protocolFeesLifetime: p1.protocolFeesAccrued.toString(),
-      interest: interest.toString(),
-      feeCap: feeCap.toString(),
-    },
-    liquidation: {
-      loan: badLoanPda.toBase58(),
-      status: Object.keys(badLoan.status)[0],
-      outstanding: badOwed.toString(),
-      recovered: badLoan.totalRepaid.toString(),
-      badDebtThisRun: (BigInt(p3.badDebt.toString()) - badDebtBefore).toString(),
-      badDebtLifetime: p3.badDebt.toString(),
-      score: badProfile.score,
-    },
-    transactions: sigs,
-    ranAt: new Date().toISOString(),
-  };
-  writeFileSync(deploymentFile, JSON.stringify(out, null, 2) + "\n");
-  console.log(`\nwrote ${deploymentFile}`);
-
-  if (CLUSTER !== "localnet") {
-    console.log(`\nexplorer:`);
-    for (const s of sigs) console.log(`  ${s.step.padEnd(40)} ${explorer(s.signature)}`);
-  }
+  writeSummary({
+    loan: badLoanPda.toBase58(),
+    status: Object.keys(badLoan.status)[0],
+    outstanding: badOwed.toString(),
+    recovered: badLoan.totalRepaid.toString(),
+    badDebtThisRun: (BigInt(p3.badDebt.toString()) - badDebtBefore).toString(),
+    badDebtLifetime: p3.badDebt.toString(),
+    score: badProfile.score,
+  });
 }
 
 main().catch((e) => {

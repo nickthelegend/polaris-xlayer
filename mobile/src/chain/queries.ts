@@ -29,6 +29,8 @@ export type Plan = {
   address: string;
   merchant: string;
   merchantIcon: string;
+  /** The merchant's registry PDA — what `subscribe` needs, not the name. */
+  merchantPda: string;
   name: string;
   pricePerPeriod: number;
   periodSeconds: number;
@@ -159,12 +161,14 @@ export async function fetchSubscriptions(user = wallet.publicKey): Promise<Plan[
     .map((s: any) => {
       const plan = plans.get(s.account.plan.toBase58());
       if (!plan) return null;
-      const m = merchantName(plan.merchant);
+      const merchantPda: PublicKey = plan.merchant;
+      const m = merchantName(merchantPda);
       return {
         id: n(plan.id),
         address: s.publicKey.toBase58(),
         merchant: m.name,
         merchantIcon: m.icon,
+        merchantPda: merchantPda.toBase58(),
         name: plan.name,
         pricePerPeriod: n(plan.pricePerPeriod),
         periodSeconds: n(plan.periodSeconds),
@@ -175,6 +179,48 @@ export async function fetchSubscriptions(user = wallet.publicKey): Promise<Plan[
       } as Plan;
     })
     .filter(Boolean) as Plan[];
+}
+
+/**
+ * Plans this borrower could subscribe to.
+ *
+ * Every active plan on the protocol, minus the ones they already hold a live
+ * subscription to. Subscribing twice to the same plan is refused on chain by
+ * `AlreadySubscribed`, so offering it is offering a guaranteed failure.
+ */
+export async function fetchAvailablePlans(user = wallet.publicKey): Promise<Plan[]> {
+  const [plans, subs] = await Promise.all([
+    (program.account as any).plan.all(),
+    (program.account as any).subscription.all([
+      { memcmp: { offset: 8, bytes: user.toBase58() } },
+    ]),
+  ]);
+
+  const taken = new Set(
+    subs
+      .filter((s: any) => statusOf(s.account.status) === "active")
+      .map((s: any) => s.account.plan.toBase58()),
+  );
+
+  return plans
+    .filter((p: any) => p.account.active && !taken.has(p.publicKey.toBase58()))
+    .map((p: any) => {
+      const m = merchantName(p.account.merchant);
+      return {
+        id: n(p.account.id),
+        address: p.publicKey.toBase58(),
+        merchant: m.name,
+        merchantIcon: m.icon,
+        merchantPda: p.account.merchant.toBase58(),
+        name: p.account.name,
+        pricePerPeriod: n(p.account.pricePerPeriod),
+        periodSeconds: n(p.account.periodSeconds),
+        nextChargeAt: 0,
+        periodsCharged: 0,
+        missedCharges: 0,
+        status: "active",
+      } as Plan;
+    });
 }
 
 // ---------------------------------------------------------------------------

@@ -13,8 +13,8 @@ import { usePolaris } from "../../src/chain/provider";
 import { useCreditLine } from "../../src/chain/usePolaris";
 import { DAY, USDC, plural, quote } from "../../src/chain/math";
 import { merchants, type MerchantRef } from "../../src/chain/config";
+import { PublicKey } from "@solana/web3.js";
 import { explainError, payLater, payNow, subscribeToPlan } from "../../src/chain/actions";
-import { explorerTx } from "../../src/chain/config";
 import {
   Button,
   ErrorState,
@@ -136,18 +136,32 @@ export default function PayScreen() {
           signature,
         });
       } else {
-        const target = subscriptions[planIndex];
+        const target = data.availablePlans[planIndex];
         if (!target) {
-          setResult({ ok: false, message: "No plan selected." });
+          setResult({
+            ok: false,
+            message: "You already subscribe to every plan on offer.",
+          });
           setBusy(false);
           return;
         }
-        setResult({
-          ok: false,
-          message: `You already subscribe to ${target.merchant} ${target.name}. Cancel it before subscribing again.`,
+        const payout = merchants.find((m) => m.pda.toBase58() === target.merchantPda)?.payout;
+        if (!payout) {
+          setResult({ ok: false, message: "That merchant has no payout account." });
+          setBusy(false);
+          return;
+        }
+        const { signature } = await subscribeToPlan({
+          plan: new PublicKey(target.address),
+          merchant: new PublicKey(target.merchantPda),
+          merchantPayout: payout,
+          pricePerPeriod: target.pricePerPeriod,
         });
-        setBusy(false);
-        return;
+        setResult({
+          ok: true,
+          message: `Subscribed to ${target.merchant} ${target.name} — period 1 charged`,
+          signature,
+        });
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await refresh();
@@ -311,9 +325,52 @@ export default function PayScreen() {
       {mode === "subscribe" ? (
         <Animated.View entering={enterFade()}>
           <Surface padded={18} style={{ marginBottom: space.lg }}>
-            <Label>Your subscriptions</Label>
-            {subscriptions.length ? (
-              subscriptions.map((s, i) => (
+            <Label>Available plans</Label>
+            {data.availablePlans.length ? (
+              data.availablePlans.map((p, i) => {
+                const on = i === planIndex;
+                return (
+                  <Surface
+                    key={p.address}
+                    variant={on ? "selected" : "raised"}
+                    padded={14}
+                    onPress={() => {
+                      setPlanIndex(i);
+                      setResult(null);
+                    }}
+                    style={{ marginTop: space.md }}
+                  >
+                    <View style={styles.rowBetween}>
+                      <View style={{ flex: 1 }}>
+                        <Text variant="body" tone={on ? "lime" : "default"} numberOfLines={1}>
+                          {p.merchantIcon} {p.merchant} · {p.name}
+                        </Text>
+                        <Text variant="bodySmall" tone="faint">
+                          every {Math.round(p.periodSeconds / 86_400) || 1} days
+                        </Text>
+                      </View>
+                      <Figure value={p.pricePerPeriod} variant="body" animate={false} />
+                    </View>
+                  </Surface>
+                );
+              })
+            ) : (
+              <Text variant="bodySmall" tone="faint" style={{ marginTop: space.sm }}>
+                You already subscribe to every plan on offer.
+              </Text>
+            )}
+
+            <Rule style={{ marginVertical: space.lg }} />
+            <Text variant="bodySmall" tone="soft">
+              You authorise twelve periods up front, not an unlimited amount, and
+              you can cancel at any time without the merchant's agreement.
+            </Text>
+          </Surface>
+
+          {subscriptions.length ? (
+            <Surface padded={18} style={{ marginBottom: space.lg }}>
+              <Label>Already subscribed</Label>
+              {subscriptions.map((s, i) => (
                 <View key={s.address} style={{ marginTop: space.md }}>
                   {i > 0 ? <Rule style={{ marginBottom: space.md }} /> : null}
                   <View style={styles.rowBetween}>
@@ -328,18 +385,9 @@ export default function PayScreen() {
                     <Figure value={s.pricePerPeriod} variant="body" animate={false} />
                   </View>
                 </View>
-              ))
-            ) : (
-              <Text variant="bodySmall" tone="faint" style={{ marginTop: space.sm }}>
-                No subscriptions yet.
-              </Text>
-            )}
-            <Rule style={{ marginVertical: space.lg }} />
-            <Text variant="bodySmall" tone="soft">
-              You authorise a bounded number of periods, not an unlimited amount,
-              and you can cancel at any time without the merchant's agreement.
-            </Text>
-          </Surface>
+              ))}
+            </Surface>
+          ) : null}
         </Animated.View>
       ) : null}
 
@@ -383,7 +431,9 @@ export default function PayScreen() {
             ? `Pay ${merchant.name}`
             : mode === "later"
               ? "Split into 4"
-              : "Manage subscriptions"
+              : data.availablePlans.length
+                ? `Subscribe to ${data.availablePlans[planIndex]?.merchant ?? ""}`
+                : "Nothing left to subscribe to"
         }
         full
         loading={busy}

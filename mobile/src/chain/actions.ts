@@ -6,8 +6,8 @@ import {
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { Buffer } from "buffer";
 
-import { connection, program, provider } from "./client";
-import { STABLECOIN, TREASURY, WALLET_TOKEN_ACCOUNT, wallet } from "./config";
+import { program, provider } from "./client";
+import { TREASURY, WALLET_TOKEN_ACCOUNT, wallet } from "./config";
 import { pdas } from "./pdas";
 import { interestFor } from "./math";
 import { fetchProfile, fetchProtocol } from "./queries";

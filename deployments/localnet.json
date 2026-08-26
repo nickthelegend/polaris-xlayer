@@ -1,0 +1,85 @@
+{
+  "cluster": "localnet",
+  "programId": "9wgqMhXvhzzDaLEWxXsQRx73CMtSUKRrVYL6Vy1cDKAU",
+  "stablecoin": "EpodHSfRoHvKsS9F9UYg8Nhig2TjLRni88spuyWxbpYP",
+  "protocol": "GvBQZxjf3d5exeq9cHV8b7Y5X9MVdF3DXRGzrZ5yzLaj",
+  "liquidityVault": "5S1pFyPJwFoQWXtuY2NKSgeE818EMZgGp5vSCkmC6jX5",
+  "collateralVault": "HkZ28RY4duwjd67uYGdQ9wGSsvNLv9usGSpkjsmc2cvr",
+  "treasury": "4Ww8yNis1MknYdYBkPXwTG7KfxUXoQmyvFBcPLgY6QeQ",
+  "merchant": "HqBjQMFC1mNz6nuwkkvCFj2ErDZ4k8r9n2F6S4FrfXtW",
+  "borrower": "FSEcmF1trx7b7Qw4XY85pdT6k4TZgdZcvXie4gNnQZBL",
+  "keeper": "HQqWFwVqJj4tPBqNywfor77jQJ154MB1iB8WUMRK3d6Y",
+  "loan": "9GZV47icQjANmUbgsWtdc7mbk1kttCD26p8kex66jupY",
+  "settings": {
+    "gracePeriod": 30,
+    "minInterval": 60,
+    "feeBps": 50
+  },
+  "result": {
+    "status": "repaid",
+    "principal": "400000000",
+    "totalOwed": "400000304",
+    "totalRepaid": "400000304",
+    "score": 648,
+    "protocolFeesThisRun": "60",
+    "protocolFeesLifetime": "120",
+    "interest": "304",
+    "feeCap": "60"
+  },
+  "liquidation": {
+    "loan": "2wAkRvaCSaDeGvaFbkCotZNydzGYvH4FCKiZakpo5VT2",
+    "status": "liquidated",
+    "outstanding": "200000152",
+    "recovered": "0",
+    "badDebtThisRun": "200000152",
+    "badDebtLifetime": "400000304",
+    "score": 450
+  },
+  "transactions": [
+    {
+      "step": "register merchant",
+      "signature": "3SKw7AiTQF8hNmQz6e68Ucox47YFYsSyjPpLccyouS2dtiz269uFxFWXU6VDgw1LKzhgpjadU84K66bBPmstgg5U"
+    },
+    {
+      "step": "activate merchant",
+      "signature": "45mV9wkWmLyKjboo7QKkbZTQXiC952WczQziNsNy1swcNyUDPU264StK1VqmALoWDPXLzhjaAU3Lb1vPHszdpvX9"
+    },
+    {
+      "step": "fund liquidity",
+      "signature": "DNxzRd5x8ojDvvWfk2GpjaMTgks9q61m7FHHTQvfMEWyRmY9gp5KN55Ah7cRGU9K3REY4FffFBUocCwuud26tss"
+    },
+    {
+      "step": "approve + create loan (one transaction)",
+      "signature": "4jFgn9pKSEimnddYoy1j6tRyDDgUSUCvRmc681AnSxcmSCYTUWz3bc3vaLj9BeKAUP5Vrymmqi1QZBz1Z1U3ZjU5"
+    },
+    {
+      "step": "collect installment 1",
+      "signature": "2a732DsQU1pvGgiELyG3CyaeU3LqNwUfMtfEajHNxMkd8Tve5N7HhtSZnYod71vBzELUUi1keGgeTmnNmVknBoiB"
+    },
+    {
+      "step": "collect installment 2",
+      "signature": "5pAtQZj58uXvxiK6fk6ANiKeCebX8vnndtdACQyWNZFpqub7KNQ9z1sefgYXZZRXr1hfeog9Pf4xU72ab1tg6BGi"
+    },
+    {
+      "step": "collect installment 3",
+      "signature": "G9agZeeL1jJpvnchLdnHXq13K6UTwRpfdNykUGr6ecxDoMmqT8QzvtvgtMpk6CQB18QdSwNC3nTX2J1YXrTBWPc"
+    },
+    {
+      "step": "collect installment 4",
+      "signature": "3cv1Ap86fUVF9mJVAaknWV1PLzoXpsRTr8jsMg84q31PvKNDAbzEvhjWkVytzYpJCNDcsXkhM6osfqtVMXJjNXfo"
+    },
+    {
+      "step": "approve + create loan (defaulter)",
+      "signature": "4UPyHYVmTbcbYJcqkovdAveufbEzKGUaAEgGedvTvzB46QpudYSaZMbCFrAoXPkcCRjtd3Dwceh2EisEn9bGAgG7"
+    },
+    {
+      "step": "defaulter revokes the delegation",
+      "signature": "2Jgt4LP6jDcQEXCGbMb5meBjB8dJdqZhhEu3FmdN8gKZa7RxSTMxYqEKVm3bb5X51nABEKxzqH6wbgge6f5MHDAK"
+    },
+    {
+      "step": "liquidate",
+      "signature": "3SVtwxSsiU6nGaRUWZjug7H4nQnr2uVaLWMSyV6cFkFUKqyDH4pLad4WemGMvpCy4hoZWbfQXU64SapJYRjV1W7J"
+    }
+  ],
+  "ranAt": "2026-08-26T12:47:57.796Z"
+}
