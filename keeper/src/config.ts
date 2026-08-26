@@ -32,7 +32,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): KeeperConfig {
   const loanEngine = env.POLARIS_LOAN_ENGINE ?? "";
   if (!loanEngine) {
     throw new Error(
-      "POLARIS_LOAN_ENGINE is not set. Point it at the LoanEngine address for this chain (see packages/protocol/deployments.json)."
+      "POLARIS_LOAN_ENGINE is not set. Point it at the PolarisLoanEngine address for this chain (see packages/contracts/deployments/sepolia.json)."
     );
   }
 

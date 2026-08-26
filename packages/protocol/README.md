@@ -1,3 +1,15 @@
+> **Superseded — not part of this build.**
+>
+> This is the earlier Creditcoin hub-and-spoke design. It is kept for
+> reference only: nothing here is deployed, its `test` script does not run
+> (`exit 1`), and its `deployments.json` holds ganache and testnet addresses
+> that no longer correspond to anything live.
+>
+> The Solidity that *is* deployed is `packages/contracts` — live Sepolia
+> addresses in `packages/contracts/deployments/sepolia.json`, 153 passing
+> tests. The Solana program in `programs/polaris` is what this repository is
+> actually for.
+
 # Polaris Protocol
 
 **Cross-chain, credit-score-based lending and BNPL, settled on Creditcoin with trustless proofs of source-chain events.**
