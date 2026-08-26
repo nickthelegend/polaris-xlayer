@@ -1,9 +1,9 @@
 {
-  "name": "polarispay-keeperhub",
+  "name": "polaris-solana",
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
-  "description": "PolarisPay: undercollateralized BNPL and crypto payments, with KeeperHub as the execution and reliability layer for collection, liquidation, dunning and settlement.",
+  "description": "Polaris: undercollateralized BNPL, subscriptions and payments on Solana. One Anchor program; the keeper is a scheduler, not an execution platform.",
   "engines": {
     "node": ">=20.9.0"
   },
@@ -30,9 +30,24 @@
     "mcp:start": "pnpm --filter @polarispay/mcp start",
     "keeper:health": "pnpm --filter @polarispay/keeper health",
     "keeper:subscriptions": "pnpm --filter @polarispay/keeper subscriptions",
-    "keeper:close-out": "pnpm --filter @polarispay/keeper close-out"
+    "keeper:close-out": "pnpm --filter @polarispay/keeper close-out",
+    "anchor:build": "anchor build",
+    "anchor:test": "anchor test",
+    "anchor:test:skip-build": "anchor test --skip-build",
+    "program:test": "cargo test -p polaris --lib"
   },
   "devDependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@solana/spl-token": "^0.4.9",
+    "@solana/web3.js": "^1.98.0",
+    "@types/chai": "^4.3.20",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.10.0",
+    "anchor-bankrun": "^0.5.0",
+    "chai": "^4.5.0",
+    "mocha": "^11.0.0",
+    "solana-bankrun": "^0.4.0",
+    "ts-mocha": "^11.1.0",
     "typescript": "^5.9.3"
   }
 }
