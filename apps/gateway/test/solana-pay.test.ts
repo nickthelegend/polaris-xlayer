@@ -70,7 +70,7 @@ describe("solana pay", () => {
   it("answers the spec's GET with a label and an icon", async () => {
     const res = await fetch(`${base}/pay/o1?merchant=${merchantPda}&amount=1000000`);
     assert.equal(res.status, 200);
-    const body = await res.json();
+    const body = (await res.json()) as { label: string; icon: string };
     assert.equal(body.label, "Polaris");
     assert.match(body.icon, /^https?:\/\/.+/);
   });
@@ -87,7 +87,7 @@ describe("solana pay", () => {
         body: JSON.stringify({ account: customer.publicKey.toBase58() }),
       }
     );
-    const payload = await res.json();
+    const payload = (await res.json()) as { transaction: string; message: string };
     assert.equal(res.status, 200, JSON.stringify(payload));
     const { transaction, message } = payload;
     assert.match(message, /180\.00 USDC in 4 payments/);
@@ -178,7 +178,7 @@ describe("solana pay", () => {
     // fails outright or the transaction does -- both are correct, and both are
     // better than a plan that opens over the limit.
     if (res.status === 200) {
-      const { transaction } = await res.json();
+      const { transaction } = (await res.json()) as { transaction: string };
       const tx = Transaction.from(Buffer.from(transaction, "base64"));
       tx.partialSign(customer);
       await assert.rejects(
@@ -201,7 +201,7 @@ describe("solana pay", () => {
     for (const [path, expected] of cases) {
       const res = await fetch(`${base}${path}`);
       assert.equal(res.status, 400, path);
-      assert.match((await res.json()).error, expected, path);
+      assert.match(((await res.json()) as { error: string }).error, expected, path);
     }
   });
 
