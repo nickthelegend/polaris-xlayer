@@ -42,8 +42,10 @@ than marked pass.
 
 ## Result
 
-**86 of 86 in-scope items pass. 4 items are out of scope and recorded as
-untestable, with the specific missing credential.**
+**82 of 82 in-scope items pass** — A (24), B (12), C (16), D (9), E (18), F (3).
+
+**4 items (section G) are out of scope and recorded as untestable**, each with
+the specific missing credential. They are the EVM build, not this one.
 
 Every fix below was made at the root cause and re-verified against the same
 item. The full plan was then re-run top to bottom.
