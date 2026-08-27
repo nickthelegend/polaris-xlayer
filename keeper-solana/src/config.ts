@@ -18,6 +18,8 @@ export type KeeperConfig = {
   programId: PublicKey;
   cluster: string;
   dryRun: boolean;
+  /** Seconds between passes when running as a service. */
+  intervalSeconds: number;
   pdas: ReturnType<typeof derivePdas>;
 };
 
@@ -89,6 +91,15 @@ export function loadConfig(idl: Idl): KeeperConfig {
     programId,
     cluster,
     dryRun: process.env.KEEPER_DRY_RUN === "true",
+    /*
+     * How often `watch` wakes up.
+     *
+     * A minute is right for a consumer book: the protocol's own interval floor
+     * is sixty seconds, so waking faster than that can only ever find the same
+     * nothing. Floored at five so a misconfigured deployment cannot turn the
+     * keeper into a denial-of-service against its own RPC.
+     */
+    intervalSeconds: Math.max(5, Number(process.env.KEEPER_INTERVAL_SECONDS ?? 60)),
     pdas: derivePdas(programId),
   };
 }
