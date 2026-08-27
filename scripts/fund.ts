@@ -63,13 +63,35 @@ async function main() {
   const mint = new PublicKey(seed.stablecoin);
 
   const ata = getAssociatedTokenAddressSync(mint, owner, true);
-  const ixs: any[] = [
-    SystemProgram.transfer({
-      fromPubkey: authority.publicKey,
-      toPubkey: owner,
-      lamports: 2 * LAMPORTS_PER_SOL,
-    }),
-  ];
+
+  /*
+   * Top up to a target rather than sending a fixed two SOL.
+   *
+   * A local validator airdrops freely, so the flat transfer never mattered
+   * there. On devnet the authority is funded by a rate-limited faucet, and a
+   * blind 2 SOL transfer from an authority holding 0.07 fails the whole
+   * transaction — taking the USDC mint down with it, for a wallet that only
+   * needed a few thousand lamports of rent. So: send the difference, send
+   * nothing when the wallet is already covered, and never send more than the
+   * authority can spare.
+   */
+  const TARGET = Number(process.env.POLARIS_FUND_SOL ?? 2) * LAMPORTS_PER_SOL;
+  const have = await connection.getBalance(owner);
+  const authorityHas = await connection.getBalance(authority.publicKey);
+  // Whatever is left has to cover this transaction's own fee and the ata rent.
+  const spare = Math.max(0, authorityHas - 0.01 * LAMPORTS_PER_SOL);
+  const topUp = Math.min(Math.max(0, TARGET - have), spare);
+
+  const ixs: any[] = [];
+  if (topUp > 0) {
+    ixs.push(
+      SystemProgram.transfer({
+        fromPubkey: authority.publicKey,
+        toPubkey: owner,
+        lamports: topUp,
+      }),
+    );
+  }
   if (!(await connection.getAccountInfo(ata))) {
     ixs.push(createAssociatedTokenAccountInstruction(authority.publicKey, ata, owner, mint));
   }
@@ -83,7 +105,11 @@ async function main() {
   await connection.confirmTransaction(sig, "confirmed");
 
   console.log(`funded ${owner.toBase58()}`);
-  console.log(`  2 SOL and 5,000 USDC`);
+  console.log(
+    topUp > 0
+      ? `  ${(topUp / LAMPORTS_PER_SOL).toFixed(4)} SOL and 5,000 USDC`
+      : `  5,000 USDC — already had ${(have / LAMPORTS_PER_SOL).toFixed(4)} SOL`,
+  );
   console.log(`  ${sig}`);
 }
 

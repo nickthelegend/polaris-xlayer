@@ -22,6 +22,8 @@ type Ctx = PolarisState & {
   connecting: boolean;
   /** Why a wallet app is not on offer here, or null if it is. */
   walletUnavailable: string | null;
+  /** A wallet-connection failure, which is not a failure to read the chain. */
+  signerError: string | null;
   /** What the chain just changed on its own, or null. */
   liveChange: LiveChange | null;
   /** Hand signing to a wallet app. Must be user-initiated. */
@@ -107,12 +109,21 @@ export function PolarisProvider({ children }: { children: React.ReactNode }) {
     }
   }, [connecting, signer, swap]);
 
-  const state = usePolarisState(signer !== null);
+  /*
+   * The address, not merely "is there a signer" — connecting a wallet replaces
+   * one signer with another and a boolean cannot see that happen.
+   */
+  const state = usePolarisState(signer?.publicKey.toBase58() ?? null);
 
   /*
    * A wallet-connection failure is surfaced without throwing away the position
    * already on screen. `PolarisState` is a discriminated union, so this picks
    * one arm of it rather than spreading an `error` onto the loading arm.
+   *
+   * The message itself is carried separately, in `signerError`. Folding it into
+   * `error` meant the screen introduced it as "Showing the last good read —",
+   * which describes a chain read that failed; connecting a wallet is not a
+   * read, and nothing on screen was stale because of it.
    */
   const base: PolarisState = walletError
     ? { status: "error", data: state.data, error: walletError }
@@ -120,6 +131,7 @@ export function PolarisProvider({ children }: { children: React.ReactNode }) {
 
   const value: Ctx = {
     ...base,
+    signerError: walletError,
     refresh: state.refresh,
     liveChange: state.liveChange,
     address: signer?.publicKey ?? null,

@@ -201,12 +201,28 @@ async function main() {
     );
     console.log(`mint      ${mint.toBase58()}`);
 
+    // An unset variable arrives as "" when the shell forwards it, and
+    // Number("") is 0 — which would seed a protocol with no grace at all.
+    const graceRaw = process.env.POLARIS_GRACE_SECONDS?.trim();
+    const graceSeconds = graceRaw ? Number(graceRaw) : 3 * DAY;
+    if (!Number.isFinite(graceSeconds) || graceSeconds <= 0) {
+      throw new Error(
+        `POLARIS_GRACE_SECONDS must be a positive number of seconds, got ${graceRaw}`,
+      );
+    }
+
     treasury = await ataFor(authority.publicKey, 200_000 * USDC, mint);
     await pace();
     await program.methods
       // A 3-day grace and a 60-second interval floor: realistic for a consumer
       // book, while still allowing one short-schedule loan for the keeper tests.
-      .initialize(new BN(3 * DAY), new BN(60), 50, 15_000)
+      //
+      // Overridable because the liquidation path is otherwise unreachable on a
+      // live cluster: nothing becomes liquidatable for three days, so the one
+      // instruction that seizes collateral could only ever be exercised in
+      // bankrun, where time is fake. `POLARIS_GRACE_SECONDS=3` stands up a
+      // cluster where it can be run for real.
+      .initialize(new BN(graceSeconds), new BN(60), 50, 15_000)
       .accountsPartial({
         authority: authority.publicKey,
         protocol: protocolPda,

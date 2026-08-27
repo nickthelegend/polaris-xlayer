@@ -113,7 +113,7 @@ export default function ActivityScreen() {
     );
   }
 
-  const { activity, activityPartial } = data;
+  const { activity, activityPartial, activityPartialReason } = data;
 
   return (
     <Screen
@@ -130,6 +130,19 @@ export default function ActivityScreen() {
             </View>
           ))}
         </Surface>
+      ) : activityPartial ? (
+        /*
+         * An empty feed and an unreadable one are different facts.
+         *
+         * "Nothing has moved yet" next to "some of this could not be read" told
+         * the reader both that they had no history and that we had failed to
+         * fetch it. Only one of those can be true, and when the read failed we
+         * do not know which.
+         */
+        <Empty
+          title="This could not be read just now"
+          note="Your history is on chain and nothing has been lost. Pull to refresh."
+        />
       ) : (
         <Empty
           title="Nothing has moved yet"
@@ -144,11 +157,17 @@ export default function ActivityScreen() {
         and the batches that fail are dropped so the rest still renders. Showing
         a short feed with no explanation would be its own quiet lie — the reader
         would think those payments never happened.
+
+        Only shown alongside rows. With no rows at all the empty state above
+        carries the message instead, so the reader is not told twice.
       */}
-      {activityPartial ? (
+      {activityPartial && activity.length > 0 ? (
         <Text variant="bodySmall" tone="danger" style={styles.foot}>
-          Some of the ledger could not be read just now — the network is rate
-          limiting us. Nothing is missing on chain; pull to refresh.
+          {activityPartialReason
+            ? `Some of the ledger could not be read just now — ${activityPartialReason}. ` +
+              "Nothing is missing on chain; pull to refresh."
+            : "Some of the ledger could not be read just now. Nothing is missing on " +
+              "chain; pull to refresh."}
         </Text>
       ) : null}
 

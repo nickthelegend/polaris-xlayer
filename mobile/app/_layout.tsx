@@ -18,6 +18,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { PolarisProvider } from "../src/chain/provider";
+import { useIncomingRequest } from "../src/chain/useIncomingRequest";
 import { ink, palette } from "../src/theme";
 
 /**
@@ -60,6 +61,9 @@ export default function RootLayout() {
     JetBrainsMono_400Regular,
     JetBrainsMono_500Medium,
   });
+
+  // A Solana Pay code can open the app cold, so this listens above the router.
+  useIncomingRequest();
 
   useEffect(() => {
     // Hide on error as well as success. A font that failed to load is a worse

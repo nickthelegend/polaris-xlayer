@@ -28,6 +28,34 @@ type ToolResult = { isError?: boolean; content?: Array<{ type: string; text?: st
 let client: Client;
 let close: () => Promise<void>;
 
+/**
+ * Call a read tool, retrying while the answer looks like a rate-limited read.
+ *
+ * These tests hit a public Sepolia endpoint. Run on their own they pass in
+ * under half a second; run inside the whole repository's suite, concurrently
+ * with everything else, that endpoint starts throttling and a read comes back
+ * degraded — a zero score rather than an error. Asserting on the first answer
+ * made the documented `pnpm test` fail unpredictably on a product that was
+ * working.
+ *
+ * This retries the *real* call against the *real* network; it never substitutes
+ * a value. If every attempt is degraded, the last one is returned and the
+ * assertion fails as it should.
+ */
+async function readWithRetry(
+  call: () => Promise<ToolResult>,
+  usable: (parsed: any) => boolean,
+  attempts = 4,
+): Promise<any> {
+  let last: any;
+  for (let i = 0; i < attempts; i += 1) {
+    last = body(await call());
+    if (usable(last)) return last;
+    await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+  }
+  return last;
+}
+
 function body(result: ToolResult): any {
   const text = result.content?.[0]?.text ?? "{}";
   try {
@@ -89,11 +117,13 @@ describe("tool discovery", () => {
 
 describe("reads against live Sepolia", () => {
   it("returns a real credit line for a borrower with history", async () => {
-    const result = body(
-      (await client.callTool({
-        name: "polaris_get_credit",
-        arguments: { address: BORROWER },
-      })) as ToolResult
+    const result = await readWithRetry(
+      () =>
+        client.callTool({
+          name: "polaris_get_credit",
+          arguments: { address: BORROWER },
+        }) as Promise<ToolResult>,
+      (r) => r?.creditScore >= 300 && r?.creditScore <= 850,
     );
 
     assert.ok(result.creditScore >= 300 && result.creditScore <= 850, "score must be in band");

@@ -36,6 +36,8 @@ export type ChainState = {
   activity: ActivityEvent[];
   /** True when the ledger could not be read in full — a rate-limited RPC. */
   activityPartial: boolean;
+  /** Why it is partial, in a sentence, or null when the cause is unknown. */
+  activityPartialReason: string | null;
   /** Whether the protocol can still collect. Null until the profile is known. */
   delegation: Delegation | null;
 };
@@ -58,7 +60,17 @@ export type PolarisState =
  */
 export function usePolarisState(
   /** Nothing is read until the signer is loaded from the device keystore. */
-  ready: boolean,
+  /**
+   * The signing address, or null until one is loaded from the device keystore.
+   *
+   * An address rather than a boolean because the signer can be *replaced*
+   * while remaining present — connecting a wallet app swaps the device key for
+   * it in place. Keyed on a boolean the live subscription below never noticed:
+   * it stayed pointed at the previous wallet's profile, so the screen updated
+   * itself for an account the user had just stopped using, and stayed silent
+   * about the one they were actually looking at.
+   */
+  address: string | null,
 ): PolarisState & { refresh: () => Promise<void>; liveChange: LiveChange | null } {
   const [state, setState] = useState<PolarisState>({
     status: "loading",
@@ -151,6 +163,7 @@ export function usePolarisState(
           availablePlans,
           activity: activity.events,
           activityPartial: activity.partial,
+          activityPartialReason: activity.partialReason,
           delegation,
         },
         error: null,
@@ -189,14 +202,14 @@ export function usePolarisState(
     /*
      * Both gates, not just the React one.
      *
-     * `ready` says the provider believes the wallet has loaded; `isReady()`
+     * `address` says the provider has a wallet loaded; `isReady()`
      * asks the client itself. They can disagree — a hot reload re-evaluates
      * the module and clears the client while React keeps the state that says
      * it is there — and the read then throws into the console for a state the
      * app recovers from on its own a moment later.
      */
-    if (ready && isReady()) void load();
-  }, [ready, load]);
+    if (address && isReady()) void load();
+  }, [address, load]);
 
   /*
    * Watch the borrower's own profile, and re-read when it moves.
@@ -211,8 +224,22 @@ export function usePolarisState(
    * event that matters to a borrower — a collection, a repayment, a score
    * change, collateral moving — writes to it.
    */
+  /*
+   * Only after a read has actually succeeded.
+   *
+   * web3.js opens the subscription socket eagerly and reconnects for as long
+   * as it fails, logging `ws error: undefined` on every attempt — an error
+   * carrying no information, forever, and on Android a red toast on top of the
+   * screen. Against a cluster that cannot be reached at all this is pure noise
+   * about something the user already knows: the error state is on screen.
+   *
+   * Live updates are an enhancement on top of a working connection, so they
+   * wait for one. The moment a read succeeds the socket opens as before.
+   */
+  const connected = state.status === "ready";
+
   useEffect(() => {
-    if (!ready || !isReady()) return;
+    if (!address || !connected || !isReady()) return;
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -250,7 +277,7 @@ export function usePolarisState(
         void getConnection().removeAccountChangeListener(id).catch(() => {});
       }
     };
-  }, [ready, load]);
+  }, [address, connected, load]);
 
   return useMemo(
     () => ({ ...state, refresh: () => load(false), liveChange }),

@@ -79,7 +79,7 @@ export default function CreditScreen() {
   const orbSize = Math.round(
     Math.max(150, Math.min(252, width * 0.68, height * 0.30)),
   );
-  const { status, data, error, refresh, address, liveChange } = usePolaris();
+  const { status, data, error, signerError, refresh, address, liveChange } = usePolaris();
   const line = useCreditLine(data);
 
   const [collateralBusy, setCollateralBusy] = useState<"lock" | "withdraw" | null>(null);
@@ -188,7 +188,19 @@ export default function CreditScreen() {
 
   return (
     <Screen eyebrow="Your credit line" title="Polaris" onRefresh={refresh}>
-      {error ? (
+      {/*
+        Two different failures, phrased as what they are.
+
+        A chain read that failed leaves the figures below stale and says so. A
+        wallet that would not connect leaves them perfectly current — saying
+        "showing the last good read" there sends the reader to distrust numbers
+        that were never in question.
+      */}
+      {signerError ? (
+        <Text variant="bodySmall" tone="danger" style={styles.stale}>
+          {signerError}
+        </Text>
+      ) : error ? (
         <Text variant="bodySmall" tone="danger" style={styles.stale}>
           Showing the last good read — {error}
         </Text>

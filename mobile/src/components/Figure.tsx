@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { StyleSheet, Text as RNText, TextInput, TextStyle, View } from "react-native";
 import Animated, {
   useAnimatedProps, useSharedValue, withTiming, Easing
@@ -108,12 +108,35 @@ export function Figure({
   style,
 }: Props) {
   const decimals = decimalsFor(value, preferredDecimals);
-  const progress = useSharedValue(animate ? 0 : value);
+
+  /*
+   * Starts at the real value, never at zero.
+   *
+   * The count-up used to begin from a shared value of 0, with the input's
+   * `defaultValue` also formatted from 0. That is fine while the animation
+   * runs and a lie the moment it does not: on Android these figures were seen
+   * sitting at `0.00` for a settled balance, with the surrounding
+   * `animate={false}` figures all correct. A balance of 200.00 rendered as
+   * 0.00 is the worst failure this component has, because nothing about it
+   * looks broken -- it looks like the money is gone.
+   *
+   * So the truth is the resting state, and the animation is layered on top of
+   * it by the effect below. If the effect never runs, or the ui thread never
+   * picks up the animated prop, the figure is merely static and correct.
+   */
+  const started = useRef(false);
+  const progress = useSharedValue(value);
 
   useEffect(() => {
     if (!animate) {
       progress.value = value;
       return;
+    }
+    // Count up from nothing on the way in, and from wherever it currently sits
+    // on any later change, so a live update slides rather than restarting.
+    if (!started.current) {
+      started.current = true;
+      progress.value = 0;
     }
     progress.value = withTiming(value, {
       duration: motion.duration.figure,
@@ -160,7 +183,8 @@ export function Figure({
         underlineColorAndroid="transparent"
         scrollEnabled={false}
         animatedProps={animatedProps}
-        defaultValue={animate ? `${prefix}${formatUnits(0, decimals, group)}${suffix}` : settled}
+        // The settled value either way — see the shared value above.
+        defaultValue={settled}
         accessible
         accessibilityLabel={settled}
         style={[

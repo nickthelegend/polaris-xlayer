@@ -57,7 +57,20 @@ async function checkoutFetch(url: string, init?: RequestInit): Promise<Response>
 /** The spec's GET: what the code says it is, before any account is revealed. */
 export async function describeRequest(url: string): Promise<ScannedRequest> {
   const res = await checkoutFetch(url, { headers: { accept: "application/json" } });
-  if (!res.ok) throw new Error(`That merchant's checkout is not answering (${res.status}).`);
+  /*
+   * "Not answering" is only true of a server that did not answer.
+   *
+   * A 4xx means the checkout replied and refused what was sent — a stale code,
+   * a malformed one, an order that no longer exists — and telling the user it
+   * is unreachable sends them to check their signal instead of the code.
+   */
+  if (!res.ok) {
+    throw new Error(
+      res.status >= 500
+        ? `That merchant's checkout is having trouble (${res.status}). Try again shortly.`
+        : `That code was refused by the merchant's checkout (${res.status}). It may be stale.`,
+    );
+  }
   const body = await res.json().catch(() => null);
   return { url, label: String(body?.label ?? "Unknown merchant"), icon: body?.icon ?? null };
 }

@@ -37,7 +37,7 @@ done
 solana airdrop 500 --url "$RPC" >/dev/null 2>&1 || true
 echo "validator up · program $PID"
 
-POLARIS_CLUSTER=localnet pnpm exec tsx scripts/seed.ts
+POLARIS_CLUSTER=localnet POLARIS_GRACE_SECONDS="${POLARIS_GRACE_SECONDS:-}" pnpm exec tsx scripts/seed.ts
 cp deployments/localnet-seed.json mobile/src/chain/deployment.json
 # The IDL carries the program id too, and Anchor reads it from there rather
 # than from deployment.json. Syncing one without the other left the app calling

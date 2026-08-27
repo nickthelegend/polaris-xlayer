@@ -171,11 +171,24 @@ export default function PayScreen() {
 
   const submit = async () => {
     if (inFlight.current) return;
-    if (amount <= 0) return refuse("Enter an amount above zero.");
-    if (!affordable) {
-      return refuse(
-        "That is more than your available credit. Repay a plan or lock collateral to raise the limit.",
-      );
+
+    /*
+     * Only the modes that actually spend the typed amount are judged on it.
+     *
+     * A subscription is priced by the merchant's plan, not by this field — the
+     * amount is never read on that path. Guarding it anyway made subscribing
+     * unreachable from a clean screen ("Enter an amount above zero" under a
+     * button that says SUBSCRIBE TO RELAY DATA), and typing something to get
+     * past it could then fail for exceeding a limit the plan's real price had
+     * nothing to do with.
+     */
+    if (mode !== "subscribe") {
+      if (amount <= 0) return refuse("Enter an amount above zero.");
+      if (!affordable) {
+        return refuse(
+          "That is more than your available credit. Repay a plan or lock collateral to raise the limit.",
+        );
+      }
     }
 
     inFlight.current = true;
@@ -362,11 +375,22 @@ export default function PayScreen() {
 
             <Rule style={{ marginVertical: space.lg }} />
 
+            {/*
+              Judged against the clock, exactly as the plans screen judges a
+              real loan.
+              
+              This used to mark the first row "due" unconditionally, so the
+              checkout told the buyer "Due now — the keeper collects this next"
+              under a date seven days away, while the same instalment on the
+              plans screen read "Scheduled". Nothing is due the moment a plan
+              is opened: the first collection is one interval out, and the
+              program's own floor keeps that interval at least a minute.
+            */}
             <ScheduleTimeline
               intervalSeconds={7 * DAY}
-              items={plan.schedule.map((s: any, i: number) => ({
+              items={plan.schedule.map((s: any) => ({
                 ...s,
-                state: i === 0 ? "due" : "upcoming",
+                state: Date.now() / 1000 >= s.dueAt ? "due" : "upcoming",
               }))}
             />
 
@@ -383,9 +407,20 @@ export default function PayScreen() {
 
             {!affordable ? (
               <Animated.View entering={enterFade()} style={styles.warn}>
+                {/*
+                  Name both figures, because the limit is checked against what
+                  is repaid, not against what is spent.
+                  
+                  Entering exactly your limit is refused — the interest tips the
+                  total over it — and "this is more credit than you have" next to
+                  an amount that visibly equals the limit reads as a bug in the
+                  app rather than as a fact about the plan.
+                */}
                 <Text variant="bodySmall" tone="danger">
-                  This is more credit than you have. Repay a plan or lock
-                  collateral to raise the limit.
+                  {`Repaying ${(plan.totalOwed / USDC).toFixed(2)} is more than the ` +
+                    `${(line.available / USDC).toFixed(2)} you have available — the ` +
+                    "interest is counted against your limit too. Repay a plan or lock " +
+                    "collateral to raise it."}
                 </Text>
               </Animated.View>
             ) : null}

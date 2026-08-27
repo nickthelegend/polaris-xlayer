@@ -99,7 +99,7 @@ export function loadConfig(idl: Idl): KeeperConfig {
      * nothing. Floored at five so a misconfigured deployment cannot turn the
      * keeper into a denial-of-service against its own RPC.
      */
-    intervalSeconds: Math.max(5, Number(process.env.KEEPER_INTERVAL_SECONDS ?? 60)),
+    intervalSeconds: resolveInterval(process.env.KEEPER_INTERVAL_SECONDS),
     pdas: derivePdas(programId),
   };
 }
@@ -136,4 +136,26 @@ export async function assertDeployed(cfg: KeeperConfig): Promise<void> {
         "Run scripts/prove.ts or ./scripts/reset-local.sh against that cluster first.",
     );
   }
+}
+
+
+/**
+ * How often `watch` wakes up, from the environment.
+ *
+ * A minute is right for a consumer book: the protocol's own interval floor is
+ * sixty seconds, so waking faster than that can only ever find the same
+ * nothing. Floored at five so a misconfigured deployment cannot turn the keeper
+ * into a denial-of-service against its own RPC.
+ *
+ * The floor has to survive a value that is not a number at all.
+ * `Math.max(5, Number("every minute"))` is NaN — not 5 — and `setTimeout(NaN)`
+ * fires immediately, so a typo in an env var would have produced exactly the
+ * hot loop this clamp exists to prevent. Anything unparseable falls back to
+ * the default rather than to nonsense.
+ */
+export function resolveInterval(raw: string | undefined): number {
+  if (raw === undefined || raw.trim() === "") return 60;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return 60;
+  return Math.max(5, Math.floor(parsed));
 }

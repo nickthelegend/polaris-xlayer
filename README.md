@@ -82,13 +82,13 @@ says is due today. Arbitrary amounts need the borrower's own signature.
 ## Layout
 
 ```
-programs/polaris        the program — one Anchor program, 21 instructions
+programs/polaris        the program — one Anchor program, 23 instructions
 keeper-solana           the crank: collect · subscriptions · liquidate
 packages/sdk-solana     createPolaris() — pay, subscribe, payLater
 mobile/                 the Android app — Expo, signs on the device
 apps/gateway            the underwriter, and a Solana Pay endpoint
 scripts/lifecycle.ts    stand it up and run a loan through its whole life
-tests/                  41 integration tests on bankrun
+tests/                  153 integration tests on bankrun
 docs/SOLANA-PORT.md     the port plan and every decision in it
 packages/contracts      the Solidity original, kept as the reference
 ```
@@ -246,6 +246,24 @@ An emulator on a machine with little free memory will hang on the GPU path;
 `-no-window -gpu off -memory 2048` boots it headless, and `adb screencap` is
 enough to see the app.
 
+### Reaching a local validator from the emulator
+
+An emulator's `localhost` is the emulator, so every host port the app talks to
+has to be reversed — **including 8900**:
+
+```bash
+adb reverse tcp:8899 tcp:8899 && adb reverse tcp:8900 tcp:8900 && adb reverse tcp:4100 tcp:4100
+```
+
+8900 is the validator's websocket, and it is the one everybody forgets. web3.js
+does not take it as a url — it derives it from the rpc port — so reversing only
+8899 leaves the app able to read the chain and unable to subscribe to it. The
+symptom is a red `ws error: undefined` toast and a screen that never updates
+itself, with every other call working perfectly. The keeper needs both ports for
+the same reason: `confirmTransaction` waits on a signature subscription.
+
+4100 is the payment gateway, needed for the scan-to-pay flow.
+
 
 Every instruction is built in `mobile/src/chain`, never in a screen, so the
 signer is the one piece a shipped build has to replace — see *What is not done*.
@@ -254,10 +272,11 @@ signer is the one piece a shipped build has to replace — see *What is not done
 
 ```bash
 pnpm run program:test        # 18 — the arithmetic that costs money
-pnpm run anchor:test         # 41 — every exploit, on chain
-pnpm --filter @polaris/keeper-solana test   # 11 — the dunning ladder
+pnpm run anchor:test         # 153 — every exploit, on chain
+pnpm --filter @polaris/keeper-solana test   # 20 — the dunning ladder
 pnpm --filter @polaris/sdk-solana test      # 13 — the SDK against a live cluster
 pnpm --filter @polaris/gateway test         # 14 — underwriting and Solana Pay
+pnpm --filter polaris-mobile test           # 59 — deep links, delegation, live diffs
 ```
 
 `anchor test` starts its own validator and will refuse if you still have the

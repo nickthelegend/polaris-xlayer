@@ -3,6 +3,8 @@ import { PublicKey } from "@solana/web3.js";
 
 import { merchantDirectory } from "./config";
 import { getConnection, getProgram, getPublicKey, getTokenAccount } from "./client";
+import { readDelegation, type Delegation } from "./delegation";
+import { describePartial } from "./partial";
 import { pdas } from "./pdas";
 import idl from "./idl.json";
 
@@ -310,7 +312,7 @@ function camelize<T = any>(value: any): T {
  */
 export async function fetchActivity(
   limit = 25,
-): Promise<{ events: ActivityEvent[]; partial: boolean }> {
+): Promise<{ events: ActivityEvent[]; partial: boolean; partialReason: string | null }> {
   const sources = [pdas.profileOf(getPublicKey()), getTokenAccount()];
 
   const perSource = await Promise.all(
@@ -330,7 +332,7 @@ export async function fetchActivity(
     .sort((a, b) => (b.blockTime ?? 0) - (a.blockTime ?? 0))
     .slice(0, limit);
 
-  if (!sigs.length) return { events: [], partial: false };
+  if (!sigs.length) return { events: [], partial: false, partialReason: null };
 
   /*
    * Fetched in small batches, and never fatally.
@@ -349,6 +351,7 @@ export async function fetchActivity(
   const BATCH = 8;
   const txs: any[] = [];
   let partial = false;
+  let partialReason: string | null = null;
   for (let i = 0; i < sigs.length; i += BATCH) {
     const slice = sigs.slice(i, i + BATCH).map((s) => s.signature);
     try {
@@ -357,12 +360,20 @@ export async function fetchActivity(
         commitment: "confirmed",
       });
       txs.push(...batch);
-    } catch {
-      // Rate-limited or unreachable. Those rows are missing from the feed,
-      // which is a smaller lie than an empty screen — but only if the screen
-      // says so, which is what `partial` is for. Dropping rows silently is its
-      // own quiet lie.
+    } catch (e: any) {
+      /*
+       * Rate-limited or unreachable. Those rows are missing from the feed,
+       * which is a smaller lie than an empty screen — but only if the screen
+       * says so, which is what `partial` is for. Dropping rows silently is its
+       * own quiet lie.
+       *
+       * The reason is carried out rather than assumed. This used to tell every
+       * reader the network was rate limiting us, including when it was not —
+       * so a node that had fallen behind sent them off to wait out a limit
+       * that was never the problem.
+       */
       partial = true;
+      partialReason ??= describePartial(e);
     }
   }
 
@@ -603,7 +614,7 @@ export async function fetchActivity(
     }
   });
 
-  return { events: out.sort((a, b) => b.at - a.at), partial };
+  return { events: out.sort((a, b) => b.at - a.at), partial, partialReason };
 }
 
 /**
@@ -620,48 +631,11 @@ export async function fetchActivity(
  * `InsufficientDelegation`). Refusing is the right behaviour and a terrible
  * first warning, because by then an installment is late.
  */
-export type Delegation = {
-  /** False when the token account names no delegate, or names someone else. */
-  toProtocol: boolean;
-  /** What the delegate may still draw. Zero when there is no delegation. */
-  remaining: number;
-  /** Everything this borrower owes across every open plan. */
-  owed: number;
-  /** Short by this much, or 0 when the delegation covers the book. */
-  shortfall: number;
-};
+export type { Delegation };
 
 export async function fetchDelegation(owed: number): Promise<Delegation> {
   const info = await getConnection().getAccountInfo(getTokenAccount());
-  if (!info) return { toProtocol: false, remaining: 0, owed, shortfall: owed };
-
-  /*
-   * Decoded by hand rather than through `getAccount`.
-   *
-   * The SPL layout is fixed and this needs four fields out of it; pulling the
-   * helper in would add a second token-program dependency to a module that is
-   * otherwise pure reads.
-   *
-   *   mint(32) owner(32) amount(8) delegateOption(4) delegate(32) state(1)
-   *   isNativeOption(4) isNative(8) delegatedAmount(8) closeAuthority(4+32)
-   *
-   * 165 bytes in total, and the whole account is required: `delegatedAmount`
-   * sits at 121, so a short read would decode a length check that passed into
-   * a number that means nothing.
-   */
-  const data = info.data;
-  if (data.length < 165) return { toProtocol: false, remaining: 0, owed, shortfall: owed };
-
-  const delegateSet = data.readUInt32LE(72) === 1;
-  const delegate = delegateSet ? new PublicKey(data.subarray(76, 108)) : null;
-  const delegatedAmount = delegateSet ? Number(data.readBigUInt64LE(121)) : 0;
-
-  const toProtocol = delegate?.equals(pdas.protocol) ?? false;
-  const remaining = toProtocol ? delegatedAmount : 0;
-  return {
-    toProtocol,
-    remaining,
-    owed,
-    shortfall: Math.max(0, owed - remaining),
-  };
+  // The decode and the verdict live in `delegation.ts`, where they can be
+  // tested against real account bytes for states a device cannot easily reach.
+  return readDelegation(info?.data ?? null, owed, pdas.protocol.toBytes());
 }

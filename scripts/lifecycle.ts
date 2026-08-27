@@ -409,6 +409,23 @@ async function main() {
   console.log(`   repaid           ${usd(BigInt(loan.totalRepaid.toString()))} of ${usd(totalOwed)}`);
   console.log(`   outstanding      ${usd(BigInt(loan.totalOwed.toString()) - BigInt(loan.totalRepaid.toString()))}`);
   console.log(`   credit score     600 → ${profile.score} (${profile.onTimePayments} on time)`);
+  /*
+   * Say why the score fell on a loan that was repaid in full.
+   *
+   * "On time" means collected before the instalment is due plus the grace
+   * period, and a cluster stood up with POLARIS_GRACE_SECONDS=3 to make
+   * liquidation reachable also makes every collection late by definition — the
+   * keeper cannot run inside three seconds. Without this line the run reads as
+   * a scoring bug rather than as the consequence of the grace it was given.
+   */
+  const graceSeconds = Number(p1.gracePeriod.toString());
+  if (profile.onTimePayments === 0 && graceSeconds < 60) {
+    console.log(
+      `                    every collection counted late: this cluster's grace is ` +
+        `${graceSeconds}s, shorter than the keeper's own round trip. Seed without ` +
+        `POLARIS_GRACE_SECONDS for the realistic figure.`,
+    );
+  }
   const feesThisRun = BigInt(p1.protocolFeesAccrued.toString()) - feesBefore;
   const feeCap = (BigInt(interest) * 2000n) / 10_000n;
   console.log(
@@ -542,7 +559,7 @@ async function main() {
       `   the loan above is real and will become liquidatable then; not waiting.`,
     );
     console.log(`   for the liquidation path end to end, run against a fresh cluster:`);
-    console.log(`     ./scripts/reset-local.sh   # stands one up with a 3s grace`);
+    console.log(`     POLARIS_GRACE_SECONDS=3 ./scripts/reset-local.sh`);
     writeSummary(null);
     return;
   }

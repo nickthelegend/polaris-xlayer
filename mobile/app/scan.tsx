@@ -1,6 +1,6 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { failed, press, succeeded, tap } from "../src/lib/haptics";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
@@ -16,6 +16,7 @@ import {
   type PreparedPayment,
 } from "../src/chain/solanaPay";
 import { describeError } from "../src/chain/actions";
+import { extractRequest, onRequestStashed, takeRequest } from "../src/chain/incomingRequest";
 import { Button, Label, Surface, Text } from "../src/components";
 import { ink, palette, space } from "../src/theme";
 
@@ -50,6 +51,7 @@ export default function ScanScreen() {
    * the code is on someone else's screen.
    */
   const { request } = useLocalSearchParams<{ request?: string }>();
+  const handledRef = useRef<string | null>(null);
 
   /*
    * A barcode in frame fires continuously, several times a second. Without a
@@ -108,8 +110,57 @@ export default function ScanScreen() {
   }, [stage, refresh]);
 
   useEffect(() => {
-    if (request) void onScanned({ data: decodeURIComponent(request) });
+    /*
+     * Two ways in. A code that arrived from outside the app was stashed by the
+     * root listener and is read from memory, because carrying a Solana Pay url
+     * through a query string loses everything after its first parameter on
+     * Android. The `request` parameter stays for the web build, where the
+     * address bar is the only channel there is.
+     */
+    const handed = takeRequest();
+    const incoming = handed ?? (request ? extractRequest(`?request=${request}`) : null);
+    if (!incoming) return;
+    /*
+     * Exactly once per code, per screen.
+     *
+     * `onScanned` is rebuilt whenever the stage changes, so without this the
+     * effect re-runs on every step of the payment and starts the same one
+     * again — after paying, tapping Done put the finished payment back on
+     * screen offering to pay it a second time. The order pda would refuse the
+     * duplicate on chain, but the app should not be offering it at all.
+     */
+    if (handledRef.current === incoming) return;
+    handledRef.current = incoming;
+    void onScanned({ data: incoming });
   }, [request, onScanned]);
+
+  /*
+   * A code that arrives while this screen is already open. The mount effect
+   * above only runs on a mount, and there is not always a new one.
+   *
+   * Scoped to focus so only the screen the borrower is actually looking at
+   * takes the code out of the slot.
+   */
+  useFocusEffect(
+    useCallback(
+      () =>
+        onRequestStashed(() => {
+          const handed = takeRequest();
+          if (!handed || handledRef.current === handed) return;
+          handledRef.current = handed;
+        /*
+         * Release the latch first. It exists to stop the camera acting on the
+         * same code in twenty consecutive frames; a code the system just
+           * handed us is unambiguously a new one, and leaving the latch closed
+           * meant the second code a merchant sent was silently dropped.
+           */
+          latched.current = false;
+          approving.current = false;
+          void onScanned({ data: handed });
+        }),
+      [onScanned],
+    ),
+  );
 
   const scanAgain = useCallback(() => {
     latched.current = false;
@@ -123,7 +174,11 @@ export default function ScanScreen() {
         <View>
           <Label>Scan to pay</Label>
           <Text variant="heading" style={styles.title}>
-            {request ? "Confirm this payment" : "Point at a Polaris code"}
+            {/* Keyed on what is happening, not on how the code arrived. A
+                code handed over by another app is stashed rather than passed
+                as a route parameter, so asking about the parameter told a
+                borrower staring at a payment to go point at a code. */}
+            {stage.name === "scanning" ? "Point at a Polaris code" : "Confirm this payment"}
           </Text>
         </View>
         <Pressable
