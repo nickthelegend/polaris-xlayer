@@ -16,6 +16,11 @@ import { Buffer } from "buffer";
 import { getProgram, getProvider, getPublicKey, getTokenAccount } from "./client";
 import { TREASURY } from "./config";
 import { pdas } from "./pdas";
+import { explainError } from "./explain";
+import { interestFor } from "./math";
+import { fetchProfile, fetchProtocol } from "./queries";
+
+export { explainError };
 
 /**
  * 32 random bytes, from the platform's own CSPRNG.
@@ -29,9 +34,6 @@ function randomOrderRef(): Uint8Array {
   crypto.getRandomValues(bytes);
   return bytes;
 }
-import { interestFor } from "./math";
-import { fetchProfile, fetchProtocol } from "./queries";
-
 export type ActionResult = { signature: string };
 
 /**
@@ -114,6 +116,16 @@ export async function payLater(params: {
   amount: number;
   installmentCount?: number;
   intervalSeconds?: number;
+  /**
+   * The order this plan is for, so a retry is the *same* order.
+   *
+   * Minted here when absent, which is right for a first attempt and wrong for
+   * a second: a fresh reference each time means the program's duplicate-order
+   * refusal never engages, and a borrower retrying after a confirmation they
+   * could not read opens a second real loan. Callers that can retry pass the
+   * reference they used the first time.
+   */
+  orderRef?: Uint8Array;
 }): Promise<ActionResult & { loanId: number }> {
   const installmentCount = params.installmentCount ?? 4;
   const intervalSeconds = params.intervalSeconds ?? 7 * 86_400;
@@ -147,7 +159,7 @@ export async function payLater(params: {
       new BN(params.amount),
       installmentCount,
       new BN(intervalSeconds),
-      Array.from(randomOrderRef()),
+      Array.from(params.orderRef ?? randomOrderRef()),
     )
     .accountsPartial({
       borrower: getPublicKey(),
@@ -327,129 +339,6 @@ export async function cancelSubscription(params: {
  * Anchor puts the error name in the logs; the raw message is a hex code and a
  * stack of program ids, which tells a user nothing.
  */
-export function explainError(e: any): string {
-  /*
-   * `getLogs()` as well as `.logs`.
-   *
-   * web3.js throws SendTransactionError, whose `logs` are often not populated
-   * until something asks for them — so the program's own error name was
-   * missing from the text this matches on, and every failed simulation
-   * collapsed to the words "Simulation failed", which tells a borrower
-   * nothing. `logs` is a plain property once resolved; reading both covers
-   * the case where it already is.
-   */
-  const fromGetter = typeof e?.getLogs === "function" ? safeLogs(e) : [];
-  const logs: string[] = e?.logs ?? fromGetter ?? [];
-  const text = `${e?.message ?? e}\n${logs.join("\n")}`;
-  const code = text.match(/Error Code: (\w+)/)?.[1];
-  const map: Record<string, string> = {
-    AccountNotInitialized: "This wallet has no USDC account yet. Add some and try again.",
-    ExceedsCreditLimit: "That is more credit than your limit allows.",
-    InsufficientDelegation: "Your payment authorisation does not cover this.",
-    NotDelegated: "Your account is not authorised for Polaris yet.",
-    InsufficientLiquidity: "The protocol pool cannot cover this purchase right now.",
-    MerchantNotEligible: "This merchant cannot take a plan of that size.",
-    InvalidInstallments: "Between 1 and 24 installments.",
-    InvalidInterval: "That schedule is outside what the protocol allows.",
-    ZeroAmount: "Enter an amount above zero.",
-    AlreadySubscribed: "You already have a live subscription to this plan.",
-
-    /*
-     * The rest of the program's errors.
-     *
-     * Twenty of twenty-nine had no sentence, and the fallback below returned
-     * the raw identifier — so withdrawing collateral against an open plan told
-     * the borrower "DebtOutstanding". Every one of these is reachable from a
-     * screen, so every one gets words.
-     */
-    DebtOutstanding: "You still owe on a plan. Repay it before withdrawing collateral.",
-    InsufficientCollateral: "That is more collateral than you have locked.",
-    LoanNotActive: "That plan is already closed.",
-    NotLiquidatable: "That plan is not overdue enough to liquidate.",
-    PlanNotActive: "That subscription plan is no longer offered.",
-    SubscriptionNotActive: "That subscription is not running.",
-    NotDue: "That charge is not due yet.",
-    NotAuthorized: "This account is not allowed to do that.",
-    InvalidPeriod: "That billing period is outside what the protocol allows.",
-    MathOverflow: "That amount is too large for the protocol to handle.",
-    StringTooLong: "That name is too long.",
-    TokenOwnerMismatch: "That token account belongs to somebody else.",
-    MintMismatch: "That account holds a different token than this deployment uses.",
-    AlreadyUnderwritten: "This wallet already has a credit line.",
-    NotUnderwriter: "Only the underwriter can open a credit line.",
-    EvidenceStale: "That credit check went stale. Try again.",
-    EvidenceFromTheFuture: "That credit check is timestamped wrong. Try again.",
-
-    // Set once at initialization, so a borrower can never see these — mapped
-    // anyway, because the alternative is a bare identifier on a screen.
-    InvalidGracePeriod: "This deployment is misconfigured.",
-    InvalidFee: "This deployment is misconfigured.",
-    InvalidMultiplier: "This deployment is misconfigured.",
-  };
-  if (code && map[code]) return map[code];
-  if (/already in use/i.test(text)) return "That order has already been paid.";
-  if (/insufficient funds|0x1\b/.test(text)) return "Your balance does not cover this.";
-  if (/could not find account|AccountNotInitialized|invalid account data/i.test(text)) {
-    return "This wallet has no USDC account yet. Add some and try again.";
-  }
-  // Not a borrower's problem, and not something they can retry into working:
-  // the app is pointed at an address with no program on it.
-  if (/program that does not exist|ProgramAccountNotFound/i.test(text)) {
-    return "This app is pointed at the wrong program. Its deployment needs re-syncing.";
-  }
-  if (/blockhash not found|block height exceeded/i.test(text)) {
-    return "That took too long to confirm. Nothing was charged — try again.";
-  }
-  if (/failed to fetch|network request failed|ECONNREFUSED/i.test(text)) {
-    return "Cannot reach the network. Check the RPC endpoint is running.";
-  }
-  /*
-   * Never the bare identifier.
-   *
-   * `return code` put things like "DebtOutstanding" on the screen — a symbol
-   * from the program's source, shown to somebody trying to move their money.
-   * Anything that reaches here is an error the map has not been taught yet,
-   * and a sentence that admits that is better than a token that explains
-   * nothing.
-   */
-  if (code) {
-    if (__DEV__) console.error(`[polaris] unmapped program error: ${code}`, e);
-    return "The program refused that. Nothing was charged.";
-  }
-
-  /*
-   * Last resort, and the reason it is not just `e.message`.
-   *
-   * A simulation failure's message is a paragraph of logs, a hint about
-   * catching SendTransactionError, and an empty array -- all of which landed
-   * on the screen verbatim under the word "Refused". Anything that long is a
-   * stack trace wearing a sentence, so it goes to the log and the borrower
-   * gets something true and short.
-   */
-  const message = String(e?.message ?? "").split("\n")[0]?.trim() ?? "";
-  /*
-   * "Simulation failed." names nothing a borrower can act on, and it is
-   * exactly the message that reaches here when the logs could not be found.
-   * Better to say what is actually true.
-   */
-  if (/^simulation failed\.?$/i.test(message)) {
-    return "The cluster refused that. Nothing was charged — check your balance and try again.";
-  }
-  if (message && message.length <= 120) return message;
-  if (__DEV__) console.error("[polaris] unexplained failure:", e);
-  return "The transaction was refused. Nothing was charged.";
-}
-
-
-/** `getLogs()` can itself throw when the RPC is gone; a diagnostic must not. */
-function safeLogs(e: any): string[] {
-  try {
-    const logs = e.getLogs();
-    return Array.isArray(logs) ? logs : [];
-  } catch {
-    return [];
-  }
-}
 
 /**
  * Resolve a failure's logs, then explain it.

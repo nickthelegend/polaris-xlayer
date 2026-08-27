@@ -491,3 +491,31 @@ naming the amount.
 | The checkout marked the first instalment "Due now — the keeper collects this next" unconditionally, under a date seven days out, while the plans screen called the same instalment "Scheduled" | `mobile/app/(tabs)/pay.tsx` |
 | Refusing a purchase said "this is more credit than you have" beside an amount that visibly equalled the limit — it is the interest that tips it over, and nothing said so | `mobile/app/(tabs)/pay.tsx` |
 | Against an unreachable cluster the live socket reconnected forever, logging `ws error: undefined` on every attempt — an error carrying no information, and on Android a red toast over the screen | `mobile/src/chain/usePolaris.ts` |
+
+
+## Run log — second browser pass, section M and the failure paths
+
+Section M driven entirely in the browser against a live validator, with a signer
+the browser generated for itself. Every figure checked against the chain.
+
+**Verified.** M1 (lock 50 → limit 200 → 275, chain agrees), M2 ("You still owe
+on a plan. Repay it before withdrawing collateral."), M3 ("Withdrew 50.00
+USDC." once clear), M4 (loan repaid 4/4, score 532 → 544), M5 (three rapid
+clicks, twelve dispatched events, **one** settlement — usdc fell by exactly
+53.000002 = 50 locked + 3.000002 settled), M6 (status `cancelled`), M7 (two
+clicks, one cancellation, periods charged unchanged).
+
+**Found and fixed.**
+
+| What was wrong | Where |
+|---|---|
+| Closing the scanner did nothing when it was opened by url — `router.back()` is a no-op on a single-entry stack, so the borrower was stranded on `/scan` with a payment card and no way into the app. `canGoBack()` is no help: it answers about browser history, which says yes while the navigator stays put | `mobile/app/scan.tsx` |
+| A confirmation timeout — the one failure where the money may well have moved — was reported as "The transaction was refused. Nothing was charged." The message web3.js throws says in its own words that the outcome is unknown, and was simply too long for the length guard at the bottom of the ladder | `mobile/src/chain/explain.ts` |
+| `explainError` threw a ReferenceError in any host without `__DEV__`, which is also what had kept it untested | `mobile/src/chain/explain.ts` |
+| A retry after an unreadable failure minted a *new* order reference, so the program's duplicate-order refusal never engaged and a second real loan could open. The reference is now per purchase, not per attempt | `mobile/app/(tabs)/pay.tsx`, `mobile/src/chain/actions.ts` |
+| The web build rebuilt a query string around the request parameter and re-parsed it, so a value the router had already decoded was split on its own `&` — the checkout was re-fetched without its amount and the gateway answered 400. Observed in the network panel, not inferred | `mobile/app/scan.tsx` |
+
+**Claimed but disproved.** A review flagged the credit-score arc and the animated
+figures as showing wrong numbers on web. Measured directly: the arc renders a
+fill of 0.4654 against 0.4655 expected for a score of 556, and all ten figures on
+the screen match the chain exactly. Both were false positives.

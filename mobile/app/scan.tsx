@@ -38,6 +38,23 @@ type Stage =
  */
 export default function ScanScreen() {
   const router = useRouter();
+
+  /*
+   * Leaving has to work even when there is nowhere to go back to.
+   *
+   * This screen is reachable directly by url — that is the documented way a
+   * merchant hands a code to the web build — and a tab opened straight onto
+   * `/scan?request=...` has a single entry in the navigator. Going back on a
+   * single-entry stack does nothing at all, so Close and Done were dead
+   * controls: the payment card fell back to the camera prompt and the borrower
+   * was stranded on a screen with no way into the app. `canGoBack` is no help
+   * either — it answers about browser history, which says yes while the
+   * navigator stays exactly where it was.
+   */
+  const leave = useCallback(() => {
+    // Dismiss down to the tabs, replacing this screen if it is the only one.
+    router.dismissTo("/");
+  }, [router]);
   const insets = useSafeAreaInsets();
   const { refresh } = usePolaris();
   const [permission, requestPermission] = useCameraPermissions();
@@ -118,7 +135,17 @@ export default function ScanScreen() {
      * address bar is the only channel there is.
      */
     const handed = takeRequest();
-    const incoming = handed ?? (request ? extractRequest(`?request=${request}`) : null);
+    /*
+     * The parameter's own value, not a query string rebuilt around it.
+     *
+     * Wrapping it back up as `?request=<value>` and re-parsing meant
+     * URLSearchParams split the value on its own `&`: the router hands this
+     * back already decoded on web, so everything after the first parameter of
+     * the merchant's url was dropped and the checkout was re-fetched without
+     * its amount, which the gateway rightly answered 400. `extractRequest`
+     * takes the bare value in either encoding.
+     */
+    const incoming = handed ?? (request ? extractRequest(request) : null);
     if (!incoming) return;
     /*
      * Exactly once per code, per screen.
@@ -184,7 +211,7 @@ export default function ScanScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close the scanner"
-          onPress={() => router.back()}
+          onPress={leave}
           style={styles.close}
         >
           <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
@@ -234,7 +261,7 @@ export default function ScanScreen() {
               stage={stage}
               onApprove={approve}
               onScanAgain={scanAgain}
-              onDone={() => router.back()}
+              onDone={leave}
             />
           </Animated.View>
         ) : null}

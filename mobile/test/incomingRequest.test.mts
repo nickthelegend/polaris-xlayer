@@ -51,6 +51,23 @@ describe("extractRequest", () => {
     assert.equal(extractRequest("polaris://(tabs)/plans"), null);
   });
 
+  it("takes an already-decoded parameter value whole", () => {
+    // What expo-router hands back on web. Re-wrapping this as `?request=<it>`
+    // split it on its own `&` and dropped everything after the merchant.
+    const decoded = "solana:" + INNER;
+    const got = extractRequest(decoded);
+    assert.equal(got, decoded);
+    assert.match(got!, /amount=6000000/);
+    assert.match(got!, /interval=60/);
+  });
+
+  it("takes a still-encoded parameter value whole", () => {
+    const encoded = encodeURIComponent("solana:" + encodeURIComponent(INNER));
+    const got = extractRequest(encoded);
+    assert.equal(got, "solana:" + INNER);
+    assert.match(got!, /installments=4/);
+  });
+
   it("returns null for a link carrying no request", () => {
     assert.equal(extractRequest("polaris://scan"), null);
     assert.equal(extractRequest("polaris://scan?other=1"), null);

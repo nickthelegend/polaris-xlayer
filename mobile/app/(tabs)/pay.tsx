@@ -89,6 +89,32 @@ export default function PayScreen() {
    * render from.
    */
   const inFlight = useRef(false);
+
+  /*
+   * One order reference per purchase, not per attempt.
+   *
+   * The payment address is derived from this, and the program refuses a second
+   * plan against an order it has already financed. That guard only works if a
+   * retry sends the *same* reference — minting a fresh one each time made the
+   * duplicate check unreachable, so a borrower who retried after a confirmation
+   * they could not read opened a second real loan. It is keyed to what is being
+   * bought, so changing the amount, mode or merchant starts a genuinely new
+   * order, and it is cleared once a purchase succeeds.
+   */
+  const attempt = useRef<{ key: string; orderId: string; orderRef: Uint8Array } | null>(null);
+
+  const orderFor = (key: string) => {
+    if (attempt.current?.key !== key) {
+      const bytes = new Uint8Array(32);
+      crypto.getRandomValues(bytes);
+      attempt.current = {
+        key,
+        orderId: `POL-${Date.now().toString(36).toUpperCase()}`,
+        orderRef: bytes,
+      };
+    }
+    return attempt.current;
+  };
   const [result, setResult] = useState<{ ok: boolean; message: string; signature?: string } | null>(
     null,
   );
@@ -195,14 +221,13 @@ export default function PayScreen() {
     setBusy(true);
     setResult(null);
     try {
+      const order = orderFor(`${mode}:${merchant.pda.toBase58()}:${amount}`);
       if (mode === "now") {
         const { signature } = await payNow({
           merchant: merchant.pda,
           merchantPayout: merchant.payout,
           amount,
-          // Unique per attempt: the payment address is derived from this, and a
-          // repeated reference is refused by the program as a duplicate.
-          orderId: `POL-${Date.now().toString(36).toUpperCase()}`,
+          orderId: order.orderId,
         });
         setResult({ ok: true, message: `Paid ${merchant.name} in full`, signature });
       } else if (mode === "later") {
@@ -210,6 +235,7 @@ export default function PayScreen() {
           merchant: merchant.pda,
           merchantPayout: merchant.payout,
           amount,
+          orderRef: order.orderRef,
         });
         setResult({
           ok: true,
@@ -245,6 +271,8 @@ export default function PayScreen() {
         });
       }
       succeeded();
+      // The order is done; the next purchase gets its own reference.
+      attempt.current = null;
       // Clear the amount. Leaving a completed purchase armed in the field is
       // how a second tap becomes a second purchase nobody meant to make.
       setRaw("0");

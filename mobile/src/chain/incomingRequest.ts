@@ -88,6 +88,14 @@ export function extractRequest(deepLink: string): string | null {
    */
   let tail = trimmed.replace(/^[a-z0-9+.-]+:(\/\/)?/i, "").replace(/^\/+/, "");
   for (let i = 0; i < 4; i += 1) {
+    /*
+     * Either shape counts as recovered: a payload that lost its scheme, or a
+     * whole `solana:` url that was simply escaped end to end. Testing only the
+     * first meant a fully-escaped parameter value decoded all the way to
+     * `solana:http://...` and was then thrown away for not looking like a bare
+     * http url.
+     */
+    if (usable(tail)) return tail;
     if (HTTP.test(tail)) return `solana:${tail}`;
     if (!PERCENT.test(tail)) break;
     let next: string;
