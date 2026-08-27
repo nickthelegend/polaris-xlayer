@@ -6,40 +6,46 @@ against.
 
 ## Final status
 
-177 rows, 176 distinct items (K13 is listed twice — once in the blockers table
-above and once in section K).
+190 distinct items (191 rows — K13 appears in the blockers table as well as in
+section K).
 
 | | Count |
 |---|---|
-| **PASS** — verified against a real cluster, a real device, or a suite run green in this pass | **169** |
+| **PASS** — verified against a real cluster, a real browser, a real device, or a suite run green in this pass | **181** |
 | **PARTIAL** — one half verified, the other blocked | **1** |
-| **UNTESTED** — needs a dependency that does not exist here | **4** |
+| **UNTESTED** — needs a dependency that does not exist here | **5** |
 | **UNTESTABLE** — the EVM build, credential-blocked and out of scope | **3** |
 
 **PARTIAL.** N7. Removing the socket listener on unmount is verified;
 re-subscribing when the *signer changes* needs a second signer to change to,
-and the emulator has no wallet app. The subscription is keyed on the signing
-address rather than on "is there a signer", which is the change that makes the
-re-subscribe happen.
+and neither the emulator nor a browser has one. The subscription is keyed on
+the signing address rather than on "is there a signer", which is the change
+that makes the re-subscribe happen.
 
-**UNTESTED.** K11 (disconnect), K12 (one session at a time) and K13 (a wallet
-actually signing) all need a wallet app installed — a physical device with
-Phantom or Solflare. G-section blockers are listed in that section.
+**UNTESTED, with the specific blocker.**
+
+| # | Blocked on |
+|---|---|
+| K11 Disconnect | A wallet app to disconnect from |
+| K12 One session at a time | A wallet app to open a session with |
+| K13 A wallet actually signing | A physical device with Phantom or Solflare; the approval sheet has never been seen |
+| P13 A merchant without CORS | A checkout endpoint outside this repository. A browser cannot read a cross-origin response that sends no `access-control-allow-origin`, so such a merchant's 404 is indistinguishable from an unreachable one |
+| P14 Camera denied vs absent | A machine with no webcam. `expo-camera` reports both as denied on web, so the app cannot tell them apart from the inside |
 
 **Confirmations.**
 
-- **Zero mocks, zero stubs.** A sweep for `mock|stub|fake|dummy|TODO|FIXME`
-  across `mobile/src`, `mobile/app`, `packages`, `apps`, `keeper-solana/src`
-  and `programs/polaris/src`, excluding tests, returns nothing. Every figure in
-  this document was read off a real cluster or a real device.
-- **Zero console errors in the tested surface.** The one console line that
-  appears on a failed read is `__DEV__`-gated and cannot reach a release build.
-- **Failure states were induced, not simulated.** Rate limiting, an
-  unreachable rpc, a node that has fallen behind and a partial ledger were all
-  produced with a real http proxy in front of the validator, reached by
-  re-pointing `adb reverse`. The app was never modified to fail.
+- **Zero mocks, zero stubs.** A sweep for `mock|stub|fake|dummy|TODO|FIXME` across
+  `programs/polaris/src`, `mobile/src`, `mobile/app`, `keeper-solana/src`,
+  `apps/gateway/src` and `packages/sdk-solana/src`, excluding tests, returns
+  nothing. Every figure in this document was read off a real cluster, a real
+  browser or a real device.
+- **Zero console errors in the tested surface.** Verified on a fresh tab, whose
+  buffer holds only that page's own output.
+- **Failure states were induced, not simulated.** Rate limiting, an unreachable
+  rpc, a node that has fallen behind and a partial ledger were produced with a
+  real http proxy in front of the validator. The app was never modified to fail.
 
-## Scope
+## Scope## Scope
 
 **In scope — the Solana project.**
 
@@ -388,6 +394,29 @@ Android intent with `am start`, not by calling a function.
 | PASS | O6 | The header describes what is happening | "Confirm this payment" whenever there is a payment, however it arrived |
 | PASS | O7 | A code is acted on once | Paying and tapping Done does not put the finished payment back on screen offering to pay it again |
 | PASS | O8 | One screen per code | A code opens a single scan screen; a second mount would find the slot emptied by the first and show the camera instead |
+
+## P. The browser as its own platform
+
+Added after driving the web build rather than reading it. Each item is checked in
+a real browser against a live validator, with the console and network panel read
+on every one.
+
+| Status | # | Item | Correct means |
+|---|---|---|---|
+| PASS | P1 | The web build signs for real | A plan, a subscription and a scan-to-pay all produce confirmed signatures from a signer the browser generated for itself |
+| PASS | P2 | Leaving the scanner always works | Opened directly by url — the documented web entry — the close control returns to the credit line, rather than no-opping on a single-entry stack and stranding the borrower on a payment card |
+| PASS | P3 | Cancel means scan again, and says so | Cancel on the review card returns to scanning; it is not a second close button |
+| PASS | P4 | A request parameter survives re-parsing | Re-reading the code after Cancel refetches the checkout with every parameter intact — no 400 from a url that lost its amount |
+| PASS | P5 | A confirmation timeout is not called a refusal | The one failure where money may already have moved says so, names the signature, and never claims nothing was charged |
+| PASS | P6 | A retry is the same order, not a new one | The order reference belongs to the purchase; retrying after an unreadable failure meets the program's duplicate refusal instead of opening a second loan |
+| PASS | P7 | The error ladder runs outside the app | Explaining a failure never throws for want of a bundler global |
+| PASS | P8 | The score arc matches the score | The rendered arc's fill equals `(score − 300) / 550` — measured, not eyeballed |
+| PASS | P9 | Every figure on screen matches chain | Score, available, limit, collateral, owed and the next instalment all equal the fetched accounts |
+| PASS | P10 | A dead rpc is an error state, not a hang | "Could not reach the network · Check the RPC endpoint is running · Try again", with the tabs still usable |
+| PASS | P11 | No socket storm against a dead cluster | An unreachable cluster opens no subscription at all, rather than reconnecting forever and logging an empty error each time |
+| PASS | P12 | Live updates still arrive when the cluster is healthy | A keeper collection moves the page with nobody touching it, and the notice names the amount |
+| UNTESTED | P13 | A third-party merchant without CORS | A browser cannot read a cross-origin response that sends no `access-control-allow-origin`, so a 404 from such a merchant is indistinguishable from an unreachable one. Needs a merchant endpoint outside this repository |
+| UNTESTED | P14 | Camera denied vs no camera present | `expo-camera` reports both as denied on web, so the two cannot be told apart from inside the app. Needs a machine with no webcam to confirm the wording |
 
 ## G. Out of scope — recorded, not tested
 
