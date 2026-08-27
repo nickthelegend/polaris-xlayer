@@ -262,6 +262,66 @@ export async function withdrawCollateral(amount: number): Promise<ActionResult> 
 }
 
 /**
+ * Pay a plan off early.
+ *
+ * Interest is annualised and pro-rated over the elapsed term, so settling on
+ * day nine of a ninety-day plan costs nine days of interest — a real saving
+ * the program already computes and the app previously gave no way to take.
+ * Both screens told a refused borrower to "repay a plan"; neither offered a
+ * button that did it.
+ */
+export async function repayLoan(loanId: number, amount: number): Promise<ActionResult> {
+  const signature = await getProgram()
+    .methods.repay(new BN(amount))
+    .accountsPartial({
+      borrower: getPublicKey(),
+      protocol: pdas.protocol,
+      profile: pdas.profileOf(getPublicKey()),
+      loan: pdas.loanOf(loanId),
+      borrowerTokenAccount: getTokenAccount(),
+      liquidityVault: pdas.liquidityVault,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    })
+    .rpc();
+  return { signature };
+}
+
+/**
+ * Cancel a subscription.
+ *
+ * The subscribe screen promises "you can cancel at any time without the
+ * merchant's agreement", and the plans screen repeats it. That is true of the
+ * program — `cancel_subscription` takes the subscriber's signature and does not
+ * consult the merchant — and it was not true of the app, which offered no way
+ * to do it. A standing authorization you cannot revoke from the thing that
+ * granted it is the exact fear this product exists to answer.
+ */
+export async function cancelSubscription(params: {
+  /**
+   * The plan's id, not an address.
+   *
+   * A subscription row carries `address` for the *Subscription* account, and
+   * passing that as the plan gets AccountDiscriminatorMismatch — Anchor
+   * checking a Subscription against the Plan layout. The id is unambiguous and
+   * both PDAs derive from it.
+   */
+  planId: number;
+  merchant: PublicKey;
+}): Promise<ActionResult> {
+  const plan = pdas.planOf(params.planId);
+  const signature = await getProgram()
+    .methods.cancelSubscription()
+    .accountsPartial({
+      signer: getPublicKey(),
+      merchant: params.merchant,
+      plan,
+      subscription: pdas.subOf(getPublicKey(), plan),
+    })
+    .rpc();
+  return { signature };
+}
+
+/**
  * Turn a program error into something a borrower can act on.
  *
  * Anchor puts the error name in the logs; the raw message is a hex code and a

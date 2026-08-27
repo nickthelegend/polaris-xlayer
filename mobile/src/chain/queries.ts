@@ -330,10 +330,35 @@ export async function fetchActivity(limit = 25): Promise<ActivityEvent[]> {
 
   if (!sigs.length) return [];
 
-  const txs = await getConnection().getTransactions(
-    sigs.map((s) => s.signature),
-    { maxSupportedTransactionVersion: 0, commitment: "confirmed" },
-  );
+  /*
+   * Fetched in small batches, and never fatally.
+   *
+   * `getTransactions` is one JSON-RPC batch, and a public cluster rate-limits
+   * it by the number of calls inside — thirty signatures at once returns "Too
+   * many requests for a specific RPC call". That rejection used to propagate
+   * out of the `Promise.all` this sits in and take the credit line, the plans
+   * and the balances down with it, so a successful repayment left the screen
+   * showing stale figures and an error.
+   *
+   * The feed is the one read on that list nobody needs in order to see their
+   * money. A batch that fails is dropped and the rest of the feed still
+   * renders.
+   */
+  const BATCH = 8;
+  const txs: any[] = [];
+  for (let i = 0; i < sigs.length; i += BATCH) {
+    const slice = sigs.slice(i, i + BATCH).map((s) => s.signature);
+    try {
+      const batch = await getConnection().getTransactions(slice, {
+        maxSupportedTransactionVersion: 0,
+        commitment: "confirmed",
+      });
+      txs.push(...batch);
+    } catch {
+      // Rate-limited or unreachable. Those rows are missing from the feed,
+      // which is a smaller lie than an empty screen.
+    }
+  }
 
   const out: ActivityEvent[] = [];
 
@@ -373,7 +398,7 @@ export async function fetchActivity(limit = 25): Promise<ActivityEvent[]> {
      * The instruction name is not a proxy. `Repay` is borrower-signed by
      * construction; `CollectInstallment` is the permissionless keeper path.
      */
-    const byKeeper = tx.meta.logMessages.some((l) =>
+    const byKeeper = tx.meta.logMessages.some((l: string) =>
       l.includes("Instruction: CollectInstallment"),
     );
 

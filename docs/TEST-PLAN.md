@@ -286,6 +286,24 @@ and must never import a native module on a platform that cannot load it.
 | L9 | Double approve | Four rapid taps open exactly one loan |
 | L10 | Re-scan a paid order | "That order has already been paid." |
 
+
+## M. The actions the app used to only talk about
+
+Three instructions the program, the SDK and the tests all had, that the product
+named in its own copy and could not perform. Each one is a promise the app was
+making and breaking.
+
+| # | Item | Correct means |
+|---|---|---|
+| M1 | Lock collateral | Locking 50 moves the limit from 200 to 275 — the base plus 150% of the lock — and the profile reads 50.000000 on chain |
+| M2 | Withdraw refused while owing | "You still owe on a plan. Repay it before withdrawing collateral." — never the identifier `DebtOutstanding` |
+| M3 | Withdraw allowed when clear | Returns the stablecoin and drops the limit back |
+| M4 | Settle a plan early | The plan reads "4 of 4 collected · REPAID", debt falls by exactly what was owed, and the score rises with an on-time payment recorded |
+| M5 | Settle is idempotent under a double tap | Three rapid taps repay once, not three times |
+| M6 | Cancel a subscription | Status becomes `cancelled` on chain and the row says so — the app's own promise, "cancel at any time without the merchant's agreement", kept |
+| M7 | Cancel is idempotent under a double tap | Two rapid taps cancel once |
+| M8 | Every program error has words | All 29 errors in the IDL map to a sentence; nothing can put a raw identifier on screen |
+
 ## G. Out of scope — recorded, not tested
 
 | # | Item | Blocker |

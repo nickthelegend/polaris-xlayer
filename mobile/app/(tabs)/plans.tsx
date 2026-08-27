@@ -1,5 +1,5 @@
 import { failed, press, selected, succeeded, tap } from "../../src/lib/haptics";
-import React, { useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, {
   LinearTransition,
@@ -9,16 +9,20 @@ import Animated, {
 import { enterFade, enterUp } from "../../src/components/motion";
 
 import {
-  Empty, ErrorState, Figure, Label, Loading, ProgressBar, Rule, ScheduleTimeline, Screen, StatusPill, Surface, Text, type Installment
+  Button, Empty, ErrorState, Figure, Label, Loading, ProgressBar, Rule, ScheduleTimeline, Screen, StatusPill, Surface, Text, type Installment
 } from "../../src/components";
+import { cancelSubscription, describeError, repayLoan } from "../../src/chain/actions";
 import { usePolaris } from "../../src/chain/provider";
 import {
+  USDC,
   installmentDueAt,
   outstanding,
   plural,
   thresholdFor,
 } from "../../src/chain/math";
 import type { Loan, Plan } from "../../src/chain/queries";
+import { PublicKey } from "@solana/web3.js";
+
 import { ink, motion, palette, radius, space } from "../../src/theme";
 
 /**
@@ -62,8 +66,55 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
-function LoanCard({ loan, index }: { loan: Loan; index: number }) {
+/**
+ * Running one chain action from a card, with the guard every other one has.
+ *
+ * The lock is a ref rather than state: a second tap runs the handler again
+ * before React re-renders, which is how this app once opened two loans for one
+ * purchase.
+ */
+function useCardAction(refresh: () => Promise<void>) {
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ ok: boolean; message: string } | null>(null);
+  const inFlight = useRef(false);
+
+  const run = useCallback(
+    async (work: () => Promise<unknown>, done: string) => {
+      if (inFlight.current) return;
+      inFlight.current = true;
+      setBusy(true);
+      setNote(null);
+      try {
+        await work();
+        setNote({ ok: true, message: done });
+        succeeded();
+        await refresh();
+      } catch (e: any) {
+        setNote({ ok: false, message: await describeError(e) });
+        failed();
+      } finally {
+        inFlight.current = false;
+        setBusy(false);
+      }
+    },
+    [refresh],
+  );
+
+  return { busy, note, run };
+}
+
+function LoanCard({
+  loan,
+  index,
+  refresh,
+}: {
+  loan: Loan;
+  index: number;
+  refresh: () => Promise<void>;
+}) {
   const [open, setOpen] = useState(loan.status === "active" && index === 0);
+  const { busy, note, run } = useCardAction(refresh);
+  const owed = outstanding(loan);
   const paidPct = loan.totalOwed === 0 ? 0 : loan.totalRepaid / loan.totalOwed;
 
   return (
@@ -152,6 +203,37 @@ function LoanCard({ loan, index }: { loan: Loan; index: number }) {
               Interest is annualised and pro-rated over the term, so a shorter
               plan costs proportionally less.
             </Text>
+
+            {/*
+              Settling early, from the card that quotes the saving.
+              
+              The checkout tells a refused borrower to "repay a plan" and this
+              card explains that a shorter term costs less — and until now
+              neither offered any way to act on it.
+            */}
+            {loan.status === "active" ? (
+              <>
+                {note ? (
+                  <Text
+                    variant="bodySmall"
+                    tone={note.ok ? "lime" : "danger"}
+                    style={{ marginTop: space.md }}
+                  >
+                    {note.message}
+                  </Text>
+                ) : null}
+                <Button
+                  label={`Settle ${(Math.floor((owed / USDC) * 100) / 100).toFixed(2)} now`}
+                  full
+                  loading={busy}
+                  disabled={busy}
+                  onPress={() =>
+                    run(() => repayLoan(loan.id, owed), "Settled. Interest stopped here.")
+                  }
+                  style={{ marginTop: space.lg }}
+                />
+              </>
+            ) : null}
           </Animated.View>
         ) : null}
       </Surface>
@@ -159,11 +241,20 @@ function LoanCard({ loan, index }: { loan: Loan; index: number }) {
   );
 }
 
-function PlanRow({ plan, index }: { plan: Plan; index: number }) {
+function PlanRow({
+  plan,
+  index,
+  refresh,
+}: {
+  plan: Plan;
+  index: number;
+  refresh: () => Promise<void>;
+}) {
   const days = Math.max(
     0,
     Math.round((plan.nextChargeAt - Date.now() / 1000) / 86_400),
   );
+  const { busy, note, run } = useCardAction(refresh);
   return (
     <Animated.View
       entering={enterUp(index)}
@@ -202,6 +293,46 @@ function PlanRow({ plan, index }: { plan: Plan; index: number }) {
           You can cancel at any time without the merchant's agreement. That is
           what makes the standing authorisation safe to grant.
         </Text>
+
+        {/*
+          And the button that makes the sentence above true.
+          
+          The program has always allowed it — `cancel_subscription` takes the
+          subscriber's signature and never consults the merchant — but the app
+          made the promise and offered no way to keep it. A standing
+          authorisation you cannot revoke from the thing that granted it is the
+          exact fear this product exists to answer.
+        */}
+        {note ? (
+          <Text
+            variant="bodySmall"
+            tone={note.ok ? "lime" : "danger"}
+            style={{ marginTop: space.md }}
+          >
+            {note.message}
+          </Text>
+        ) : null}
+
+        {plan.status === "active" ? (
+          <Button
+            label="Cancel this subscription"
+            variant="ghost"
+            full
+            loading={busy}
+            disabled={busy}
+            onPress={() =>
+              run(
+                () =>
+                  cancelSubscription({
+                    planId: plan.id,
+                    merchant: new PublicKey(plan.merchantPda),
+                  }),
+                "Cancelled. Nothing further will be charged.",
+              )
+            }
+            style={{ marginTop: space.lg }}
+          />
+        ) : null}
       </Surface>
     </Animated.View>
   );
@@ -262,7 +393,7 @@ export default function PlansScreen() {
         active.length || closed.length ? (
           <>
             {active.map((loan, i) => (
-              <LoanCard key={loan.address} loan={loan} index={i} />
+              <LoanCard key={loan.address} loan={loan} index={i} refresh={refresh} />
             ))}
             {closed.length ? (
               <>
@@ -270,7 +401,12 @@ export default function PlansScreen() {
                   Closed
                 </Label>
                 {closed.map((loan, i) => (
-                  <LoanCard key={loan.address} loan={loan} index={active.length + i} />
+                  <LoanCard
+                    key={loan.address}
+                    loan={loan}
+                    index={active.length + i}
+                    refresh={refresh}
+                  />
                 ))}
               </>
             ) : null}
@@ -283,7 +419,7 @@ export default function PlansScreen() {
         )
       ) : subscriptions.length ? (
         subscriptions.map((plan, i) => (
-          <PlanRow key={plan.address} plan={plan} index={i} />
+          <PlanRow key={plan.address} plan={plan} index={i} refresh={refresh} />
         ))
       ) : (
         <Empty
