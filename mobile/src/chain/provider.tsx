@@ -8,7 +8,7 @@ import { createDeviceSigner } from "./signing/deviceSigner";
 import { MWA_AVAILABLE, createMwaSigner } from "./signing/mwaSigner";
 import { chainIdFor, whyNoMwa } from "./signing/pure.ts";
 import type { ChainSigner, SignerKind } from "./signing/types.ts";
-import { usePolarisState, type PolarisState } from "./usePolaris";
+import { usePolarisState, type LiveChange, type PolarisState } from "./usePolaris";
 
 type Ctx = PolarisState & {
   refresh: () => Promise<void>;
@@ -22,6 +22,8 @@ type Ctx = PolarisState & {
   connecting: boolean;
   /** Why a wallet app is not on offer here, or null if it is. */
   walletUnavailable: string | null;
+  /** What the chain just changed on its own, or null. */
+  liveChange: LiveChange | null;
   /** Hand signing to a wallet app. Must be user-initiated. */
   connectWallet: () => Promise<void>;
   /** Give it back to the device key. */
@@ -119,6 +121,7 @@ export function PolarisProvider({ children }: { children: React.ReactNode }) {
   const value: Ctx = {
     ...base,
     refresh: state.refresh,
+    liveChange: state.liveChange,
     address: signer?.publicKey ?? null,
     signerKind: signer?.kind ?? null,
     signerLabel: signer?.label ?? null,

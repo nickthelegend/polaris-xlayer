@@ -12,3 +12,4 @@ export { ProgressBar } from "./ProgressBar";
 export { Screen } from "./Screen";
 export { Loading, ErrorState } from "./AsyncState";
 export { WalletRow } from "./WalletRow";
+export { LiveChange } from "./LiveChange";

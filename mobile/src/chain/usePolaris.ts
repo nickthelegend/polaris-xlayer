@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getConnection, getPublicKey, isReady } from "./client";
+import { describeChange, type LiveChange } from "./changes.ts";
+
+export type { LiveChange };
 import { pdas } from "./pdas";
 import {
   fetchActivity,
@@ -52,14 +55,32 @@ export type PolarisState =
 export function usePolarisState(
   /** Nothing is read until the signer is loaded from the device keystore. */
   ready: boolean,
-): PolarisState & { refresh: () => Promise<void> } {
+): PolarisState & { refresh: () => Promise<void>; liveChange: LiveChange | null } {
   const [state, setState] = useState<PolarisState>({
     status: "loading",
     data: null,
     error: null,
   });
+  const [liveChange, setLiveChange] = useState<LiveChange | null>(null);
+  const previous = useRef<{ profile: CreditProfile | null; loans: Loan[] } | null>(null);
 
-  const load = useCallback(async () => {
+  /*
+   * The notice is a moment, not a state — it clears itself.
+   *
+   * Thirty seconds. This is the one thing on the screen that appears without
+   * being asked for — a collection the borrower was not involved in — and the
+   * realistic case is a phone that was in a pocket when it happened. Seven
+   * seconds meant the only people who saw it were the ones already looking.
+   * Long enough to still be there when they glance down; short enough that it
+   * is plainly an event rather than a banner that lives on the screen.
+   */
+  useEffect(() => {
+    if (!liveChange) return;
+    const t = setTimeout(() => setLiveChange(null), 30_000);
+    return () => clearTimeout(t);
+  }, [liveChange]);
+
+  const load = useCallback(async (live = false) => {
     try {
       const [protocol, existing, loans, subscriptions, availablePlans, activity] =
         await Promise.all([
@@ -93,6 +114,17 @@ export function usePolarisState(
           if (__DEV__) console.warn("[polaris] underwriting unavailable:", e?.message ?? e);
         }
       }
+
+      /*
+       * Only diff when the chain woke us. A manual refresh is the user asking
+       * for the latest, and telling them what changed since they asked is
+       * noise.
+       */
+      if (live) {
+        const change = describeChange(previous.current, profile, loans, Date.now());
+        if (change) setLiveChange(change);
+      }
+      previous.current = { profile, loans };
 
       setState({
         status: "ready",
@@ -185,7 +217,7 @@ export function usePolarisState(
            */
           if (timer) clearTimeout(timer);
           timer = setTimeout(() => {
-            if (!cancelled) void load();
+            if (!cancelled) void load(true);
           }, 400);
         },
         { commitment: "confirmed" },
@@ -205,7 +237,10 @@ export function usePolarisState(
     };
   }, [ready, load]);
 
-  return useMemo(() => ({ ...state, refresh: load }), [state, load]);
+  return useMemo(
+    () => ({ ...state, refresh: () => load(false), liveChange }),
+    [state, load, liveChange],
+  );
 }
 
 /** The derived credit line, or nulls while there is nothing to derive it from. */

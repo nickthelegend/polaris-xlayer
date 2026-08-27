@@ -13,6 +13,7 @@ import {
   ErrorState,
   Figure,
   Label,
+  LiveChange,
   Loading,
   ProgressBar,
   Rule,
@@ -78,7 +79,7 @@ export default function CreditScreen() {
   const orbSize = Math.round(
     Math.max(150, Math.min(252, width * 0.68, height * 0.30)),
   );
-  const { status, data, error, refresh, address } = usePolaris();
+  const { status, data, error, refresh, address, liveChange } = usePolaris();
   const line = useCreditLine(data);
 
   const [collateralBusy, setCollateralBusy] = useState<"lock" | "withdraw" | null>(null);
@@ -192,6 +193,8 @@ export default function CreditScreen() {
           Showing the last good read — {error}
         </Text>
       ) : null}
+
+      <LiveChange change={liveChange} />
 
       <View style={styles.orbWrap}>
         <CreditOrb score={profile.score} size={orbSize} />
