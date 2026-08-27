@@ -139,14 +139,14 @@ export default function PayScreen() {
 
   if (status === "loading") {
     return (
-      <Screen eyebrow="Checkout" title="Pay">
+      <Screen eyebrow="Checkout" title="Pay" onRefresh={refresh}>
         <Loading label="Reading your credit line" />
       </Screen>
     );
   }
   if (!data || !line) {
     return (
-      <Screen eyebrow="Checkout" title="Pay">
+      <Screen eyebrow="Checkout" title="Pay" onRefresh={refresh}>
         <ErrorState message={error ?? "No data returned."} onRetry={refresh} />
       </Screen>
     );
@@ -245,7 +245,7 @@ export default function PayScreen() {
   };
 
   return (
-    <Screen eyebrow="Checkout" title="Pay">
+    <Screen eyebrow="Checkout" title="Pay" onRefresh={refresh}>
       <Animated.View style={shakeStyle}>
         <Surface padded={22} style={{ marginBottom: space.xl }}>
           <Label>Amount</Label>

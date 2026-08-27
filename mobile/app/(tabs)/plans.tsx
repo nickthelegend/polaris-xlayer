@@ -346,14 +346,14 @@ export default function PlansScreen() {
 
   if (status === "loading") {
     return (
-      <Screen eyebrow="What you owe" title="Plans">
+      <Screen eyebrow="What you owe" title="Plans" onRefresh={refresh}>
         <Loading label="Reading your plans" />
       </Screen>
     );
   }
   if (!data) {
     return (
-      <Screen eyebrow="What you owe" title="Plans">
+      <Screen eyebrow="What you owe" title="Plans" onRefresh={refresh}>
         <ErrorState message={error ?? "No data returned."} onRetry={refresh} />
       </Screen>
     );

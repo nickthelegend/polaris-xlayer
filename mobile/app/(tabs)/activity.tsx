@@ -100,14 +100,14 @@ export default function ActivityScreen() {
 
   if (status === "loading") {
     return (
-      <Screen eyebrow="Every movement of money" title="Activity">
+      <Screen eyebrow="Every movement of money" title="Activity" onRefresh={refresh}>
         <Loading label="Reading the ledger" />
       </Screen>
     );
   }
   if (!data) {
     return (
-      <Screen eyebrow="Every movement of money" title="Activity">
+      <Screen eyebrow="Every movement of money" title="Activity" onRefresh={refresh}>
         <ErrorState message={error ?? "No data returned."} onRetry={refresh} />
       </Screen>
     );

@@ -1,11 +1,19 @@
-import React from "react";
-import { ScrollView, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
+import React, { useCallback, useState } from "react";
+import {
+  RefreshControl,
+  ScrollView,
+  StyleProp,
+  StyleSheet,
+  View,
+  ViewStyle,
+} from "react-native";
 import Animated from "react-native-reanimated";
 
 import { enterFade, enterUpAfter } from "./motion";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { palette, space } from "../theme";
+import { tap } from "../lib/haptics";
 import { AmbientBackground } from "./AmbientBackground";
 import { Label, Text } from "./Text";
 
@@ -27,6 +35,7 @@ export function Screen({
   children,
   scroll = true,
   contentStyle,
+  onRefresh,
 }: {
   eyebrow?: string;
   title?: string;
@@ -35,8 +44,29 @@ export function Screen({
   children: React.ReactNode;
   scroll?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
+  /**
+   * Pull down to re-read the chain.
+   *
+   * Every screen here is a view of on-chain state, and the gesture people
+   * already try on one is the gesture that should work. Passing this in rather
+   * than reaching for the context keeps `Screen` unaware of what it is
+   * refreshing.
+   */
+  onRefresh?: () => Promise<void>;
 }) {
   const insets = useSafeAreaInsets();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const pull = useCallback(async () => {
+    if (!onRefresh || refreshing) return;
+    setRefreshing(true);
+    tap();
+    try {
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [onRefresh, refreshing]);
 
   const head =
     title || eyebrow ? (
@@ -101,6 +131,17 @@ export function Screen({
         },
       ]}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        onRefresh ? (
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={pull}
+            tintColor={palette.primary}
+            colors={[palette.primary]}
+            progressBackgroundColor={palette.card}
+          />
+        ) : undefined
+      }
     >
       {head}
       {body}

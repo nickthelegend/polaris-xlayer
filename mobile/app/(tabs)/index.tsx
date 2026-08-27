@@ -125,7 +125,7 @@ export default function CreditScreen() {
 
   if (status === "loading") {
     return (
-      <Screen eyebrow="Your credit line" title="Polaris">
+      <Screen eyebrow="Your credit line" title="Polaris" onRefresh={refresh}>
         <Loading label="Reading your credit line" />
       </Screen>
     );
@@ -133,7 +133,7 @@ export default function CreditScreen() {
 
   if (!data) {
     return (
-      <Screen eyebrow="Your credit line" title="Polaris">
+      <Screen eyebrow="Your credit line" title="Polaris" onRefresh={refresh}>
         <ErrorState message={error ?? "No data returned."} onRetry={refresh} />
       </Screen>
     );
@@ -149,7 +149,7 @@ export default function CreditScreen() {
    */
   if (!data.profile || !line) {
     return (
-      <Screen eyebrow="Your credit line" title="Polaris">
+      <Screen eyebrow="Your credit line" title="Polaris" onRefresh={refresh}>
         <WalletRow address={address} />
         <Animated.View entering={enterUpAfter(80)}>
           <Surface padded={20} style={styles.unopened}>
@@ -186,7 +186,7 @@ export default function CreditScreen() {
         : [];
 
   return (
-    <Screen eyebrow="Your credit line" title="Polaris">
+    <Screen eyebrow="Your credit line" title="Polaris" onRefresh={refresh}>
       {error ? (
         <Text variant="bodySmall" tone="danger" style={styles.stale}>
           Showing the last good read — {error}

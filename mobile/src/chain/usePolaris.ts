@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { getPublicKey, isReady } from "./client";
+import { getConnection, getPublicKey, isReady } from "./client";
+import { pdas } from "./pdas";
 import {
   fetchActivity,
   fetchAvailablePlans,
@@ -114,10 +115,25 @@ export function usePolarisState(
       // Development only. A caught error that survives as a sentence is
       // untraceable on a device; a production build should not print stacks.
       if (__DEV__) console.error("[polaris] chain read failed:", e?.stack ?? e);
-      const message =
-        e?.message?.includes("fetch") || e?.message?.includes("Failed to fetch")
+      const raw = String(e?.message ?? e);
+      /*
+       * Never the RPC's own body.
+       *
+       * A rate-limited public cluster answers with a JSON-RPC envelope, and
+       * that envelope — braces, error code, request id and all — was being
+       * printed on the screen under "Could not reach the network". Each of
+       * these is a real thing that happens to this app on a shared endpoint,
+       * and each gets a sentence.
+       */
+      const message = /429|too many requests/i.test(raw)
+        ? "The network is rate limiting us. Your position is safe on chain — try again in a moment."
+        : /failed to fetch|network request failed|econnrefused/i.test(raw)
           ? "Cannot reach the network. Check the RPC endpoint is running."
-          : (e?.message ?? String(e));
+          : /timed out|timeout/i.test(raw)
+            ? "The network took too long to answer. Try again."
+            : raw.length <= 120 && !raw.includes("{")
+              ? raw
+              : "Could not read your position just now. Try again in a moment.";
       setState((prev) => ({ status: "error", data: prev.data, error: message }));
     }
   }, []);
@@ -133,6 +149,60 @@ export function usePolarisState(
      * app recovers from on its own a moment later.
      */
     if (ready && isReady()) void load();
+  }, [ready, load]);
+
+  /*
+   * Watch the borrower's own profile, and re-read when it moves.
+   *
+   * This is the whole argument of the product made visible. A keeper collects
+   * an installment with the borrower offline and nothing of theirs involved —
+   * so the only honest way to show that is for the screen to change while
+   * nobody is touching it. Polling would do it too, badly; `accountSubscribe`
+   * is a socket the cluster pushes to.
+   *
+   * The profile is the right account to watch rather than each loan: every
+   * event that matters to a borrower — a collection, a repayment, a score
+   * change, collateral moving — writes to it.
+   */
+  useEffect(() => {
+    if (!ready || !isReady()) return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let id: number | null = null;
+
+    try {
+      const connection = getConnection();
+      const profile = pdas.profileOf(getPublicKey());
+      id = connection.onAccountChange(
+        profile,
+        () => {
+          /*
+           * Debounced. One transaction can write the profile more than once —
+           * a repayment touches the debt and the score — and each write
+           * arrives as its own notification. Re-reading the whole position
+           * per notification would fire several overlapping loads.
+           */
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => {
+            if (!cancelled) void load();
+          }, 400);
+        },
+        { commitment: "confirmed" },
+      );
+    } catch (e: any) {
+      // A socket that cannot open is not a reason to fail the screen; the app
+      // simply goes back to updating when asked.
+      if (__DEV__) console.warn("[polaris] live updates unavailable:", e?.message ?? e);
+    }
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      if (id !== null) {
+        void getConnection().removeAccountChangeListener(id).catch(() => {});
+      }
+    };
   }, [ready, load]);
 
   return useMemo(() => ({ ...state, refresh: load }), [state, load]);
