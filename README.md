@@ -299,11 +299,21 @@ cannot move the clock can only test origination.
 | Android | native dev build, running on an emulator against devnet |
 | Size | 593 KB, clean SBF build |
 
-Devnet carries the current build, an initialised protocol, a funded pool and a
-real plan opened against it. One command puts it there, or confirms it:
+Devnet carries the current build, an initialised protocol, a funded pool, and
+all three payment modes exercised against it from the app: a purchase paid in
+full, a purchase split into four, and a subscription with its first period
+charged — plus collateral locked and the credit limit moving from 200 to 275
+because of it. One command puts a deployment there, or confirms one:
 
 ```bash
 POLARIS_CLUSTER=devnet pnpm exec tsx scripts/prove.ts
+```
+
+`prove.ts` covers the credit line and an installment plan. For the third mode,
+put a subscription plan on the deployment too:
+
+```bash
+POLARIS_CLUSTER=devnet pnpm exec tsx scripts/devnet-plan.ts
 ```
 
 `prove.ts` initialises the protocol, funds the pool and opens a real plan

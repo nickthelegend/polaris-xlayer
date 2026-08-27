@@ -10,7 +10,7 @@ import {
   TOKEN_PROGRAM_ID,
   createApproveInstruction,
 } from "@solana/spl-token";
-import { PublicKey, Transaction } from "@solana/web3.js";
+import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { Buffer } from "buffer";
 
 import { getProgram, getProvider, getPublicKey, getTokenAccount } from "./client";
@@ -218,6 +218,50 @@ export async function subscribeToPlan(params: {
 }
 
 /**
+ * Lock stablecoin as collateral, raising the credit limit.
+ *
+ * The app displayed a collateral figure and told a refused borrower to "lock
+ * collateral to raise the limit" without offering any way to do it — a screen
+ * naming an action the product could not perform. The instruction, the SDK and
+ * the tests all had it; only the app did not.
+ *
+ * Collateral is not a payment. It stays the borrower's, sits in a vault held
+ * apart from lending liquidity, and comes back out with `withdrawCollateral`
+ * once nothing is owed against it.
+ */
+export async function lockCollateral(amount: number): Promise<ActionResult> {
+  const signature = await getProgram()
+    .methods.lockCollateral(new BN(amount))
+    .accountsPartial({
+      user: getPublicKey(),
+      protocol: pdas.protocol,
+      profile: pdas.profileOf(getPublicKey()),
+      from: getTokenAccount(),
+      collateralVault: pdas.collateralVault,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    })
+    .rpc();
+  return { signature };
+}
+
+/** Take it back. The program refuses while it is still backing a debt. */
+export async function withdrawCollateral(amount: number): Promise<ActionResult> {
+  const signature = await getProgram()
+    .methods.withdrawCollateral(new BN(amount))
+    .accountsPartial({
+      user: getPublicKey(),
+      protocol: pdas.protocol,
+      profile: pdas.profileOf(getPublicKey()),
+      collateralVault: pdas.collateralVault,
+      to: getTokenAccount(),
+      tokenProgram: TOKEN_PROGRAM_ID,
+    })
+    .rpc();
+  return { signature };
+}
+
+/**
  * Turn a program error into something a borrower can act on.
  *
  * Anchor puts the error name in the logs; the raw message is a hex code and a
@@ -249,6 +293,38 @@ export function explainError(e: any): string {
     InvalidInterval: "That schedule is outside what the protocol allows.",
     ZeroAmount: "Enter an amount above zero.",
     AlreadySubscribed: "You already have a live subscription to this plan.",
+
+    /*
+     * The rest of the program's errors.
+     *
+     * Twenty of twenty-nine had no sentence, and the fallback below returned
+     * the raw identifier — so withdrawing collateral against an open plan told
+     * the borrower "DebtOutstanding". Every one of these is reachable from a
+     * screen, so every one gets words.
+     */
+    DebtOutstanding: "You still owe on a plan. Repay it before withdrawing collateral.",
+    InsufficientCollateral: "That is more collateral than you have locked.",
+    LoanNotActive: "That plan is already closed.",
+    NotLiquidatable: "That plan is not overdue enough to liquidate.",
+    PlanNotActive: "That subscription plan is no longer offered.",
+    SubscriptionNotActive: "That subscription is not running.",
+    NotDue: "That charge is not due yet.",
+    NotAuthorized: "This account is not allowed to do that.",
+    InvalidPeriod: "That billing period is outside what the protocol allows.",
+    MathOverflow: "That amount is too large for the protocol to handle.",
+    StringTooLong: "That name is too long.",
+    TokenOwnerMismatch: "That token account belongs to somebody else.",
+    MintMismatch: "That account holds a different token than this deployment uses.",
+    AlreadyUnderwritten: "This wallet already has a credit line.",
+    NotUnderwriter: "Only the underwriter can open a credit line.",
+    EvidenceStale: "That credit check went stale. Try again.",
+    EvidenceFromTheFuture: "That credit check is timestamped wrong. Try again.",
+
+    // Set once at initialization, so a borrower can never see these — mapped
+    // anyway, because the alternative is a bare identifier on a screen.
+    InvalidGracePeriod: "This deployment is misconfigured.",
+    InvalidFee: "This deployment is misconfigured.",
+    InvalidMultiplier: "This deployment is misconfigured.",
   };
   if (code && map[code]) return map[code];
   if (/already in use/i.test(text)) return "That order has already been paid.";
@@ -267,7 +343,19 @@ export function explainError(e: any): string {
   if (/failed to fetch|network request failed|ECONNREFUSED/i.test(text)) {
     return "Cannot reach the network. Check the RPC endpoint is running.";
   }
-  if (code) return code;
+  /*
+   * Never the bare identifier.
+   *
+   * `return code` put things like "DebtOutstanding" on the screen — a symbol
+   * from the program's source, shown to somebody trying to move their money.
+   * Anything that reaches here is an error the map has not been taught yet,
+   * and a sentence that admits that is better than a token that explains
+   * nothing.
+   */
+  if (code) {
+    if (__DEV__) console.error(`[polaris] unmapped program error: ${code}`, e);
+    return "The program refused that. Nothing was charged.";
+  }
 
   /*
    * Last resort, and the reason it is not just `e.message`.

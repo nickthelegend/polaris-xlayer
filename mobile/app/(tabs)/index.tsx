@@ -1,7 +1,9 @@
 import { useRouter } from "expo-router";
+import { useCallback, useRef, useState } from "react";
 import { StyleSheet, useWindowDimensions, View } from "react-native";
 import Animated from "react-native-reanimated";
 
+import { describeError, lockCollateral, withdrawCollateral } from "../../src/chain/actions";
 import { usePolaris } from "../../src/chain/provider";
 import { nextCollection, useCreditLine } from "../../src/chain/usePolaris";
 import { USDC, nextBand } from "../../src/chain/math";
@@ -78,6 +80,48 @@ export default function CreditScreen() {
   );
   const { status, data, error, refresh, address } = usePolaris();
   const line = useCreditLine(data);
+
+  const [collateralBusy, setCollateralBusy] = useState<"lock" | "withdraw" | null>(null);
+  const [collateralNote, setCollateralNote] = useState<{ ok: boolean; message: string } | null>(
+    null,
+  );
+  /*
+   * The same synchronous lock the checkout needs. React state is not one: a
+   * second tap runs this again before the re-render and sends a second
+   * transaction against the same balance.
+   */
+  const collateralInFlight = useRef(false);
+
+  const moveCollateral = useCallback(
+    async (direction: "lock" | "withdraw", amount: number) => {
+      if (collateralInFlight.current) return;
+      if (amount <= 0) {
+        setCollateralNote({ ok: false, message: "There is nothing locked to withdraw." });
+        return;
+      }
+      collateralInFlight.current = true;
+      setCollateralBusy(direction);
+      setCollateralNote(null);
+      try {
+        if (direction === "lock") await lockCollateral(amount);
+        else await withdrawCollateral(amount);
+        setCollateralNote({
+          ok: true,
+          message:
+            direction === "lock"
+              ? `Locked ${(amount / USDC).toFixed(2)} USDC. Your limit has gone up.`
+              : `Withdrew ${(amount / USDC).toFixed(2)} USDC.`,
+        });
+        await refresh();
+      } catch (e: any) {
+        setCollateralNote({ ok: false, message: await describeError(e) });
+      } finally {
+        collateralInFlight.current = false;
+        setCollateralBusy(null);
+      }
+    },
+    [refresh],
+  );
 
   if (status === "loading") {
     return (
@@ -299,6 +343,57 @@ export default function CreditScreen() {
         />
       </Animated.View>
 
+      {/*
+        Locking collateral, from the screen that talks about it.
+
+        The tile above has always shown a collateral figure and the refusal on
+        the checkout tells a borrower to "lock collateral to raise the limit" —
+        with nowhere in the app to do it. The instruction, the SDK and the
+        tests all had it; only the product did not.
+      */}
+      <Animated.View entering={enterUpAfter(340)}>
+        <Surface padded={18} style={styles.card}>
+          <View style={styles.rowBetween}>
+            <Label>Collateral</Label>
+            <Text variant="label" tone="soft">
+              Adds {Math.round(data.protocol.creditMultiplierBps / 100)}% of what you lock
+            </Text>
+          </View>
+          <Text variant="bodySmall" tone="soft" style={{ marginTop: space.sm }}>
+            Locked stablecoin stays yours. It sits in a vault kept apart from
+            lending liquidity and comes back out once nothing is owed against it.
+          </Text>
+
+          {collateralNote ? (
+            <Text
+              variant="bodySmall"
+              tone={collateralNote.ok ? "lime" : "danger"}
+              style={{ marginTop: space.md }}
+            >
+              {collateralNote.message}
+            </Text>
+          ) : null}
+
+          <View style={styles.collateralRow}>
+            <Button
+              label="Lock 50"
+              onPress={() => moveCollateral("lock", 50 * USDC)}
+              loading={collateralBusy === "lock"}
+              disabled={collateralBusy !== null}
+              style={{ flex: 1 }}
+            />
+            <Button
+              label="Withdraw all"
+              variant="ghost"
+              onPress={() => moveCollateral("withdraw", profile.lockedCollateral)}
+              disabled={collateralBusy !== null || profile.lockedCollateral === 0}
+              loading={collateralBusy === "withdraw"}
+              style={{ flex: 1 }}
+            />
+          </View>
+        </Surface>
+      </Animated.View>
+
       <Animated.View entering={enterUpAfter(370)}>
         <Button
           label="Pay with Polaris"
@@ -312,6 +407,7 @@ export default function CreditScreen() {
 }
 
 const styles = StyleSheet.create({
+  collateralRow: { flexDirection: "row", gap: space.md, marginTop: space.lg },
   unopened: { marginTop: space.lg, gap: space.md },
   unopenedBody: { marginTop: space.xs },
   reason: {
