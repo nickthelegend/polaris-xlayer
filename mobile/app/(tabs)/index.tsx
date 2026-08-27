@@ -24,7 +24,7 @@ import {
   WalletRow,
 } from "../../src/components";
 import { enterUpAfter } from "../../src/components/motion";
-import { ink, space } from "../../src/theme";
+import { ink, palette, space } from "../../src/theme";
 
 const relativeDays = (unix: number) => {
   const days = Math.round((unix - Date.now() / 1000) / 86_400);
@@ -170,7 +170,7 @@ export default function CreditScreen() {
     );
   }
 
-  const { profile, loans, underwriting } = data;
+  const { profile, loans, underwriting, delegation } = data;
   const next = nextCollection(loans);
   const band = nextBand(profile.score);
 
@@ -308,6 +308,39 @@ export default function CreditScreen() {
         </Animated.View>
       ) : null}
 
+      {/*
+        The one failure mode that is invisible until it bites.
+        
+        An SPL token account holds exactly one delegate and the allowance
+        decrements as each instalment is drawn, so a borrower who approves
+        another protocol, revokes by hand, or opens enough plans to exhaust it
+        stops being collectable — silently, until a charge fails and the plan
+        goes into dunning. The program refuses in that state, which is correct
+        and far too late to be the first anyone hears of it.
+      */}
+      {delegation && (!delegation.toProtocol || delegation.shortfall > 0) ? (
+        <Animated.View entering={enterUpAfter(150)}>
+          <Surface padded={18} style={styles.warning}>
+            <Label>
+              {delegation.toProtocol ? "Authorisation runs short" : "Authorisation revoked"}
+            </Label>
+            <Text variant="bodySmall" tone="soft" style={{ marginTop: space.sm }}>
+              {delegation.toProtocol
+                ? `Your plans are covered for ${(delegation.remaining / USDC).toFixed(2)} but ` +
+                  `owe ${(delegation.owed / USDC).toFixed(2)}. The next collection short ` +
+                  `by ${(delegation.shortfall / USDC).toFixed(2)} will fail and the plan ` +
+                  `will go into dunning.`
+                : "Polaris can no longer draw from this account, so nothing on your open " +
+                  "plans can be collected. They will fall into dunning until it is restored."}
+            </Text>
+            <Text variant="bodySmall" tone="faint" style={{ marginTop: space.sm }}>
+              Opening any new plan re-authorises against everything you owe, which
+              fixes this.
+            </Text>
+          </Surface>
+        </Animated.View>
+      ) : null}
+
       {reasons.length > 0 ? (
         <Animated.View entering={enterUpAfter(280)}>
           <Surface padded={18} style={styles.card}>
@@ -411,6 +444,11 @@ export default function CreditScreen() {
 
 const styles = StyleSheet.create({
   collateralRow: { flexDirection: "row", gap: space.md, marginTop: space.lg },
+  warning: {
+    marginBottom: space.lg,
+    borderWidth: 1,
+    borderColor: palette.destructive + "55",
+  },
   unopened: { marginTop: space.lg, gap: space.md },
   unopenedBody: { marginTop: space.xs },
   reason: {

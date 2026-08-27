@@ -605,3 +605,63 @@ export async function fetchActivity(
 
   return { events: out.sort((a, b) => b.at - a.at), partial };
 }
+
+/**
+ * Whether the protocol can still collect from this borrower.
+ *
+ * The single most Solana-specific risk in the whole book, and the app had no
+ * view of it. An SPL token account holds exactly one delegate, and the
+ * delegated amount decrements itself as each installment is drawn — so a
+ * borrower who approves another protocol, revokes by hand, or simply opens
+ * enough plans to exhaust the allowance stops being collectable, silently,
+ * until a charge fails.
+ *
+ * The program already refuses in that state (`NotDelegated`,
+ * `InsufficientDelegation`). Refusing is the right behaviour and a terrible
+ * first warning, because by then an installment is late.
+ */
+export type Delegation = {
+  /** False when the token account names no delegate, or names someone else. */
+  toProtocol: boolean;
+  /** What the delegate may still draw. Zero when there is no delegation. */
+  remaining: number;
+  /** Everything this borrower owes across every open plan. */
+  owed: number;
+  /** Short by this much, or 0 when the delegation covers the book. */
+  shortfall: number;
+};
+
+export async function fetchDelegation(owed: number): Promise<Delegation> {
+  const info = await getConnection().getAccountInfo(getTokenAccount());
+  if (!info) return { toProtocol: false, remaining: 0, owed, shortfall: owed };
+
+  /*
+   * Decoded by hand rather than through `getAccount`.
+   *
+   * The SPL layout is fixed and this needs four fields out of it; pulling the
+   * helper in would add a second token-program dependency to a module that is
+   * otherwise pure reads.
+   *
+   *   mint(32) owner(32) amount(8) delegateOption(4) delegate(32) state(1)
+   *   isNativeOption(4) isNative(8) delegatedAmount(8) closeAuthority(4+32)
+   *
+   * 165 bytes in total, and the whole account is required: `delegatedAmount`
+   * sits at 121, so a short read would decode a length check that passed into
+   * a number that means nothing.
+   */
+  const data = info.data;
+  if (data.length < 165) return { toProtocol: false, remaining: 0, owed, shortfall: owed };
+
+  const delegateSet = data.readUInt32LE(72) === 1;
+  const delegate = delegateSet ? new PublicKey(data.subarray(76, 108)) : null;
+  const delegatedAmount = delegateSet ? Number(data.readBigUInt64LE(121)) : 0;
+
+  const toProtocol = delegate?.equals(pdas.protocol) ?? false;
+  const remaining = toProtocol ? delegatedAmount : 0;
+  return {
+    toProtocol,
+    remaining,
+    owed,
+    shortfall: Math.max(0, owed - remaining),
+  };
+}

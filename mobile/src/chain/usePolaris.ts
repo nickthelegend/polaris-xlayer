@@ -11,8 +11,10 @@ import {
   fetchLoans,
   fetchProfile,
   fetchProtocol,
+  fetchDelegation,
   fetchSubscriptions,
   type ActivityEvent,
+  type Delegation,
   type CreditProfile,
   type Loan,
   type Plan,
@@ -34,6 +36,8 @@ export type ChainState = {
   activity: ActivityEvent[];
   /** True when the ledger could not be read in full — a rate-limited RPC. */
   activityPartial: boolean;
+  /** Whether the protocol can still collect. Null until the profile is known. */
+  delegation: Delegation | null;
 };
 
 export type PolarisState =
@@ -126,6 +130,16 @@ export function usePolarisState(
       }
       previous.current = { profile, loans };
 
+      /*
+       * Read after the profile, because it needs the debt to compare against —
+       * and skipped entirely for a borrower who owes nothing, where a
+       * delegation that does not cover zero is not news.
+       */
+      const delegation =
+        profile && profile.activeDebt > 0
+          ? await fetchDelegation(profile.activeDebt).catch(() => null)
+          : null;
+
       setState({
         status: "ready",
         data: {
@@ -137,6 +151,7 @@ export function usePolarisState(
           availablePlans,
           activity: activity.events,
           activityPartial: activity.partial,
+          delegation,
         },
         error: null,
       });
