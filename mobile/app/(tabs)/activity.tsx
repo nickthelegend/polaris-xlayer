@@ -113,7 +113,7 @@ export default function ActivityScreen() {
     );
   }
 
-  const { activity } = data;
+  const { activity, activityPartial } = data;
 
   return (
     <Screen
@@ -136,6 +136,21 @@ export default function ActivityScreen() {
           note="Collections, subscription charges and score changes all land here."
         />
       )}
+
+      {/*
+        Say when the ledger is incomplete.
+        
+        A public RPC rate-limits the transaction reads this feed is built from,
+        and the batches that fail are dropped so the rest still renders. Showing
+        a short feed with no explanation would be its own quiet lie — the reader
+        would think those payments never happened.
+      */}
+      {activityPartial ? (
+        <Text variant="bodySmall" tone="danger" style={styles.foot}>
+          Some of the ledger could not be read just now — the network is rate
+          limiting us. Nothing is missing on chain; pull to refresh.
+        </Text>
+      ) : null}
 
       <Text variant="bodySmall" tone="faint" style={styles.foot}>
         Collections are paid for by the keeper, so none of these cost you a

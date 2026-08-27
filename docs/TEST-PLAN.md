@@ -43,7 +43,7 @@ than marked pass.
 
 ## Result
 
-**140 of 142 in-scope items pass.** Two are recorded UNTESTED with the specific
+**148 of 150 in-scope items pass.** Two are recorded UNTESTED with the specific
 blocker rather than marked green.
 
 Run against **devnet** — the cluster the app ships pointed at — with a local
@@ -53,35 +53,41 @@ clock.
 | | |
 |---|---|
 | Tests | 120 on the Solana build, 235 on the EVM reference — all passing |
-| Clusters | Devnet live; a local validator for liquidation |
+| Clusters | Devnet live: 3 loans, 1 plan, a subscription cancelled, collateral locked and returned |
 | Console | Zero errors on every screen at 375, 768 and 1440 px |
-| Mocks | None. Three grep hits remain and all three are prose: two name a
-read-only provider's unused signer, one is a comment explaining why something
-is *not* a stub |
+| Mocks | None. Three grep hits remain and all three are prose |
 
 ### Untested, and why
 
 | # | Item | Blocker |
 |---|---|---|
-| K13 | A wallet actually signing | Needs a physical device with Phantom or Solflare installed. Everything up to the approval sheet is exercised: the intent fires, and a device with no wallet returns ERROR_WALLET_NOT_FOUND, which the app renders as a sentence. |
-| E-Android | Android re-check at HEAD | The emulator boots headless (`-no-window -gpu off -memory 2048`) and the app was verified on it against devnet. It has not been re-run after the last three commits, which touch the activity feed and two copy strings. |
+| K13 | A wallet actually signing | Needs a physical device with Phantom or Solflare. The intent fires and a device with no wallet returns ERROR_WALLET_NOT_FOUND, rendered as a sentence — the approval sheet itself has not been seen. |
+| G2-write | `apps/merchant` chain write | `DEPLOYER_PRIVATE_KEY` exists nowhere in the repository. Its pages, reads and error paths are verified; the write is unsignable. |
 
-### What running it against devnet found
+### What running it found
 
-Neither of these reproduces on a local validator, which is why neither had been
-seen before.
+The pattern worth naming: **auditing the IDL against the app found three
+instructions the product named in its own copy and could not perform.** The
+program, the SDK and the tests all had them.
 
-- **The activity feed linked every event to the wrong transaction.** It paired
-  `txs[i]` with `sigs[i]`, assuming a JSON-RPC batch returns in request order.
-  The spec allows any order and devnet returns them swapped, so a credit line
-  opened by one transaction was displayed — and linked on the explorer — under
-  the hash of an unrelated token transfer.
-- **The Solana Pay blockhash was `finalized`.** Already ~32 slots into its own
-  validity before anyone sees the code, and then a human has to read the terms
-  and decide. It expired mid-checkout, and the app blamed the transaction.
-- **Two empty states claimed the opposite of the truth.** With no subscription
-  plans on the deployment at all, the app said "You already subscribe to every
-  plan on offer" and the button read "Nothing left to subscribe to".
+- **Cancel a subscription.** Two screens promised "cancel at any time without
+  the merchant's agreement". There was no cancel button.
+- **Settle a plan early.** Two screens told a refused borrower to "repay a
+  plan". There was no repay button.
+- **Lock collateral.** The checkout said "lock collateral to raise the limit"
+  and the credit screen showed a collateral figure. There was nowhere to lock any.
+
+And from running it on a public cluster rather than a local validator:
+
+- **The activity feed linked events to the wrong transaction** — `txs[i]` paired
+  with `sigs[i]`, assuming a JSON-RPC batch returns in request order.
+- **The Solana Pay blockhash was `finalized`**, expiring mid-checkout.
+- **A rate-limited feed took down the whole screen**, because it shared a
+  `Promise.all` with the balances.
+- **Twenty of twenty-nine program errors had no sentence**, so withdrawing
+  collateral against an open plan said `DebtOutstanding`.
+- **Two empty states claimed the opposite of the truth** on a deployment with
+  no subscription plans.
 
 ## A. Program — origination and collection
 

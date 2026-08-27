@@ -308,7 +308,9 @@ function camelize<T = any>(value: any): T {
  * Two lookups are merged and deduplicated by signature, because a single
  * transaction usually touches both.
  */
-export async function fetchActivity(limit = 25): Promise<ActivityEvent[]> {
+export async function fetchActivity(
+  limit = 25,
+): Promise<{ events: ActivityEvent[]; partial: boolean }> {
   const sources = [pdas.profileOf(getPublicKey()), getTokenAccount()];
 
   const perSource = await Promise.all(
@@ -328,7 +330,7 @@ export async function fetchActivity(limit = 25): Promise<ActivityEvent[]> {
     .sort((a, b) => (b.blockTime ?? 0) - (a.blockTime ?? 0))
     .slice(0, limit);
 
-  if (!sigs.length) return [];
+  if (!sigs.length) return { events: [], partial: false };
 
   /*
    * Fetched in small batches, and never fatally.
@@ -346,6 +348,7 @@ export async function fetchActivity(limit = 25): Promise<ActivityEvent[]> {
    */
   const BATCH = 8;
   const txs: any[] = [];
+  let partial = false;
   for (let i = 0; i < sigs.length; i += BATCH) {
     const slice = sigs.slice(i, i + BATCH).map((s) => s.signature);
     try {
@@ -356,7 +359,10 @@ export async function fetchActivity(limit = 25): Promise<ActivityEvent[]> {
       txs.push(...batch);
     } catch {
       // Rate-limited or unreachable. Those rows are missing from the feed,
-      // which is a smaller lie than an empty screen.
+      // which is a smaller lie than an empty screen — but only if the screen
+      // says so, which is what `partial` is for. Dropping rows silently is its
+      // own quiet lie.
+      partial = true;
     }
   }
 
@@ -597,5 +603,5 @@ export async function fetchActivity(limit = 25): Promise<ActivityEvent[]> {
     }
   });
 
-  return out.sort((a, b) => b.at - a.at);
+  return { events: out.sort((a, b) => b.at - a.at), partial };
 }

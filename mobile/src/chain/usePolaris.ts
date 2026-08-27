@@ -28,6 +28,8 @@ export type ChainState = {
   /** Plans on offer that this borrower does not already hold. */
   availablePlans: Plan[];
   activity: ActivityEvent[];
+  /** True when the ledger could not be read in full — a rate-limited RPC. */
+  activityPartial: boolean;
 };
 
 export type PolarisState =
@@ -93,7 +95,16 @@ export function usePolarisState(
 
       setState({
         status: "ready",
-        data: { protocol, profile, underwriting, loans, subscriptions, availablePlans, activity },
+        data: {
+          protocol,
+          profile,
+          underwriting,
+          loans,
+          subscriptions,
+          availablePlans,
+          activity: activity.events,
+          activityPartial: activity.partial,
+        },
         error: null,
       });
     } catch (e: any) {
