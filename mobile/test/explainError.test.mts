@@ -57,6 +57,16 @@ describe("explainError — a network failure is not a refusal", () => {
   });
 });
 
+describe("explainError — a fee is not a credit limit", () => {
+  it("names SOL when the fee payer has never been funded", () => {
+    const said = explainError(
+      new Error("Transaction simulation failed: Attempt to debit an account but found no record of a prior credit."),
+    );
+    assert.match(said, /no SOL to pay the network fee/i);
+    assert.ok(!/credit line|limit/i.test(said), `this is not about credit: ${said}`);
+  });
+});
+
 describe("explainError — always a sentence, never a symbol", () => {
   it("maps a known program error to its own words", () => {
     assert.equal(

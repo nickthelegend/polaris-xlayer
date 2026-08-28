@@ -353,6 +353,7 @@ export async function cancelSubscription(params: {
  * already carry their logs.
  */
 export async function describeError(e: any): Promise<string> {
+
   /*
    * The logs are not always on the error you were handed.
    *
@@ -365,6 +366,25 @@ export async function describeError(e: any): Promise<string> {
   const carriers = [e, e?.cause, e?.simulationResponse, e?.cause?.simulationResponse];
   for (const carrier of carriers) {
     if (!carrier) continue;
+    /*
+     * `transactionLogs` as well as `logs`.
+     *
+     * web3.js's SendTransactionError does not expose the program's output as
+     * `.logs` at all — it carries `signature`, `transactionMessage` and
+     * `transactionLogs`, and `getLogs()` returns an empty array once the
+     * error has already been constructed with them. Reading only `.logs`
+     * meant every send failure on a device collapsed to the bare words
+     * "Simulation failed." and then to "The cluster refused that", with the
+     * program's own reason sitting unread on the error the whole time.
+     */
+    if (Array.isArray(carrier.transactionLogs) && carrier.transactionLogs.length > 0) {
+      e.logs = carrier.transactionLogs;
+      break;
+    }
+    if (typeof carrier.transactionMessage === "string" && carrier.transactionMessage) {
+      e.logs = [carrier.transactionMessage];
+      break;
+    }
     if (Array.isArray(carrier.logs) && carrier.logs.length > 0) {
       e.logs = carrier.logs;
       break;

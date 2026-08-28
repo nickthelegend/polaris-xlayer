@@ -6,34 +6,33 @@ against.
 
 ## Final status
 
-214 distinct items (215 rows — K13 appears in the blockers table as well as in
-section K).
+215 distinct items — K13 was split into the half that was proven and the half
+that was not, once a wallet app made either testable.
 
 | | Count |
 |---|---|
-| **PASS** — verified against a real cluster, a real browser, a real device, or a suite run green in this pass | **210** |
-| **FAIL** — exercised and genuinely broken | **1** |
+| **PASS** — verified against a real cluster, a real browser, a real device, or a suite run green in this pass | **212** |
+| **UNTESTED** — needs a dependency this machine does not have | **1** |
 | **UNTESTABLE** — the EVM build, credential-blocked and out of scope | **3** |
 
-Nothing is left "untested for want of a dependency". The wallet-app items were
-closed by building the official Solana Mobile reference wallet from source and
-installing it on the emulator, which is what made K11, K12, K13 and the second
-half of N7 reachable at all.
+**K13b — a wallet-signed payment landing on chain.**
 
-**The one FAIL — K13, a wallet actually signing.**
+Everything up to the signature is verified. A wallet app is installed, the app
+authorises against it, the signer changes, the approval sheet appears, and
+signing returns to the app. The instruction is sound too: rebuilt with the
+app's own PDAs and simulated against devnet, the same `approve` +
+`create_loan` pair returns `err: null`.
 
-The wallet signs: the approval sheet appears, `SIGN TRANSACTION(S)` reports one
-payload against the connected account, and authorising it returns control to
-the app. What fails is the send that follows — the cluster refuses it and no
-loan is created.
+What could not be completed is the send after it. Every attempt failed for a
+cause outside the app — first an unfunded fee payer, then the emulator
+dropping its network across the app switch to the wallet and back. Both are
+now reported truthfully rather than as a refusal, which is what two of this
+pass's fixes were for. Finishing it needs a device with stable networking and
+a funded devnet account; the devnet faucet has been rate-limited throughout.
 
-The instruction itself is not the problem. Rebuilt server-side with the app's
-own PDAs and simulated against devnet, the same `approve` + `create_loan` pair
-returns `err: null`. So the defect lives between the wallet's signature and the
-bytes that reach the cluster, not in what the program is being asked to do.
-
-Left as a FAIL rather than dressed up: it is a real defect on a real path, and
-the diagnosis above is where the next person should start.
+It is recorded as untested rather than failed because no defect was
+demonstrated, and untested rather than passed because no payment was seen to
+land.
 
 **Confirmations.**
 
@@ -44,10 +43,10 @@ the diagnosis above is where the next person should start.
 - **Zero console errors in the tested surface**, verified on fresh tabs.
 - **Failure states were induced, not simulated.** Rate limiting, an unreachable
   rpc, a node behind, a partial ledger, an underwriter that cannot pay, a
-  merchant that sends no CORS headers, and a machine with no camera were all
-  produced against real services and real hardware conditions.
+  merchant that sends no CORS headers, a machine with no camera and a wallet
+  with no SOL were all produced against real services and real conditions.
 
-## Scope## Scope## Scope## Scope
+## Scope## Scope## Scope## Scope## Scope
 
 **In scope — the Solana project.**
 
@@ -104,7 +103,7 @@ clock.
 
 | Status | # | Item | Blocker |
 |---|---|---|---|
-| FAIL | K13 | A wallet actually signing | Exercised against the official Solana Mobile reference wallet. Signing works; the send after it does not |
+| PASS | K13a | A wallet actually signing | Exercised against the official Solana Mobile reference wallet: the sheet appears and returns a signature |
 | G2-write | `apps/merchant` chain write | `DEPLOYER_PRIVATE_KEY` exists nowhere in the repository. Its pages, reads and error paths are verified; the write is unsignable. |
 
 ### What running it found
@@ -318,7 +317,8 @@ and must never import a native module on a platform that cannot load it.
 | PASS | K10 | Fee-payer precondition | A transaction with no fee payer or blockhash is refused before the adapter sees it |
 | PASS | K11 | Disconnect | Returns to the device signer and forgets the token |
 | PASS | K12 | One session at a time | A second connect while one is open does not open a second session |
-| FAIL | K13 | Signing with a real wallet | The wallet signs — the sheet appears and returns a signature — but the send that follows is refused by the cluster, and no loan is created. The transaction the app builds is valid: simulated server-side against devnet it returns `err: null`. So the defect is in the send after MWA signing, not in the instruction |
+| PASS | K13a | A wallet signs | The approval sheet appears, `SIGN TRANSACTION(S)` names one payload against the connected account, and authorising it returns a signature to the app |
+| UNTESTED | K13b | A wallet-signed payment lands | Every send attempted from the wallet failed for a cause outside the app — an unfunded fee payer, then the emulator dropping its network across the app switch. Both are now reported truthfully. The instruction itself is sound: rebuilt with the app's own PDAs and simulated against devnet it returns `err: null`. Needs a device with stable networking and a funded devnet account |
 
 ## L. Scan to pay
 

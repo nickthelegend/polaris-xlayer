@@ -107,6 +107,17 @@ export function explainError(e: any): string {
       ? `Sent, but not confirmed in time. It may still have gone through — check ${sig.slice(0, 8)}… in Activity before trying again.`
       : "Sent, but not confirmed in time. It may still have gone through — check Activity before trying again.";
   }
+  /*
+   * The runtime's way of saying an account has never held a lamport.
+   *
+   * It surfaces when the fee payer does not exist on chain yet — a wallet
+   * that has just been generated, or one connected on a cluster where it has
+   * never been funded. "The cluster refused that" is true but useless; the
+   * borrower needs to know it is SOL for the fee, not their credit line.
+   */
+  if (/found no record of a prior credit|insufficient funds for fee|insufficient lamports/i.test(text)) {
+    return "This wallet has no SOL to pay the network fee. Fund it and try again.";
+  }
   if (/blockhash not found|block height exceeded/i.test(text)) {
     return "That took too long to confirm. Nothing was charged — try again.";
   }
