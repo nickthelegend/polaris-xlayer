@@ -80,6 +80,7 @@ export default function CreditScreen() {
     Math.max(150, Math.min(252, width * 0.68, height * 0.30)),
   );
   const { status, data, error, signerError, refresh, address, liveChange } = usePolaris();
+  const underwritingError = data?.underwritingError ?? null;
   const line = useCreditLine(data);
 
   const [collateralBusy, setCollateralBusy] = useState<"lock" | "withdraw" | null>(null);
@@ -161,7 +162,7 @@ export default function CreditScreen() {
               Nothing has read it yet.
             </Text>
             <Text variant="bodySmall" tone="faint" style={styles.unopenedBody}>
-              {error ?? "The underwriter is not reachable from here."}
+              {underwritingError ?? error ?? "The underwriter could not be reached from here."}
             </Text>
             <Button label="Try again" onPress={refresh} />
           </Surface>

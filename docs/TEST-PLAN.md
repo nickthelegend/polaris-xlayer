@@ -6,46 +6,40 @@ against.
 
 ## Final status
 
-190 distinct items (191 rows — K13 appears in the blockers table as well as in
+214 distinct items (215 rows — K13 appears in the blockers table as well as in
 section K).
 
 | | Count |
 |---|---|
-| **PASS** — verified against a real cluster, a real browser, a real device, or a suite run green in this pass | **181** |
+| **PASS** — verified against a real cluster, a real browser, a real device, or a suite run green in this pass | **205** |
 | **PARTIAL** — one half verified, the other blocked | **1** |
 | **UNTESTED** — needs a dependency that does not exist here | **5** |
 | **UNTESTABLE** — the EVM build, credential-blocked and out of scope | **3** |
 
-**PARTIAL.** N7. Removing the socket listener on unmount is verified;
+**PARTIAL.** N7 — removing the socket listener on unmount is verified;
 re-subscribing when the *signer changes* needs a second signer to change to,
-and neither the emulator nor a browser has one. The subscription is keyed on
-the signing address rather than on "is there a signer", which is the change
-that makes the re-subscribe happen.
+and neither an emulator nor a browser has one.
 
 **UNTESTED, with the specific blocker.**
 
 | # | Blocked on |
 |---|---|
-| K11 Disconnect | A wallet app to disconnect from |
-| K12 One session at a time | A wallet app to open a session with |
-| K13 A wallet actually signing | A physical device with Phantom or Solflare; the approval sheet has never been seen |
-| P13 A merchant without CORS | A checkout endpoint outside this repository. A browser cannot read a cross-origin response that sends no `access-control-allow-origin`, so such a merchant's 404 is indistinguishable from an unreachable one |
-| P14 Camera denied vs absent | A machine with no webcam. `expo-camera` reports both as denied on web, so the app cannot tell them apart from the inside |
+| K11, K12, K13 | A physical device with Phantom or Solflare. The approval sheet has never been seen |
+| P13 | A merchant endpoint outside this repository. A browser cannot read a cross-origin response with no `access-control-allow-origin`, so such a merchant's 404 is indistinguishable from an unreachable one |
+| P14 | A machine with no webcam. `expo-camera` reports denied and absent identically on web |
 
 **Confirmations.**
 
-- **Zero mocks, zero stubs.** A sweep for `mock|stub|fake|dummy|TODO|FIXME` across
-  `programs/polaris/src`, `mobile/src`, `mobile/app`, `keeper-solana/src`,
-  `apps/gateway/src` and `packages/sdk-solana/src`, excluding tests, returns
-  nothing. Every figure in this document was read off a real cluster, a real
-  browser or a real device.
-- **Zero console errors in the tested surface.** Verified on a fresh tab, whose
-  buffer holds only that page's own output.
+- **Zero mocks, zero stubs.** A sweep for `mock|stub|fake|dummy|TODO|FIXME`
+  across every shipped Solana source tree, excluding tests, returns nothing.
+- **Zero console errors in the tested surface**, verified on fresh tabs whose
+  buffer holds only that page's own output — local and deployed.
 - **Failure states were induced, not simulated.** Rate limiting, an unreachable
-  rpc, a node that has fallen behind and a partial ledger were produced with a
-  real http proxy in front of the validator. The app was never modified to fail.
+  rpc, a node behind, a partial ledger and an underwriter that cannot pay for
+  the account it is opening were all produced against real services. The app
+  was never modified to fail.
 
-## Scope## Scope
+## Scope## Scope## Scope
 
 **In scope — the Solana project.**
 
@@ -417,6 +411,45 @@ on every one.
 | PASS | P12 | Live updates still arrive when the cluster is healthy | A keeper collection moves the page with nobody touching it, and the notice names the amount |
 | UNTESTED | P13 | A third-party merchant without CORS | A browser cannot read a cross-origin response that sends no `access-control-allow-origin`, so a 404 from such a merchant is indistinguishable from an unreachable one. Needs a merchant endpoint outside this repository |
 | UNTESTED | P14 | Camera denied vs no camera present | `expo-camera` reports both as denied on web, so the two cannot be told apart from inside the app. Needs a machine with no webcam to confirm the wording |
+
+## Q. The merchant dashboard
+
+The merchant's own view of their book, served by the gateway. It holds no
+database and needs no key: a merchant's trade is public state under their PDA.
+
+| Status | # | Item | Correct means |
+|---|---|---|---|
+| PASS | Q1 | Index lists merchants from chain | Every `Merchant` account on the deployment appears, sorted by name — not the seed file, which is one run's snapshot |
+| PASS | Q2 | Invalid address | "That is not a valid merchant address." — a 400, not a stack trace |
+| PASS | Q3 | Valid but unregistered | "That merchant is not registered on this deployment." — a 404 |
+| PASS | Q4 | Totals match chain exactly | Financed, collected and outstanding each equal a direct `getProgramAccounts` sum over that merchant's loans, to the cent |
+| PASS | Q5 | One row per loan | The book has exactly one row per `Loan` whose `merchant` is this PDA, newest first |
+| PASS | Q6 | Status is the chain's status | Each row's pill is the loan's own `status` — active, repaid or liquidated |
+| PASS | Q7 | A merchant with no trade | Says so in a sentence and still renders the charge form, rather than an empty table |
+| PASS | Q8 | Figures round, never truncate | Money already collected is never shown as less than it was: 401.415 renders 401.42 |
+| PASS | Q9 | Charge form takes whole USDC | A human types 25 and gets a 25.00 checkout — the form does not lie about its own units |
+| PASS | Q10 | Charge form reaches a real checkout | Submitting it lands on a Solana Pay page with a scannable code for that merchant |
+| PASS | Q11 | No client JavaScript | The page is complete with scripting disabled — it is server-rendered for the same reason the checkout is |
+| PASS | Q12 | Console and network | Zero console errors; every request 2xx |
+
+## R. The deployed surfaces
+
+Three things a stranger can reach without anything from this machine. Devnet.
+
+| Status | # | Item | Correct means |
+|---|---|---|---|
+| PASS | R1 | Gateway is up | `/health` returns the devnet cluster, the program id, and the underwriter it actually signs with |
+| PASS | R2 | The deployed key can only attest | The service's underwriter is **not** the protocol authority and **not** the program's upgrade authority — rotated before deployment |
+| PASS | R3 | Live merchant dashboard | Reads devnet and shows that merchant's real book |
+| PASS | R4 | Live checkout | Renders a QR and the terms for a devnet merchant over HTTPS |
+| PASS | R5 | Solana Pay over HTTPS | Spec GET returns label and icon; POST returns a real base64 transaction |
+| PASS | R6 | Consumer app loads | The public URL renders the credit screen |
+| PASS | R7 | A stranger is underwritten | A wallet the browser generates seconds earlier gets a real devnet profile, written by the deployed gateway |
+| PASS | R8 | Every route serves | `/`, `/plans`, `/pay`, `/activity`, `/scan` all 200 — an SPA needs an index fallback |
+| PASS | R9 | The APK is standalone | Runs with no dev server and with every `adb reverse` tunnel removed |
+| PASS | R10 | The APK points at the deployment | Devnet, and the deployed gateway — not localhost |
+| PASS | R11 | Running dry is honest | When the underwriter cannot pay for a profile, the app says it has no credit line yet rather than inventing a score |
+| PASS | R12 | Console and network | Zero console errors on every live surface; every request 2xx |
 
 ## G. Out of scope — recorded, not tested
 

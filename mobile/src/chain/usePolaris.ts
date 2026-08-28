@@ -29,6 +29,14 @@ export type ChainState = {
   profile: CreditProfile | null;
   /** Why the line is the size it is, when the gateway told us. */
   underwriting: Underwriting | null;
+  /**
+   * Why no line was opened, in the underwriter's own words.
+   *
+   * This used to be swallowed into a dev-only warning, so the screen had
+   * nothing to show and fell back to guessing "the underwriter is not
+   * reachable" — which is wrong whenever it answered and refused.
+   */
+  underwritingError: string | null;
   loans: Loan[];
   subscriptions: Plan[];
   /** Plans on offer that this borrower does not already hold. */
@@ -122,12 +130,23 @@ export function usePolarisState(
        */
       let profile = existing;
       let underwriting: Underwriting | null = null;
+      let underwritingError: string | null = null;
       if (!profile) {
         try {
           underwriting = await requestUnderwriting(getPublicKey().toBase58());
           profile = await fetchProfile();
         } catch (e: any) {
-          if (__DEV__) console.warn("[polaris] underwriting unavailable:", e?.message ?? e);
+          const said = String(e?.message ?? "").trim();
+          /*
+           * Prefer what the underwriter actually said. Only when there was no
+           * answer at all — a network failure, not a refusal — is "not
+           * reachable" the true description.
+           */
+          underwritingError =
+            /failed to fetch|network request failed|econnrefused|load failed/i.test(said) || !said
+              ? "The underwriter could not be reached from here."
+              : said;
+          if (__DEV__) console.warn("[polaris] underwriting unavailable:", said || e);
         }
       }
 
@@ -158,6 +177,7 @@ export function usePolarisState(
           protocol,
           profile,
           underwriting,
+          underwritingError,
           loans,
           subscriptions,
           availablePlans,
