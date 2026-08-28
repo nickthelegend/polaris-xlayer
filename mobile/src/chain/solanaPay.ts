@@ -166,20 +166,66 @@ export async function preparePayment(url: string): Promise<PreparedPayment> {
  * authority's — and send the bytes untouched.
  */
 export async function approvePayment(tx: Transaction): Promise<string> {
-  await getSigner().signTransaction(tx);
+  /*
+   * Send what the signer handed back, not what it was given.
+   *
+   * The device signer signs in place, so discarding the return value and
+   * serializing the original worked and hid this for as long as the device key
+   * was the only signer. A wallet app does not work that way: Mobile Wallet
+   * Adapter returns a *new* transaction carrying the signature, and the
+   * original object it was passed is never touched. So the borrower's slot
+   * went out empty and the cluster answered "Signature verification failed"
+   * for a payment the wallet had genuinely signed.
+   *
+   * The gateway's own partial signature — it sponsors both the fee and the
+   * rent — rides along on the returned transaction, because the wallet signs
+   * the same message rather than rebuilding it.
+   */
+  const signed = await getSigner().signTransaction(tx);
 
   const connection = getConnection();
-  const signature = await connection.sendRawTransaction(tx.serialize(), {
+  const signature = await connection.sendRawTransaction(signed.serialize(), {
     // Preflight stays on: a plan that would fail should fail before it is sent,
     // not after the borrower has watched a spinner.
     skipPreflight: false,
   });
 
+  /*
+   * Confirm, but never wait forever.
+   *
+   * `confirmTransactionInitialTimeout` only governs the happy path. The
+   * confirmation rides a signature subscription, and where that websocket
+   * cannot be reached at all — a cluster whose wss endpoint the device cannot
+   * open — the promise simply never settles and the screen sits on "Submitting
+   * to the cluster…" with no way out. That was observed against devnet from an
+   * emulator, indefinitely.
+   *
+   * A transaction that was broadcast and could not be confirmed is not a
+   * failure to report as a refusal; the caller's error ladder has a sentence
+   * for exactly this, naming the signature so it can be checked.
+   */
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-  await connection.confirmTransaction(
+  const confirmed = connection.confirmTransaction(
     { signature, blockhash, lastValidBlockHeight },
     "confirmed",
   );
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          new Error(
+            `Transaction was not confirmed in 60 seconds. It is unknown if it succeeded or failed. Check signature ${signature}`,
+          ),
+        ),
+      60_000,
+    );
+  });
+  try {
+    await Promise.race([confirmed, expired]);
+  } finally {
+    clearTimeout(timer);
+  }
   return signature;
 }
 

@@ -6,33 +6,39 @@ against.
 
 ## Final status
 
-215 distinct items — K13 was split into the half that was proven and the half
-that was not, once a wallet app made either testable.
+215 distinct items.
 
 | | Count |
 |---|---|
 | **PASS** — verified against a real cluster, a real browser, a real device, or a suite run green in this pass | **212** |
-| **UNTESTED** — needs a dependency this machine does not have | **1** |
 | **UNTESTABLE** — the EVM build, credential-blocked and out of scope | **3** |
 
-**K13b — a wallet-signed payment landing on chain.**
+Every item that describes the Solana build passes. The three remaining are the
+Solidity reference kept beside it, which needs a MongoDB instance, a KeeperHub
+organisation key and a Supabase project that do not exist here — recorded with
+those blockers rather than counted.
 
-Everything up to the signature is verified. A wallet app is installed, the app
-authorises against it, the signer changes, the approval sheet appears, and
-signing returns to the app. The instruction is sound too: rebuilt with the
-app's own PDAs and simulated against devnet, the same `approve` +
-`create_loan` pair returns `err: null`.
+**What it took to close the last one.** K13 — a wallet actually signing — was
+reachable only after building the official Solana Mobile reference wallet from
+source and installing it. Doing so exposed two real defects:
 
-What could not be completed is the send after it. Every attempt failed for a
-cause outside the app — first an unfunded fee payer, then the emulator
-dropping its network across the app switch to the wallet and back. Both are
-now reported truthfully rather than as a refusal, which is what two of this
-pass's fixes were for. Finishing it needs a device with stable networking and
-a funded devnet account; the devnet faucet has been rate-limited throughout.
+`approvePayment` discarded the return value of `signTransaction` and serialized
+the transaction it had been handed. The device signer signs in place, so this
+worked for as long as the device key was the only signer; Mobile Wallet Adapter
+returns a *new* transaction, so the borrower's signature never reached the
+cluster and every wallet-signed payment came back "Signature verification
+failed".
 
-It is recorded as untested rather than failed because no defect was
-demonstrated, and untested rather than passed because no payment was seen to
-land.
+The confirmation could then hang forever. `confirmTransactionInitialTimeout`
+governs only the happy path; the confirmation rides a signature subscription,
+and against a cluster whose websocket the device cannot open the promise never
+settles. The screen sat on "Submitting to the cluster…" indefinitely. The wait
+is now bounded, and a broadcast transaction that cannot be confirmed reports
+itself as exactly that, naming the signature.
+
+With both fixed, loan #4 landed on devnet: 5.00 USDC over four instalments,
+signed by the wallet, with the gateway's sponsorship signature riding alongside
+it — two required signatures on one transaction.
 
 **Confirmations.**
 
@@ -43,10 +49,11 @@ land.
 - **Zero console errors in the tested surface**, verified on fresh tabs.
 - **Failure states were induced, not simulated.** Rate limiting, an unreachable
   rpc, a node behind, a partial ledger, an underwriter that cannot pay, a
-  merchant that sends no CORS headers, a machine with no camera and a wallet
-  with no SOL were all produced against real services and real conditions.
+  merchant that sends no CORS headers, a machine with no camera, a wallet with
+  no SOL and a cluster whose websocket could not be opened were all produced
+  against real services and real conditions.
 
-## Scope## Scope## Scope## Scope## Scope
+## Scope## Scope## Scope## Scope## Scope## Scope
 
 **In scope — the Solana project.**
 
@@ -318,7 +325,7 @@ and must never import a native module on a platform that cannot load it.
 | PASS | K11 | Disconnect | Returns to the device signer and forgets the token |
 | PASS | K12 | One session at a time | A second connect while one is open does not open a second session |
 | PASS | K13a | A wallet signs | The approval sheet appears, `SIGN TRANSACTION(S)` names one payload against the connected account, and authorising it returns a signature to the app |
-| UNTESTED | K13b | A wallet-signed payment lands | Every send attempted from the wallet failed for a cause outside the app — an unfunded fee payer, then the emulator dropping its network across the app switch. Both are now reported truthfully. The instruction itself is sound: rebuilt with the app's own PDAs and simulated against devnet it returns `err: null`. Needs a device with stable networking and a funded devnet account |
+| PASS | K13b | A wallet-signed payment lands | Loan #4 on devnet — principal 5.00, owed 5.038356, borrower the wallet-signed account, two required signatures (the gateway sponsors the fee and the rent, the wallet signs for the borrower), transaction error none. The app showed CONFIRMED with the signature |
 
 ## L. Scan to pay
 
