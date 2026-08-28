@@ -22,6 +22,8 @@ import { orderRef } from "./order.ts";
 import { buildPaymentTransaction, totalOwed, type Order } from "./solana-pay.ts";
 import { underwrite } from "./underwrite.ts";
 import { checkoutPage } from "./page.ts";
+import { listMerchants, readMerchantBook } from "./merchant.ts";
+import { merchantIndexPage, merchantPage } from "./merchantPage.ts";
 
 const PORT = Number(process.env.PORT ?? 4100);
 /**
@@ -208,8 +210,44 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     return;
   }
 
+  if (path === "/merchant" || path.startsWith("/merchant/")) {
+    const raw = path === "/merchant" ? "" : decodeURIComponent(path.slice("/merchant/".length));
+    if (!raw) {
+      const html = merchantIndexPage({ merchants: await listMerchants(chain), cluster: CLUSTER });
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(html);
+      return;
+    }
+    let address: PublicKey;
+    try {
+      address = new PublicKey(raw);
+    } catch {
+      throw new HttpError(400, "That is not a valid merchant address.");
+    }
+    const book = await readMerchantBook(chain, address);
+    if (!book) throw new HttpError(404, "That merchant is not registered on this deployment.");
+    const html = merchantPage({ book, cluster: CLUSTER, origin: PUBLIC_URL });
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(html);
+    return;
+  }
+
   if (path === "/" || path === "/checkout") {
     const merchant = url.searchParams.get("merchant");
+    /*
+     * `amount` is base units, which is right for a machine and wrong for a
+     * person. The merchant dashboard's form is filled in by a human, so it
+     * sends `usdc` instead and this converts — rather than the form lying
+     * about its own units, which is what it did first.
+     */
+    const usdc = url.searchParams.get("usdc");
+    if (usdc !== null && !url.searchParams.get("amount")) {
+      const whole = Number(usdc);
+      if (!Number.isFinite(whole) || whole <= 0) {
+        throw new HttpError(400, "usdc must be a number above zero");
+      }
+      url.searchParams.set("amount", String(Math.round(whole * 1_000_000)));
+    }
     const amount = url.searchParams.get("amount");
     const orderId = url.searchParams.get("order") ?? `order-${Date.now()}`;
     if (!(merchant && amount)) {

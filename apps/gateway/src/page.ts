@@ -1,9 +1,20 @@
 import type { Order } from "./solana-pay.ts";
 
+/**
+ * USDC to the nearest cent, rounded rather than truncated.
+ *
+ * An instalment of 6.297945 was printed as "6.29" — nearly a cent under what
+ * will actually be drawn, four times over, on the one page whose whole job is
+ * to state the terms before somebody agrees to them. Rounding puts every
+ * figure within half a cent of the truth instead of up to a whole cent under.
+ */
 const usd = (raw: bigint) => {
-  const whole = raw / 1_000_000n;
-  const frac = (raw % 1_000_000n).toString().padStart(6, "0").slice(0, 2);
-  return `${whole.toLocaleString()}.${frac}`;
+  const neg = raw < 0n;
+  const v = neg ? -raw : raw;
+  const cents = (v + 5_000n) / 10_000n;
+  const whole = cents / 100n;
+  const frac = (cents % 100n).toString().padStart(2, "0");
+  return `${neg ? "-" : ""}${whole.toLocaleString()}.${frac}`;
 };
 
 /**
