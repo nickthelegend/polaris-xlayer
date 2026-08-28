@@ -1,4 +1,14 @@
-import { BN } from "@coral-xyz/anchor";
+/*
+ * Anchor is CommonJS, so it is imported by default and destructured.
+ *
+ * `import { BN } from "@coral-xyz/anchor"` works only where node's CJS lexer
+ * happens to detect that name, and that detection differs by node version: it
+ * resolved fine locally on node 26 and threw "Named export 'BN' not found" the
+ * moment the service ran on node 22. Taking the default export is what node's
+ * own error message recommends, and it does not depend on the lexer at all.
+ */
+import anchor from "@coral-xyz/anchor";
+const { BN } = anchor;
 import { PublicKey } from "@solana/web3.js";
 
 import { connect, type Chain } from "./chain.ts";

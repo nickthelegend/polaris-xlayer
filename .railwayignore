@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+target
+test-ledger
+.anchor
+.git
+mobile/android
+mobile/ios
+mobile/.expo
+apps/core
+apps/merchant
+packages/contracts/artifacts
+packages/contracts/cache

@@ -3,7 +3,18 @@ import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { AnchorProvider, Program } from "@coral-xyz/anchor";
+/*
+ * Anchor is CommonJS, so it is imported by default and destructured.
+ *
+ * `import { BN } from "@coral-xyz/anchor"` works only where node's CJS lexer
+ * happens to detect that name, and that detection differs by node version: it
+ * resolved fine locally on node 26 and threw "Named export 'BN' not found" the
+ * moment the service ran on node 22. Taking the default export is what node's
+ * own error message recommends, and it does not depend on the lexer at all.
+ */
+import anchor from "@coral-xyz/anchor";
+import type { Program as ProgramT } from "@coral-xyz/anchor";
+const { AnchorProvider, Program } = anchor;
 
 // Anchor generates this from the IDL at build time. Using it rather than the
 // bare `Idl` is what makes `program.account.creditProfile` a real type instead
@@ -36,6 +47,25 @@ function endpoint(): string {
  */
 export function loadUnderwriter(): Keypair {
   const explicit = process.env.POLARIS_UNDERWRITER_KEYPAIR;
+
+  /*
+   * The key itself, not a path to it.
+   *
+   * A hosted deployment has no filesystem to put a keypair on — a secret
+   * manager hands over a value. So the same variable accepts the JSON array a
+   * Solana keypair file contains, which is what `railway variables --set` or
+   * any other secret store can actually hold.
+   */
+  if (explicit?.trim().startsWith("[")) {
+    try {
+      return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(explicit)));
+    } catch {
+      throw new Error(
+        "POLARIS_UNDERWRITER_KEYPAIR looked like a key array but could not be parsed."
+      );
+    }
+  }
+
   const cfg = resolve(homedir(), ".config/solana/cli/config.yml");
   const path =
     explicit ??
@@ -71,7 +101,7 @@ class KeypairWallet {
 
 export type Chain = {
   connection: Connection;
-  program: Program<Polaris>;
+  program: ProgramT<Polaris>;
   underwriter: Keypair;
   pda: (seeds: (Buffer | Uint8Array)[]) => PublicKey;
 };
@@ -79,9 +109,25 @@ export type Chain = {
 export function connect(signer?: Keypair): Chain {
   const connection = new Connection(endpoint(), "confirmed");
   const underwriter = signer ?? loadUnderwriter();
-  const idl = JSON.parse(
-    readFileSync(resolve(root, "target/idl/polaris.json"), "utf8")
-  ) as Polaris;
+  /*
+   * The IDL, from wherever it actually is.
+   *
+   * `target/` is a build artifact and is gitignored, so a deployed copy of
+   * this service has no `target/idl/polaris.json` at all — it would have
+   * thrown on the first request. The app's committed copy is the same file,
+   * kept in step by `reset-local.sh`, so it is the honest fallback rather
+   * than a second source of truth.
+   */
+  const idlPath = [
+    resolve(root, "target/idl/polaris.json"),
+    resolve(root, "mobile/src/chain/idl.json"),
+  ].find((c) => existsSync(c));
+  if (!idlPath) {
+    throw new Error(
+      "No IDL found. Run `anchor build`, or ship mobile/src/chain/idl.json with the service."
+    );
+  }
+  const idl = JSON.parse(readFileSync(idlPath, "utf8")) as Polaris;
   const provider = new AnchorProvider(connection, new KeypairWallet(underwriter) as any, {
     commitment: "confirmed",
   });

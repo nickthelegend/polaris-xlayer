@@ -339,6 +339,26 @@ They run on **bankrun**, not a validator, for one reason: every rule here is a
 function of time. The default grace period is three days, so a suite that
 cannot move the clock can only test origination.
 
+## Live
+
+| | |
+|---|---|
+| Consumer app | **https://web-production-985a5.up.railway.app** |
+| Merchant dashboard | **https://gateway-production-9ee1.up.railway.app/merchant** |
+| Checkout + Solana Pay endpoint | `https://gateway-production-9ee1.up.railway.app` |
+
+Both run against **devnet**, against the program below. Open the app and it
+underwrites the wallet your browser generates, from that wallet's own history —
+no sign-up, no key to bring. The merchant dashboard needs no key either: a
+merchant's trade is public state under their own address.
+
+The deployed service signs with a key that can do exactly one thing — attest a
+score. The protocol authority and the program's upgrade authority were rotated
+away from it first (`set_underwriter`), so nothing on that host can change the
+program or the protocol. It holds a few hundredths of a devnet SOL to pay for
+the accounts it opens; when that runs out the app says it has no credit line
+yet rather than inventing one.
+
 ## Status
 
 | | |

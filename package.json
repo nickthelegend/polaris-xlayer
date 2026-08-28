@@ -34,7 +34,8 @@
     "anchor:build": "anchor build",
     "anchor:test": "anchor test",
     "anchor:test:skip-build": "anchor test --skip-build",
-    "program:test": "cargo test -p polaris --lib"
+    "program:test": "cargo test -p polaris --lib",
+    "start": "node --experimental-strip-types apps/gateway/src/server.ts"
   },
   "devDependencies": {
     "@coral-xyz/anchor": "^0.32.1",
