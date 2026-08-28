@@ -110,8 +110,21 @@ export function explainError(e: any): string {
   if (/blockhash not found|block height exceeded/i.test(text)) {
     return "That took too long to confirm. Nothing was charged — try again.";
   }
-  if (/failed to fetch|network request failed|ECONNREFUSED/i.test(text)) {
-    return "Cannot reach the network. Check the RPC endpoint is running.";
+  /*
+   * Both word orders, and Android's own wording.
+   *
+   * A browser says "Failed to fetch"; Android's fetch says "fetch failed:
+   * java.net.UnknownHostException: Unable to resolve host ...". Matching only
+   * the browser's phrasing meant every network failure on a device fell all
+   * the way through this ladder and was announced as "The transaction was
+   * refused" — a refusal, for a transaction that never left the phone.
+   */
+  if (
+    /failed to fetch|fetch failed|network request failed|ECONNREFUSED|unknownhost|unable to resolve host|no address associated/i.test(
+      text,
+    )
+  ) {
+    return "Cannot reach the network. Check your connection and try again.";
   }
   /*
    * Never the bare identifier.

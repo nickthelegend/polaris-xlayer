@@ -89,6 +89,23 @@ export function usePolarisState(
   const previous = useRef<{ profile: CreditProfile | null; loans: Loan[] } | null>(null);
 
   /*
+   * Whose position is on screen.
+   *
+   * Keeping the last good read is right when a refresh of the *same* wallet
+   * fails — better a stale balance than a blank screen. Across a change of
+   * signer it is a lie: connecting a wallet app left the device wallet's score
+   * and limit sitting under the newly connected wallet's address, which is one
+   * account's credit line attributed to another. So the position is dropped
+   * the moment the address changes, and the previous reading that feeds the
+   * live-change notice goes with it.
+   */
+  const shownFor = useRef<string | null>(null);
+  if (shownFor.current !== address) {
+    shownFor.current = address;
+    previous.current = null;
+  }
+
+  /*
    * The notice is a moment, not a state — it clears itself.
    *
    * Thirty seconds. This is the one thing on the screen that appears without
@@ -228,7 +245,11 @@ export function usePolarisState(
      * it is there — and the read then throws into the console for a state the
      * app recovers from on its own a moment later.
      */
-    if (address && isReady()) void load();
+    if (!address) return;
+    // Nothing from the last signer survives into this one.
+    setState({ status: "loading", data: null, error: null });
+    setLiveChange(null);
+    if (isReady()) void load();
   }, [address, load]);
 
   /*

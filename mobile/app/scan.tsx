@@ -58,6 +58,31 @@ export default function ScanScreen() {
   const insets = useSafeAreaInsets();
   const { refresh } = usePolaris();
   const [permission, requestPermission] = useCameraPermissions();
+
+  /*
+   * Whether this machine has a camera at all.
+   *
+   * `expo-camera` on web turns every getUserMedia rejection into "denied",
+   * so a laptop with no webcam and a browser where the user said no are
+   * indistinguishable from the permission alone — and the app offered "Allow
+   * the camera" to someone who had no camera to allow. `enumerateDevices`
+   * answers the question directly. Null means not yet known; on native the
+   * question does not arise, because the permission there is truthful.
+   */
+  const [hasCamera, setHasCamera] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (Platform.OS !== "web") return setHasCamera(true);
+    const media = (globalThis as any).navigator?.mediaDevices;
+    if (!media?.enumerateDevices) return setHasCamera(false);
+    let alive = true;
+    media
+      .enumerateDevices()
+      .then((ds: any[]) => alive && setHasCamera(ds.some((d) => d.kind === "videoinput")))
+      .catch(() => alive && setHasCamera(null));
+    return () => {
+      alive = false;
+    };
+  }, []);
   const [stage, setStage] = useState<Stage>({ name: "scanning" });
   /*
    * A request handed straight to the screen, without the camera.
@@ -237,11 +262,13 @@ export default function ScanScreen() {
           ) : (
             <View style={styles.permission}>
               <Text variant="body" tone="soft" style={styles.centered}>
-                {permission
-                  ? "Polaris needs the camera to read a merchant's code. Nothing is recorded — the frame is decoded and discarded."
-                  : "Checking the camera…"}
+                {hasCamera === false
+                  ? "There is no camera on this device. A merchant's checkout page can hand the code straight to Polaris instead — open it there and choose to pay with Polaris."
+                  : permission
+                    ? "Polaris needs the camera to read a merchant's code. Nothing is recorded — the frame is decoded and discarded."
+                    : "Checking the camera…"}
               </Text>
-              {permission && !permission.granted ? (
+              {permission && !permission.granted && hasCamera !== false ? (
                 <Button label="Allow the camera" onPress={requestPermission} />
               ) : null}
             </View>
@@ -268,9 +295,12 @@ export default function ScanScreen() {
       </View>
 
       <Text variant="bodySmall" tone="faint" style={styles.footnote}>
-        {Platform.OS === "web"
-          ? "Your browser will ask for the camera. A merchant's checkout page shows the code to scan."
-          : "A merchant shows the code at checkout. Nothing is charged until you approve it here."}
+        {/* Do not promise a camera prompt to a machine with no camera. */}
+        {Platform.OS !== "web"
+          ? "A merchant shows the code at checkout. Nothing is charged until you approve it here."
+          : hasCamera === false
+            ? "Nothing is charged until you approve it here."
+            : "Your browser will ask for the camera. A merchant's checkout page shows the code to scan."}
       </Text>
     </View>
   );

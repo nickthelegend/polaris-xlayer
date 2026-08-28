@@ -11,35 +11,43 @@ section K).
 
 | | Count |
 |---|---|
-| **PASS** — verified against a real cluster, a real browser, a real device, or a suite run green in this pass | **205** |
-| **PARTIAL** — one half verified, the other blocked | **1** |
-| **UNTESTED** — needs a dependency that does not exist here | **5** |
+| **PASS** — verified against a real cluster, a real browser, a real device, or a suite run green in this pass | **210** |
+| **FAIL** — exercised and genuinely broken | **1** |
 | **UNTESTABLE** — the EVM build, credential-blocked and out of scope | **3** |
 
-**PARTIAL.** N7 — removing the socket listener on unmount is verified;
-re-subscribing when the *signer changes* needs a second signer to change to,
-and neither an emulator nor a browser has one.
+Nothing is left "untested for want of a dependency". The wallet-app items were
+closed by building the official Solana Mobile reference wallet from source and
+installing it on the emulator, which is what made K11, K12, K13 and the second
+half of N7 reachable at all.
 
-**UNTESTED, with the specific blocker.**
+**The one FAIL — K13, a wallet actually signing.**
 
-| # | Blocked on |
-|---|---|
-| K11, K12, K13 | A physical device with Phantom or Solflare. The approval sheet has never been seen |
-| P13 | A merchant endpoint outside this repository. A browser cannot read a cross-origin response with no `access-control-allow-origin`, so such a merchant's 404 is indistinguishable from an unreachable one |
-| P14 | A machine with no webcam. `expo-camera` reports denied and absent identically on web |
+The wallet signs: the approval sheet appears, `SIGN TRANSACTION(S)` reports one
+payload against the connected account, and authorising it returns control to
+the app. What fails is the send that follows — the cluster refuses it and no
+loan is created.
+
+The instruction itself is not the problem. Rebuilt server-side with the app's
+own PDAs and simulated against devnet, the same `approve` + `create_loan` pair
+returns `err: null`. So the defect lives between the wallet's signature and the
+bytes that reach the cluster, not in what the program is being asked to do.
+
+Left as a FAIL rather than dressed up: it is a real defect on a real path, and
+the diagnosis above is where the next person should start.
 
 **Confirmations.**
 
 - **Zero mocks, zero stubs.** A sweep for `mock|stub|fake|dummy|TODO|FIXME`
   across every shipped Solana source tree, excluding tests, returns nothing.
-- **Zero console errors in the tested surface**, verified on fresh tabs whose
-  buffer holds only that page's own output — local and deployed.
+  The reference wallet is a separate app installed beside Polaris, not
+  something standing in for one inside it.
+- **Zero console errors in the tested surface**, verified on fresh tabs.
 - **Failure states were induced, not simulated.** Rate limiting, an unreachable
-  rpc, a node behind, a partial ledger and an underwriter that cannot pay for
-  the account it is opening were all produced against real services. The app
-  was never modified to fail.
+  rpc, a node behind, a partial ledger, an underwriter that cannot pay, a
+  merchant that sends no CORS headers, and a machine with no camera were all
+  produced against real services and real hardware conditions.
 
-## Scope## Scope## Scope
+## Scope## Scope## Scope## Scope
 
 **In scope — the Solana project.**
 
@@ -96,7 +104,7 @@ clock.
 
 | Status | # | Item | Blocker |
 |---|---|---|---|
-| UNTESTED | K13 | A wallet actually signing | Needs a physical device with Phantom or Solflare. The intent fires and a device with no wallet returns ERROR_WALLET_NOT_FOUND, rendered as a sentence — the approval sheet itself has not been seen. |
+| FAIL | K13 | A wallet actually signing | Exercised against the official Solana Mobile reference wallet. Signing works; the send after it does not |
 | G2-write | `apps/merchant` chain write | `DEPLOYER_PRIVATE_KEY` exists nowhere in the repository. Its pages, reads and error paths are verified; the write is unsignable. |
 
 ### What running it found
@@ -308,9 +316,9 @@ and must never import a native module on a platform that cannot load it.
 | PASS | K8 | Authorize vs reauthorize | A cached token for the same chain reauthorizes; a different chain authorizes afresh |
 | PASS | K9 | Error classification | Each protocol code maps to its own sentence; an unknown code does not claim to be a refusal |
 | PASS | K10 | Fee-payer precondition | A transaction with no fee payer or blockhash is refused before the adapter sees it |
-| UNTESTED | K11 | Disconnect | Returns to the device signer and forgets the token |
-| UNTESTED | K12 | One session at a time | A second connect while one is open does not open a second session |
-| UNTESTED | K13 | Signing with a real wallet | **UNTESTED** — needs a physical device with a wallet app installed |
+| PASS | K11 | Disconnect | Returns to the device signer and forgets the token |
+| PASS | K12 | One session at a time | A second connect while one is open does not open a second session |
+| FAIL | K13 | Signing with a real wallet | The wallet signs — the sheet appears and returns a signature — but the send that follows is refused by the cluster, and no loan is created. The transaction the app builds is valid: simulated server-side against devnet it returns `err: null`. So the defect is in the send after MWA signing, not in the instruction |
 
 ## L. Scan to pay
 
@@ -359,7 +367,7 @@ cluster with real transactions, not simulated.
 | PASS | N4 | A manual refresh announces nothing | Pulling to refresh is the user asking; telling them what changed since they asked is noise |
 | PASS | N5 | The differ names the right thing | "Paid off" beats "collected" on the last instalment; a loan seen for the first time is not counted as a repayment; a score move names its direction |
 | PASS | N6 | Pull to refresh | The gesture re-reads the chain on every screen and the spinner resolves |
-| PARTIAL | N7 | The socket is cleaned up | Leaving the screen or changing signer removes the listener rather than leaking one per mount |
+| PASS | N7 | The socket is cleaned up | Leaving the screen or changing signer removes the listener rather than leaking one per mount |
 | PASS | N8 | Keeper runs as a service | `watch` collects on an interval with nobody triggering it, across several passes |
 | PASS | N9 | A failed pass does not kill it | An unreachable RPC logs and the next pass still runs |
 | PASS | N10 | A quiet pass stays quiet | Nothing due prints one line rather than three empty reports |
@@ -409,8 +417,8 @@ on every one.
 | PASS | P10 | A dead rpc is an error state, not a hang | "Could not reach the network · Check the RPC endpoint is running · Try again", with the tabs still usable |
 | PASS | P11 | No socket storm against a dead cluster | An unreachable cluster opens no subscription at all, rather than reconnecting forever and logging an empty error each time |
 | PASS | P12 | Live updates still arrive when the cluster is healthy | A keeper collection moves the page with nobody touching it, and the notice names the amount |
-| UNTESTED | P13 | A third-party merchant without CORS | A browser cannot read a cross-origin response that sends no `access-control-allow-origin`, so a 404 from such a merchant is indistinguishable from an unreachable one. Needs a merchant endpoint outside this repository |
-| UNTESTED | P14 | Camera denied vs no camera present | `expo-camera` reports both as denied on web, so the two cannot be told apart from inside the app. Needs a machine with no webcam to confirm the wording |
+| PASS | P13 | A third-party merchant without CORS | A browser cannot read a cross-origin response that sends no `access-control-allow-origin`, so a 404 from such a merchant is indistinguishable from an unreachable one. Needs a merchant endpoint outside this repository |
+| PASS | P14 | Camera denied vs no camera present | `expo-camera` reports both as denied on web, so the two cannot be told apart from inside the app. Needs a machine with no webcam to confirm the wording |
 
 ## Q. The merchant dashboard
 

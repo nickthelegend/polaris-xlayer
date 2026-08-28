@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { Transaction } from "@solana/web3.js";
 
 import { getConnection, getPublicKey, getSigner } from "./client";
@@ -50,7 +51,34 @@ async function checkoutFetch(url: string, init?: RequestInit): Promise<Response>
   try {
     return await fetch(url, init);
   } catch {
-    throw new Error("That merchant's checkout is not answering. The code may be stale.");
+    /*
+     * In a browser this is very often not silence — it is CORS.
+     *
+     * A cross-origin response with no `access-control-allow-origin` cannot be
+     * read at all, so a merchant answering 404 and a merchant that is switched
+     * off arrive here identically. Saying only "not answering" sent a merchant
+     * integrating their checkout to look at their uptime, when what they
+     * actually had to do was allow this origin. The shopper still gets a
+     * sentence they can act on; the merchant gets the real cause.
+     *
+     * Kept short on purpose: `explainError` drops anything over 120 characters
+     * as a probable stack trace, and the first draft of this sentence was 123.
+     */
+    throw new Error(
+      crossOrigin(url)
+        ? "That checkout could not be read from here — it may be offline, or not allow this app."
+        : "That merchant's checkout is not answering. The code may be stale.",
+    );
+  }
+}
+
+/** True when the browser would apply CORS to this url — never on native. */
+function crossOrigin(url: string): boolean {
+  if (Platform.OS !== "web" || typeof location === "undefined") return false;
+  try {
+    return new URL(url).origin !== location.origin;
+  } catch {
+    return false;
   }
 }
 

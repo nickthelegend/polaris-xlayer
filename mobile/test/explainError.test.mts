@@ -32,6 +32,31 @@ describe("explainError — never call money safe when it might not be", () => {
   });
 });
 
+describe("explainError — a network failure is not a refusal", () => {
+  const ANDROID =
+    'fetch failed: java.net.UnknownHostException: Unable to resolve host "api.devnet.solana.com": ' +
+    "No address associated with hostname";
+
+  it("recognises Android's wording, not just the browser's", () => {
+    // Android says "fetch failed"; a browser says "Failed to fetch". Matching
+    // only the browser's order announced a refusal for a transaction that
+    // never left the phone.
+    const said = explainError(new Error(ANDROID));
+    assert.match(said, /cannot reach the network/i);
+    assert.ok(!/refused/i.test(said), `a DNS failure is not a refusal: ${said}`);
+  });
+
+  it("still recognises the browser's wording", () => {
+    assert.match(explainError(new TypeError("Failed to fetch")), /cannot reach the network/i);
+  });
+
+  it("does not leak the java stack to the screen", () => {
+    const said = explainError(new Error(ANDROID));
+    assert.ok(!said.includes("java.net"), said);
+    assert.ok(said.length < 120, said);
+  });
+});
+
 describe("explainError — always a sentence, never a symbol", () => {
   it("maps a known program error to its own words", () => {
     assert.equal(
