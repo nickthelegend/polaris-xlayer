@@ -17,7 +17,19 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 RPC=http://127.0.0.1:8899
-PID=$(cat .program-id.txt)
+# The program id, read from the keypair the build actually produced.
+#
+# This used to read `.program-id.txt`, which is gitignored — so this script,
+# and the quick start in the README that mirrors it, could not run from a fresh
+# clone at all. Parsing Anchor.toml is not the fix either: `anchor keys sync`
+# leaves [programs.devnet] above [programs.localnet], so the first `polaris =`
+# line in that file is the wrong one. `anchor keys list` reads the keypair
+# itself, so it cannot disagree with the .so beside it.
+PID=$(anchor keys list 2>/dev/null | awk '/polaris/{print $NF}')
+if [ -z "$PID" ]; then
+  echo "could not read the program id from Anchor.toml" >&2
+  exit 1
+fi
 LOG=${1:-/tmp/polaris-validator.log}
 
 pkill -f solana-test-validator 2>/dev/null || true

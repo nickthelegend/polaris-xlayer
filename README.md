@@ -95,19 +95,41 @@ packages/contracts      the Solidity original, kept as the reference
 
 ## Quick start
 
+Needs the Solana CLI, Anchor 0.32.1, Rust 1.89.0 (pinned in
+`rust-toolchain.toml`), and **Node 22.6 or newer** — several packages run
+TypeScript directly with `--experimental-strip-types`, which older Node does
+not have. If you have never used the Solana CLI here, give it a key first:
+`solana-keygen new`.
+
 ```bash
 pnpm install
 ```
 
+`anchor build` mints a program keypair, and it is not the one this repository
+was written against — a keypair is a secret and none is committed. `keys sync`
+rewrites `declare_id!` and `Anchor.toml` to whatever your build produced, so
+the program you run is internally consistent from the first command:
+
 ```bash
-anchor build && cargo test -p polaris --lib
+anchor build && anchor keys sync && anchor build
+```
+
+```bash
+cargo test -p polaris --lib
 ```
 
 Run the whole thing against a local validator — origination, four collections,
 a default and a liquidation, in about five minutes:
 
 ```bash
-solana-test-validator --bpf-program $(cat .program-id.txt) target/deploy/polaris.so --reset
+solana-test-validator --bpf-program $(anchor keys list | awk '/polaris/{print $NF}') target/deploy/polaris.so --reset
+```
+
+The lifecycle spends real SOL, so fund the CLI key against the validator you
+just started — `reset-local.sh` below does this for you:
+
+```bash
+solana airdrop 500 --url http://127.0.0.1:8899
 ```
 
 ```bash
@@ -118,7 +140,7 @@ The keeper reads what is due off the chain rather than a database, because the
 whole book is one `getProgramAccounts` call:
 
 ```bash
-KEEPER_DRY_RUN=true pnpm --filter @polaris/keeper-solana start
+KEEPER_DRY_RUN=true POLARIS_CLUSTER=localnet pnpm --filter @polaris/keeper-solana start
 ```
 
 Or stand the whole demo up in one command — validator, program, five merchants,
@@ -231,15 +253,24 @@ address on the home screen; fund that address on a test cluster with:
 pnpm exec tsx scripts/fund.ts <address>
 ```
 
+The app is installed on its own, not through the workspace. It is deliberately
+not a member of `pnpm-workspace.yaml`: Expo needs a hoisted `node_modules`, and
+`mobile/.npmrc` asks for one, while the thirteen packages beside it keep pnpm's
+isolated linker. So every command below runs from inside `mobile/`:
+
+```bash
+cd mobile && pnpm install --ignore-workspace
+```
+
 Mobile Wallet Adapter needs native code, so the app runs from a development
 build rather than Expo Go:
 
 ```bash
-pnpm --filter polaris-mobile exec expo prebuild --platform android --clean
+cd mobile && pnpm exec expo prebuild --platform android --clean
 ```
 
 ```bash
-pnpm --filter polaris-mobile exec expo run:android
+cd mobile && pnpm exec expo run:android
 ```
 
 An emulator on a machine with little free memory will hang on the GPU path;
@@ -276,7 +307,7 @@ pnpm run anchor:test         # 153 — every exploit, on chain
 pnpm --filter @polaris/keeper-solana test   # 20 — the dunning ladder
 pnpm --filter @polaris/sdk-solana test      # 13 — the SDK against a live cluster
 pnpm --filter @polaris/gateway test         # 14 — underwriting and Solana Pay
-pnpm --filter polaris-mobile test           # 59 — deep links, delegation, live diffs
+cd mobile && pnpm test                      # 69 — deep links, delegation, live diffs
 ```
 
 `anchor test` starts its own validator and will refuse if you still have the

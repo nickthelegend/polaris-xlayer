@@ -36,7 +36,14 @@ packages/contracts/typechain-types/
 
 # Anchor / Solana
 .anchor
+# Everything under target/ is a build artifact, the program keypair included.
+#
+# There used to be a `!target/deploy/*-keypair.json` negation here, which does
+# nothing at all: git cannot re-include a file inside an excluded directory, so
+# the keypair was never committed and `anchor build` on a fresh clone mints a
+# new, random one. `anchor keys sync` is the documented way out — see the
+# README's quick start — and publishing a program's identity key would be the
+# wrong fix.
 target/
-!target/deploy/*-keypair.json
 test-ledger/
 .program-id.txt
