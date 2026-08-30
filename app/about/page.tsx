@@ -1,112 +1,94 @@
-"use client";
+import type { Metadata } from "next";
+import { Page, Block } from "../components/Page";
+import { APPS, PROGRAM_ID } from "../components/Chrome";
 
-import React from "react";
-import { motion } from "framer-motion";
-import Image from "next/image";
-
-const fadeInUp = {
-    initial: { opacity: 0, y: 20 },
-    animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.6 }
+export const metadata: Metadata = {
+  title: "About",
+  description:
+    "Polaris Pay is a payments layer with credit built in, on Solana — three ways to pay, a line underwritten from on-chain history, and instalments collected without the buyer being online.",
 };
 
-const Logo = ({ className = "" }: { className?: string }) => (
-    <div className={`relative w-8 h-8 ${className}`}>
-        <Image
-            src="/polaris.png"
-            alt="Polaris Logo"
-            fill
-            className="object-contain"
-            priority
-        />
-    </div>
-);
-
 export default function About() {
-    return (
-        <div className="min-h-screen bg-background-dark text-white font-display">
-            <header className="fixed top-0 z-[60] w-full border-b border-solid border-slate-200/10 dark:border-border-dark/50 bg-background-dark/40 backdrop-blur-xl px-6 lg:px-40 py-4">
-                <div className="flex items-center justify-between max-w-[1400px] mx-auto">
-                    <a href="/" className="flex items-center gap-2">
-                        <Logo />
-                        <h2 className="text-lg font-bold tracking-tight">Polaris</h2>
-                    </a>
-                    <nav className="hidden md:flex items-center gap-8 text-xs font-medium text-slate-400">
-                        <a href="/" className="hover:text-primary transition-colors">Home</a>
-                        <a href="/docs" className="hover:text-primary transition-colors">Docs</a>
-                        <a href="/privacy" className="hover:text-primary transition-colors">Privacy</a>
-                    </nav>
-                </div>
-            </header>
+  return (
+    <Page
+      title="A payments layer with credit built in."
+      lede="Three ways to pay: in full, on a subscription, or split into four against an undercollateralized credit line. Polaris decides who gets credit and collects what is owed — merchants paid up front, instalments drawn on the day they fall due."
+    >
+      <Block heading="What it actually does">
+        <p>
+          At checkout a buyer chooses how to pay. If they split into four, the
+          merchant is paid the full amount that day and Polaris carries the
+          instalments — four draws of{" "}
+          <span className="figure font-medium text-ink">50.38</span> against a
+          $200 purchase, seven days apart, repaying{" "}
+          <span className="figure font-medium text-ink">201.53</span> in total.
+        </p>
+        <p>
+          The credit line behind that is underwritten from the wallet&rsquo;s own
+          record: how long the address has existed, what it has signed, what it
+          holds, what it can cover. No application, no bureau, nothing the buyer
+          had to tell us. Every instalment paid on time is worth 12 points; a
+          late one costs 40.
+        </p>
+      </Block>
 
-            <main className="pt-32 pb-20 px-6 lg:px-40 max-w-[1400px] mx-auto">
-                <motion.div {...fadeInUp} className="mb-20">
-                    <h1 className="text-4xl lg:text-7xl font-black mb-8 leading-tight">
-                        Building the <span className="text-primary">Future</span> of <br /> Decentralized Finance.
-                    </h1>
-                    <p className="text-slate-400 text-lg lg:text-xl leading-relaxed max-w-3xl">
-                        Polaris is an institutional-grade fintech layer built on the Fhenix blockchain.
-                        We are dedicated to creating secure, non-custodial payment and credit infrastructure
-                        that bridges the gap between traditional commerce and the decentralized world.
-                    </p>
-                </motion.div>
+      <Block heading="The pull model">
+        <p>
+          Every collection path rests on one mechanism. At checkout the borrower
+          authorises the protocol once, and each instalment is drawn later
+          without them being online. On EVM that was an ERC-20 allowance; here it
+          is an <span className="font-mono text-ink/80">SPL delegate</span> —
+          close, with one difference that is a product constraint rather than a
+          bug: the allowance decrements automatically on use, so it cannot be
+          spent twice.
+        </p>
+        <p>
+          The authorisation and the purchase go in a single transaction. They
+          both land or neither does.
+        </p>
+      </Block>
 
-                <section className="grid grid-cols-1 lg:grid-cols-2 gap-20 mb-32">
-                    <motion.div {...fadeInUp} transition={{ delay: 0.1 }}>
-                        <h2 className="text-2xl lg:text-4xl font-bold mb-6">Our Mission</h2>
-                        <p className="text-slate-400 leading-relaxed mb-6">
-                            Our mission is to empower global commerce by providing scalable, permissionless, and
-                            formally verified financial rails. We believe in the power of decentralization to
-                            bring financial services to the unbanked and to eliminate intermediaries in global trade.
-                        </p>
-                        <div className="p-8 rounded-2xl bg-card-dark border border-white/5">
-                            <h4 className="font-bold text-primary mb-2">Institutional Grade</h4>
-                            <p className="text-xs text-slate-500">
-                                We use Solidity and optimized EVM byte-code to ensure our smart contracts meet the highest
-                                security standards for institutional adoption on Fhenix.
-                            </p>
-                        </div>
-                    </motion.div>
+      <Block heading="What porting it taught us">
+        <p>
+          This is a port. The original was five Solidity contracts plus an
+          external platform whose job was making sure transactions landed.
+          Porting it produced one finding worth the whole exercise:
+        </p>
+        <p className="py-1 text-[17px] leading-[1.5] text-ink/85">
+          Most of what a keeper platform sells is native to Solana. Simulation,
+          atomic check-and-execute, fee sponsorship and replay protection are
+          runtime features here, not a product. The keeper stops being an
+          execution layer and becomes a scheduler — which is all it should ever
+          have been.
+        </p>
+        <p>
+          Five contracts became one program. Two invariants come free from
+          addressing rather than from a check that could be forgotten: a payment
+          PDA seeded by{" "}
+          <span className="font-mono text-ink/80">(merchant, order_ref)</span>{" "}
+          makes a retried checkout idempotent, and a subscription PDA seeded by{" "}
+          <span className="font-mono text-ink/80">(subscriber, plan)</span> makes
+          a double-subscribe impossible.
+        </p>
+      </Block>
 
-                    <motion.div {...fadeInUp} transition={{ delay: 0.2 }}>
-                        <h2 className="text-2xl lg:text-4xl font-bold mb-6">The Team</h2>
-                        <p className="text-slate-400 leading-relaxed">
-                            We are a group of veteran software engineers, financial researchers, and
-                            blockchain pioneers. With deep expertise in high-performance EVM development, we were
-                            recognized as winners of the Cardano Emurgo Build 2023 for our technical
-                            excellence in DeFi infrastructure.
-                        </p>
-                    </motion.div>
-                </section>
-
-                <section className="py-20 border-t border-white/5">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-12 text-center">
-                        {[
-                            { label: "Founded", value: "2023" },
-                            { label: "Community", value: "10k+" },
-                            { label: "Transactions", value: "1M+" },
-                            { label: "TVR", value: "$50M+" }
-                        ].map((stat, i) => (
-                            <motion.div key={i} {...fadeInUp} transition={{ delay: 0.1 * i }}>
-                                <p className="text-primary text-3xl font-black mb-2">{stat.value}</p>
-                                <p className="text-[10px] uppercase tracking-widest text-slate-500">{stat.label}</p>
-                            </motion.div>
-                        ))}
-                    </div>
-                </section>
-            </main>
-
-            <footer className="border-t border-white/5 px-6 lg:px-40 py-10 bg-card-dark">
-                <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-                    <div className="flex items-center gap-2">
-                        <Logo />
-                        <span className="font-bold">Polaris</span>
-                    </div>
-                    <p className="text-[10px] text-slate-500 uppercase tracking-widest">
-                        © 2026 Polaris Finance. Built on Fhenix.
-                    </p>
-                </div>
-            </footer>
-        </div>
-    );
+      <Block heading="Where it runs">
+        <p>
+          On devnet, against the program below, deployed and exercised. Open the
+          app and it underwrites the wallet your browser generates from that
+          wallet&rsquo;s own history — no sign-up, no key to bring. The merchant
+          dashboard needs no key either: a merchant&rsquo;s trade is public state
+          under their own address.
+        </p>
+        <p className="font-mono text-sm text-ink/45">
+          devnet · <span className="break-all">{PROGRAM_ID}</span>
+        </p>
+        <p className="pt-2">
+          <a href={APPS.dashboard} className="text-lamp underline-offset-4 hover:underline">
+            Open the app →
+          </a>
+        </p>
+      </Block>
+    </Page>
+  );
 }

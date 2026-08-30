@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Built APK — a release artifact, not source. See public/downloads/README.md
+public/downloads/*.apk
