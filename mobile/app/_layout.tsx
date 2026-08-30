@@ -12,7 +12,7 @@ import {
 import { DarkTheme, Stack, ThemeProvider, type Theme } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -49,6 +49,13 @@ const polarisTheme: Theme = {
   fonts: DarkTheme.fonts,
 };
 
+/**
+ * How long the app will wait for webfonts before rendering without them.
+ * Long enough that a normal load wins the race; short enough that a stalled
+ * one is a slightly plainer app rather than a black rectangle.
+ */
+const FONT_GRACE_MS = 2500;
+
 SplashScreen.preventAutoHideAsync().catch(() => {
   /* already hidden — not worth failing a launch over */
 });
@@ -62,16 +69,39 @@ export default function RootLayout() {
     JetBrainsMono_500Medium,
   });
 
+  /*
+   * The font gate must not be load-bearing for whether the app renders.
+   *
+   * `useFonts` reports success and failure, but it has a third outcome with no
+   * signal at all: neither. When that happens `!loaded && !error` stays true
+   * forever and this component returns null for the life of the process — a
+   * black screen, no crash, no redbox, `Running "main"` in the log and nothing
+   * on the glass. That is exactly what a Galaxy S24 Ultra did on this build.
+   *
+   * This is the same rule `src/components/motion.ts` already applies to
+   * entrances: an async step may improve the screen, never decide whether the
+   * screen exists. So the gate now expires. After `FONT_GRACE_MS` the app
+   * renders regardless, in the platform's own sans and mono, and the real
+   * faces swap in if they ever arrive.
+   */
+  const [fontGraceExpired, setFontGraceExpired] = useState(false);
+
   // A Solana Pay code can open the app cold, so this listens above the router.
   useIncomingRequest();
 
   useEffect(() => {
-    // Hide on error as well as success. A font that failed to load is a worse
-    // app, but a splash screen that never goes away is a broken one.
-    if (loaded || error) SplashScreen.hideAsync().catch(() => {});
+    if (loaded || error) return;
+    const t = setTimeout(() => setFontGraceExpired(true), FONT_GRACE_MS);
+    return () => clearTimeout(t);
   }, [loaded, error]);
 
-  if (!loaded && !error) return null;
+  useEffect(() => {
+    // Hide on error and on expiry as well as success. A font that failed to
+    // load is a worse app; a splash screen that never goes away is a broken one.
+    if (loaded || error || fontGraceExpired) SplashScreen.hideAsync().catch(() => {});
+  }, [loaded, error, fontGraceExpired]);
+
+  if (!loaded && !error && !fontGraceExpired) return null;
 
   return (
     <GestureHandlerRootView style={styles.root}>

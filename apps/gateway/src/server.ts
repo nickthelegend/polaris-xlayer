@@ -91,7 +91,27 @@ function parseOrder(url: URL, orderId: string): Order {
   }
   if (value <= 0n) throw new HttpError(400, "amount must be above zero");
 
-  const mode = url.searchParams.get("mode") === "full" ? "full" : "later";
+  /*
+   * Only two modes exist on this endpoint, and an unknown one is refused
+   * rather than coerced.
+   *
+   * This used to read `=== "full" ? "full" : "later"`, which silently turned
+   * every unrecognised mode into an installment plan. `?mode=subscription`
+   * therefore did not fail — it quietly originated a four-payment loan and
+   * told the customer "5.00 USDC in 4 payments of 1.26". A checkout that
+   * charges differently from what was asked for is worse than one that
+   * refuses. Subscriptions are a program feature and are reachable through
+   * the SDK's `subscribe()`, but they need a Plan the merchant created first,
+   * so they are not a Solana Pay checkout mode here.
+   */
+  const requestedMode = url.searchParams.get("mode") ?? "later";
+  if (requestedMode !== "full" && requestedMode !== "later") {
+    throw new HttpError(
+      400,
+      `mode must be "full" or "later" — "${requestedMode}" is not a checkout mode on this endpoint`,
+    );
+  }
+  const mode = requestedMode;
   const installmentCount = Number(url.searchParams.get("installments") ?? 4);
   const intervalSeconds = Number(url.searchParams.get("interval") ?? 7 * 86_400);
   if (!Number.isInteger(installmentCount) || installmentCount < 1 || installmentCount > 24) {

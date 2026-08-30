@@ -41,10 +41,31 @@ function defaultKeypairPath(): string {
 }
 
 function loadKeypair(path: string): Keypair {
-  const expanded = path.startsWith("~") ? resolve(homedir(), path.slice(2)) : resolve(path);
+  /*
+   * The value, not only a path to it.
+   *
+   * The gateway's POLARIS_UNDERWRITER_KEYPAIR already accepts the JSON array a
+   * keypair file contains, for the reason stated there: a hosted deployment has
+   * no filesystem to put a keypair on, and a secret manager hands over a value.
+   * The keeper took the same shape of variable and treated it as a path only,
+   * so setting it to a real key produced `No keypair at .../[165,204,...]` —
+   * the secret echoed into an error message, and a keeper that cannot run
+   * anywhere its secrets come from an environment.
+   */
+  const trimmed = path.trim();
+  if (trimmed.startsWith("[")) {
+    try {
+      return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(trimmed)));
+    } catch {
+      // Deliberately not echoing the value: it is a private key.
+      throw new Error("POLARIS_KEEPER_KEYPAIR looks like a JSON array but could not be parsed.");
+    }
+  }
+
+  const expanded = trimmed.startsWith("~") ? resolve(homedir(), trimmed.slice(2)) : resolve(trimmed);
   if (!existsSync(expanded)) {
     throw new Error(
-      `No keypair at ${expanded}. Set POLARIS_KEEPER_KEYPAIR, or run: solana-keygen new -o ${expanded}`,
+      `No keypair at ${expanded}. Set POLARIS_KEEPER_KEYPAIR to a path or to the key's JSON array, or run: solana-keygen new -o ${expanded}`,
     );
   }
   return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(expanded, "utf8"))));

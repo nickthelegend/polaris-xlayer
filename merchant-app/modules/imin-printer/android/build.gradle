@@ -1,0 +1,41 @@
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+group = 'polaris.iminprinter'
+version = '0.1.0'
+
+android {
+  namespace 'polaris.iminprinter'
+  compileSdk safeExtGet('compileSdkVersion', 36)
+
+  defaultConfig {
+    minSdk safeExtGet('minSdkVersion', 24)
+  }
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+  kotlinOptions { jvmTarget = '17' }
+  lintOptions { abortOnError false }
+}
+
+def safeExtGet(prop, fallback) {
+  rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+}
+
+repositories {
+  mavenCentral()
+  google()
+  maven { url 'https://www.jitpack.io' }
+}
+
+dependencies {
+  implementation project(':expo-modules-core')
+  implementation "org.jetbrains.kotlin:kotlin-stdlib:${safeExtGet('kotlinVersion', '2.0.21')}"
+  // iMin printer, generation 1 — com.imin.printerlib.IminPrintUtils, talks to the
+  // printer over SPI/USB directly. Vendor jar; there is no maven coordinate for it.
+  implementation files('libs/iminPrinterSDK.jar')
+  // iMin printer, generation 2 ("Neo") — binds the com.imin.printerservice system
+  // service over AIDL. This is what an I23M01 actually ships with.
+  implementation 'com.github.iminsoftware:IminPrinterLibrary:V2.0.0.18'
+}

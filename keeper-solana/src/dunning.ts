@@ -60,6 +60,10 @@ export type DunningInput = {
   /** Attempts already made, including the one that just failed. */
   attemptsMade: number;
   failureKind: FailureKind;
+  /** The classifier's own detail, when it had one. `would_revert` is also the
+   *  catch-all, so without this an unrecognised error is announced as a
+   *  confident diagnosis of a state the keeper never actually read. */
+  detail?: string;
   /** Injected so this stays deterministic in tests. */
   now: Date;
   ladder?: readonly DunningStage[];
@@ -79,8 +83,17 @@ export function nextDunningStep(input: DunningInput): DunningDecision {
       return {
         action: "abandon",
         notify: false,
-        reason:
-          "The program rejected the call on current state — the loan may be closed, already collected, or not yet due. Needs reconciliation, not a retry.",
+        /*
+         * `would_revert` is both a real classification and the classifier's
+         * fallback. Claiming "the program rejected this on current state" for
+         * an error nobody classified is a diagnosis the keeper has not earned —
+         * it sent an operator chasing a loan whose guards all passed. When the
+         * classifier had no specific code, say so and show what actually came
+         * back.
+         */
+        reason: input.detail
+          ? `Unclassified failure — not necessarily a program rejection. Raw: ${input.detail}`
+          : "The program rejected the call on current state — the loan may be closed, already collected, or not yet due. Needs reconciliation, not a retry.",
       };
 
     case "indefinite":

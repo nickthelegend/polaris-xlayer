@@ -71,7 +71,13 @@ function handleFailure(
   result.receipts.push(receipt);
 
   const kind = receipt.error?.kind ?? "would_revert";
-  const decision = nextDunningStep({ attemptsMade, failureKind: kind, now: new Date() });
+  const decision = nextDunningStep({
+    attemptsMade,
+    failureKind: kind,
+    // Only a genuinely unclassified error carries its raw text forward.
+    detail: receipt.error?.kind ? undefined : receipt.error?.message,
+    now: new Date(),
+  });
 
   if (decision.action === "abandon") {
     log(`   abandoned: ${decision.reason}`);

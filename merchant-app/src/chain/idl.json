@@ -1,0 +1,4093 @@
+{
+  "address": "CpRqbMywzAEKkEALZtrXqPYM36E5RrFewYnRtUYEEvUS",
+  "metadata": {
+    "name": "polaris",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Polaris — undercollateralized BNPL, subscriptions and payments on Solana"
+  },
+  "instructions": [
+    {
+      "name": "cancel_subscription",
+      "discriminator": [
+        60,
+        139,
+        189,
+        242,
+        191,
+        208,
+        143,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.authority",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "plan",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "plan.id",
+                "account": "Plan"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscription",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "subscription.subscriber",
+                "account": "Subscription"
+              },
+              {
+                "kind": "account",
+                "path": "plan"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "charge_due",
+      "docs": [
+        "Permissionless. The subscription analogue of `collect_installment`."
+      ],
+      "discriminator": [
+        107,
+        1,
+        44,
+        49,
+        139,
+        175,
+        199,
+        129
+      ],
+      "accounts": [
+        {
+          "name": "keeper",
+          "docs": [
+            "Permissionless, and fee-payer only.",
+            "",
+            "Funds can only travel subscriber → merchant on a schedule the subscriber",
+            "already agreed to, so a third-party keeper calling this is harmless and",
+            "keeps collection decentralised."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "protocol",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.authority",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "plan",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "plan.id",
+                "account": "Plan"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscription",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "subscription.subscriber",
+                "account": "Subscription"
+              },
+              {
+                "kind": "account",
+                "path": "plan"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscriber_token_account",
+          "writable": true
+        },
+        {
+          "name": "merchant_payout",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "collect_installment",
+      "docs": [
+        "Permissionless. Collects exactly the installment that is due."
+      ],
+      "discriminator": [
+        117,
+        63,
+        142,
+        252,
+        213,
+        188,
+        121,
+        11
+      ],
+      "accounts": [
+        {
+          "name": "keeper",
+          "docs": [
+            "Permissionless. The keeper signs only to pay the transaction fee — it",
+            "has no authority over the money.",
+            "",
+            "This is where KeeperHub's gas sponsorship goes: on Solana the fee payer",
+            "is simply a different signer from the token authority, so a keeper that",
+            "holds no stablecoin and touches no borrower balance still gets the",
+            "transaction landed."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "protocol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "loan.borrower",
+                "account": "Loan"
+              }
+            ]
+          }
+        },
+        {
+          "name": "loan",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  111,
+                  97,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "loan.id",
+                "account": "Loan"
+              }
+            ]
+          }
+        },
+        {
+          "name": "borrower_token_account",
+          "writable": true
+        },
+        {
+          "name": "liquidity_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  113,
+                  117,
+                  105,
+                  100,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_loan",
+      "docs": [
+        "`order_ref` is the merchant's basket id, and financing it twice is",
+        "impossible: it seeds an account that `init` refuses to create again."
+      ],
+      "discriminator": [
+        166,
+        131,
+        118,
+        219,
+        138,
+        218,
+        206,
+        140
+      ],
+      "accounts": [
+        {
+          "name": "borrower",
+          "docs": [
+            "The borrower signs their own origination.",
+            "",
+            "On EVM this was `onlyOriginator`: a permissioned backend called",
+            "`createLoan(borrower, ...)` against an allowance the borrower had",
+            "granted in an earlier transaction. Solana can put the SPL `Approve` and",
+            "this instruction in **one atomic transaction**, so the borrower signs",
+            "once at checkout and the permissioned-originator role — along with the",
+            "window between approving and borrowing — disappears entirely."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "payer",
+          "docs": [
+            "Who pays rent for the accounts this opens.",
+            "",
+            "Normally the borrower, and passing the borrower here is the ordinary",
+            "case. A sponsored checkout passes the gateway instead, which is what",
+            "lets a customer with no SOL at all open a plan: the fee payer already",
+            "differs from the token authority on Solana, and rent is the only other",
+            "thing standing between a shopper and a wallet that has never held the",
+            "native token. Both still sign, so nobody is opening a loan in someone",
+            "else's name."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "protocol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "borrower"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.authority",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "loan",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  111,
+                  97,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "protocol.loan_count",
+                "account": "Protocol"
+              }
+            ]
+          }
+        },
+        {
+          "name": "financed_order",
+          "docs": [
+            "Makes financing the same order twice unrepresentable.",
+            "",
+            "`init`, seeded by (merchant, order reference) — so a second plan against",
+            "the same basket fails on the address rather than on a check somebody",
+            "has to remember to write. `pay` has had this since the beginning; plans",
+            "did not, and scanning one Solana Pay code twice opened two loans."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant"
+              },
+              {
+                "kind": "arg",
+                "path": "order_ref"
+              }
+            ]
+          }
+        },
+        {
+          "name": "borrower_token_account",
+          "docs": [
+            "The account every installment will be drawn from. Pinned into the loan",
+            "so a keeper cannot later point collection at a different one."
+          ],
+          "writable": true
+        },
+        {
+          "name": "liquidity_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  113,
+                  117,
+                  105,
+                  100,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant_payout",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "principal",
+          "type": "u64"
+        },
+        {
+          "name": "installment_count",
+          "type": "u32"
+        },
+        {
+          "name": "interval_seconds",
+          "type": "i64"
+        },
+        {
+          "name": "order_ref",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_plan",
+      "discriminator": [
+        77,
+        43,
+        141,
+        254,
+        212,
+        118,
+        41,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "merchant"
+          ]
+        },
+        {
+          "name": "protocol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "plan",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "protocol.plan_count",
+                "account": "Protocol"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "price_per_period",
+          "type": "u64"
+        },
+        {
+          "name": "period_seconds",
+          "type": "i64"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "deactivate_plan",
+      "discriminator": [
+        91,
+        38,
+        214,
+        232,
+        172,
+        21,
+        30,
+        93
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "merchant"
+          ]
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "plan",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "plan.id",
+                "account": "Plan"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "fund_liquidity",
+      "discriminator": [
+        92,
+        113,
+        223,
+        209,
+        191,
+        118,
+        31,
+        8
+      ],
+      "accounts": [
+        {
+          "name": "funder",
+          "signer": true
+        },
+        {
+          "name": "protocol",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "from",
+          "writable": true
+        },
+        {
+          "name": "liquidity_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  113,
+                  117,
+                  105,
+                  100,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "`grace_period` and `min_interval_seconds` are fixed here for the life of",
+        "the deployment. Zero means the default for either."
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "protocol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "stablecoin"
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "Where protocol fees are swept. Must hold the protocol stablecoin."
+          ]
+        },
+        {
+          "name": "liquidity_vault",
+          "docs": [
+            "The pool merchants are paid from and repayments land in."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  113,
+                  117,
+                  105,
+                  100,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_vault",
+          "docs": [
+            "Locked borrower collateral. Held apart from lending liquidity so a",
+            "withdrawal of idle capital can never reach into it."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  108,
+                  108,
+                  97,
+                  116,
+                  101,
+                  114,
+                  97,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "grace_period",
+          "type": "i64"
+        },
+        {
+          "name": "min_interval_seconds",
+          "type": "i64"
+        },
+        {
+          "name": "fee_bps",
+          "type": "u16"
+        },
+        {
+          "name": "credit_multiplier_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "liquidate",
+      "docs": [
+        "Permissionless. The condition is checked inside the instruction, so",
+        "there is no window between the check and the action."
+      ],
+      "discriminator": [
+        223,
+        179,
+        226,
+        125,
+        48,
+        46,
+        39,
+        74
+      ],
+      "accounts": [
+        {
+          "name": "keeper",
+          "docs": [
+            "Permissionless, and fee-payer only — same as collection."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "protocol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "loan.borrower",
+                "account": "Loan"
+              }
+            ]
+          }
+        },
+        {
+          "name": "loan",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  111,
+                  97,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "loan.id",
+                "account": "Loan"
+              }
+            ]
+          }
+        },
+        {
+          "name": "borrower_token_account",
+          "writable": true
+        },
+        {
+          "name": "collateral_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  108,
+                  108,
+                  97,
+                  116,
+                  101,
+                  114,
+                  97,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "liquidity_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  113,
+                  117,
+                  105,
+                  100,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "lock_collateral",
+      "discriminator": [
+        161,
+        216,
+        135,
+        122,
+        12,
+        104,
+        211,
+        101
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "protocol",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "from",
+          "writable": true
+        },
+        {
+          "name": "collateral_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  108,
+                  108,
+                  97,
+                  116,
+                  101,
+                  114,
+                  97,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "pay",
+      "docs": [
+        "`order_ref` is the merchant's 32-byte reference for this order. It",
+        "addresses the payment account, which is what makes a retried checkout",
+        "idempotent without a duplicate check."
+      ],
+      "discriminator": [
+        119,
+        18,
+        216,
+        65,
+        192,
+        117,
+        122,
+        220
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "protocol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.authority",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payment",
+          "docs": [
+            "Seeded by (merchant, order reference).",
+            "",
+            "On EVM this was `keccak256(merchant, orderId)` used as a mapping key,",
+            "with an explicit `if (payments[id].paidAt != 0) revert DuplicatePayment`.",
+            "Here the address *is* the guard: a retrying checkout hits an account",
+            "that already exists and `init` fails. The check cannot be forgotten,",
+            "because it is not a check.",
+            "",
+            "The reference is the identifier itself rather than a digest of a string",
+            "carried alongside it. Nothing to recompute means nothing to disagree."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  121,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant"
+              },
+              {
+                "kind": "arg",
+                "path": "order_ref"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer_token_account",
+          "writable": true
+        },
+        {
+          "name": "merchant_payout",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "order_ref",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "register_merchant",
+      "discriminator": [
+        238,
+        245,
+        77,
+        132,
+        161,
+        88,
+        216,
+        248
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "protocol",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payout",
+          "docs": [
+            "Where this merchant is settled. Must hold the protocol stablecoin."
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "metadata_uri",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "repay",
+      "docs": [
+        "Borrower-signed. Any amount, including early payoff."
+      ],
+      "discriminator": [
+        234,
+        103,
+        67,
+        82,
+        208,
+        234,
+        219,
+        166
+      ],
+      "accounts": [
+        {
+          "name": "borrower",
+          "docs": [
+            "The borrower's own signature. This path takes an arbitrary amount, so it",
+            "is exactly the one that must not be permissionless."
+          ],
+          "signer": true
+        },
+        {
+          "name": "protocol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "borrower"
+              }
+            ]
+          }
+        },
+        {
+          "name": "loan",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  111,
+                  97,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "loan.id",
+                "account": "Loan"
+              }
+            ]
+          }
+        },
+        {
+          "name": "borrower_token_account",
+          "writable": true
+        },
+        {
+          "name": "liquidity_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  113,
+                  117,
+                  105,
+                  100,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_config",
+      "discriminator": [
+        108,
+        158,
+        154,
+        175,
+        212,
+        98,
+        52,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "protocol"
+          ]
+        },
+        {
+          "name": "protocol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury"
+        }
+      ],
+      "args": [
+        {
+          "name": "fee_bps",
+          "type": "u16"
+        },
+        {
+          "name": "credit_multiplier_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "set_merchant_active",
+      "discriminator": [
+        135,
+        200,
+        111,
+        155,
+        7,
+        90,
+        21,
+        169
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "protocol"
+          ]
+        },
+        {
+          "name": "protocol",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.authority",
+                "account": "Merchant"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "active",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "set_merchant_max_order",
+      "discriminator": [
+        166,
+        179,
+        141,
+        35,
+        147,
+        3,
+        80,
+        75
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "protocol"
+          ]
+        },
+        {
+          "name": "protocol",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.authority",
+                "account": "Merchant"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "max_order_value",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_underwriter",
+      "discriminator": [
+        100,
+        73,
+        161,
+        131,
+        128,
+        144,
+        113,
+        17
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "protocol"
+          ]
+        },
+        {
+          "name": "protocol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "underwriter"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "subscribe",
+      "discriminator": [
+        254,
+        28,
+        191,
+        138,
+        156,
+        179,
+        183,
+        53
+      ],
+      "accounts": [
+        {
+          "name": "subscriber",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "protocol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.authority",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "plan",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "plan.id",
+                "account": "Plan"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscription",
+          "docs": [
+            "Seeded by (subscriber, plan). One live subscription per pair is a",
+            "property of the address, so a double-subscribe is impossible rather than",
+            "merely checked for. `init_if_needed` is what lets a cancelled",
+            "subscription be restarted in the same slot; the status guard below is",
+            "what stops it being restarted while still active."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "subscriber"
+              },
+              {
+                "kind": "account",
+                "path": "plan"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscriber_token_account",
+          "writable": true
+        },
+        {
+          "name": "merchant_payout",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "sweep_fees",
+      "discriminator": [
+        175,
+        225,
+        98,
+        71,
+        118,
+        66,
+        34,
+        148
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "protocol"
+          ]
+        },
+        {
+          "name": "protocol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "liquidity_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  113,
+                  117,
+                  105,
+                  100,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "relations": [
+            "protocol"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "underwrite",
+      "docs": [
+        "Open a credit line from what the wallet's own history shows.",
+        "",
+        "The underwriter attests to four facts it read off the cluster; the",
+        "program turns them into a score. Only ever valid for a borrower with no",
+        "record of their own — after the first repayment their behaviour is",
+        "better evidence than their wallet age."
+      ],
+      "discriminator": [
+        130,
+        243,
+        71,
+        79,
+        111,
+        78,
+        186,
+        213
+      ],
+      "accounts": [
+        {
+          "name": "underwriter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "protocol",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "borrower",
+          "docs": [
+            "as the key the profile PDA is derived from."
+          ]
+        },
+        {
+          "name": "profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "borrower"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "wallet_age_days",
+          "type": "u32"
+        },
+        {
+          "name": "transaction_count",
+          "type": "u32"
+        },
+        {
+          "name": "token_accounts",
+          "type": "u32"
+        },
+        {
+          "name": "stable_balance",
+          "type": "u64"
+        },
+        {
+          "name": "observed_at",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "update_payout_address",
+      "discriminator": [
+        188,
+        6,
+        139,
+        71,
+        197,
+        147,
+        155,
+        21
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "merchant"
+          ]
+        },
+        {
+          "name": "protocol",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payout"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "withdraw_collateral",
+      "discriminator": [
+        115,
+        135,
+        168,
+        106,
+        139,
+        214,
+        138,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "signer": true,
+          "relations": [
+            "profile"
+          ]
+        },
+        {
+          "name": "protocol",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  108,
+                  108,
+                  97,
+                  116,
+                  101,
+                  114,
+                  97,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "to",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_liquidity",
+      "discriminator": [
+        149,
+        158,
+        33,
+        185,
+        47,
+        243,
+        253,
+        31
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "protocol"
+          ]
+        },
+        {
+          "name": "protocol",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "liquidity_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  113,
+                  117,
+                  105,
+                  100,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "to",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "CreditProfile",
+      "discriminator": [
+        155,
+        31,
+        253,
+        22,
+        211,
+        62,
+        131,
+        148
+      ]
+    },
+    {
+      "name": "FinancedOrder",
+      "discriminator": [
+        40,
+        5,
+        141,
+        141,
+        250,
+        46,
+        80,
+        28
+      ]
+    },
+    {
+      "name": "Loan",
+      "discriminator": [
+        20,
+        195,
+        70,
+        117,
+        165,
+        227,
+        182,
+        1
+      ]
+    },
+    {
+      "name": "Merchant",
+      "discriminator": [
+        71,
+        235,
+        30,
+        40,
+        231,
+        21,
+        32,
+        64
+      ]
+    },
+    {
+      "name": "Payment",
+      "discriminator": [
+        227,
+        231,
+        51,
+        26,
+        244,
+        88,
+        4,
+        148
+      ]
+    },
+    {
+      "name": "Plan",
+      "discriminator": [
+        161,
+        231,
+        251,
+        119,
+        2,
+        12,
+        162,
+        2
+      ]
+    },
+    {
+      "name": "Protocol",
+      "discriminator": [
+        45,
+        39,
+        101,
+        43,
+        115,
+        72,
+        131,
+        40
+      ]
+    },
+    {
+      "name": "Subscription",
+      "discriminator": [
+        64,
+        7,
+        26,
+        135,
+        102,
+        132,
+        98,
+        33
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "ChargeMissed",
+      "discriminator": [
+        207,
+        118,
+        243,
+        102,
+        45,
+        164,
+        156,
+        194
+      ]
+    },
+    {
+      "name": "CollateralLocked",
+      "discriminator": [
+        185,
+        146,
+        119,
+        8,
+        41,
+        179,
+        88,
+        96
+      ]
+    },
+    {
+      "name": "CollateralSeized",
+      "discriminator": [
+        165,
+        149,
+        146,
+        90,
+        242,
+        23,
+        11,
+        168
+      ]
+    },
+    {
+      "name": "CollateralWithdrawn",
+      "discriminator": [
+        51,
+        224,
+        133,
+        106,
+        74,
+        173,
+        72,
+        82
+      ]
+    },
+    {
+      "name": "FeesSwept",
+      "discriminator": [
+        96,
+        218,
+        115,
+        136,
+        74,
+        170,
+        202,
+        172
+      ]
+    },
+    {
+      "name": "InstallmentPaid",
+      "discriminator": [
+        247,
+        32,
+        44,
+        43,
+        84,
+        76,
+        215,
+        84
+      ]
+    },
+    {
+      "name": "LiquidityFunded",
+      "discriminator": [
+        67,
+        122,
+        95,
+        25,
+        226,
+        99,
+        78,
+        69
+      ]
+    },
+    {
+      "name": "LiquidityWithdrawn",
+      "discriminator": [
+        240,
+        120,
+        73,
+        139,
+        154,
+        31,
+        218,
+        68
+      ]
+    },
+    {
+      "name": "LoanCreated",
+      "discriminator": [
+        142,
+        148,
+        28,
+        215,
+        65,
+        185,
+        246,
+        200
+      ]
+    },
+    {
+      "name": "LoanFullyRepaid",
+      "discriminator": [
+        211,
+        241,
+        199,
+        87,
+        36,
+        217,
+        123,
+        186
+      ]
+    },
+    {
+      "name": "LoanLiquidated",
+      "discriminator": [
+        1,
+        29,
+        28,
+        96,
+        66,
+        95,
+        8,
+        204
+      ]
+    },
+    {
+      "name": "LoanStatusChanged",
+      "discriminator": [
+        13,
+        92,
+        117,
+        131,
+        204,
+        91,
+        229,
+        234
+      ]
+    },
+    {
+      "name": "MerchantActivated",
+      "discriminator": [
+        147,
+        240,
+        192,
+        95,
+        198,
+        75,
+        190,
+        80
+      ]
+    },
+    {
+      "name": "MerchantRegistered",
+      "discriminator": [
+        202,
+        61,
+        140,
+        95,
+        139,
+        239,
+        17,
+        83
+      ]
+    },
+    {
+      "name": "PaymentMade",
+      "discriminator": [
+        227,
+        251,
+        123,
+        16,
+        133,
+        220,
+        83,
+        242
+      ]
+    },
+    {
+      "name": "PlanCreated",
+      "discriminator": [
+        215,
+        11,
+        135,
+        121,
+        208,
+        119,
+        149,
+        149
+      ]
+    },
+    {
+      "name": "ScoreChanged",
+      "discriminator": [
+        63,
+        117,
+        5,
+        29,
+        227,
+        172,
+        227,
+        166
+      ]
+    },
+    {
+      "name": "Subscribed",
+      "discriminator": [
+        135,
+        59,
+        105,
+        76,
+        190,
+        236,
+        138,
+        228
+      ]
+    },
+    {
+      "name": "SubscriptionCancelled",
+      "discriminator": [
+        158,
+        216,
+        233,
+        205,
+        138,
+        62,
+        176,
+        239
+      ]
+    },
+    {
+      "name": "SubscriptionCharged",
+      "discriminator": [
+        176,
+        201,
+        198,
+        4,
+        5,
+        238,
+        48,
+        128
+      ]
+    },
+    {
+      "name": "SubscriptionLapsed",
+      "discriminator": [
+        71,
+        233,
+        77,
+        76,
+        2,
+        169,
+        199,
+        232
+      ]
+    },
+    {
+      "name": "Underwritten",
+      "discriminator": [
+        195,
+        106,
+        147,
+        39,
+        83,
+        21,
+        26,
+        239
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "ZeroAmount",
+      "msg": "Amount must be greater than zero"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidInstallments",
+      "msg": "Installment count must be between 1 and 24"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidInterval",
+      "msg": "Interval must be between 1 hour and 365 days"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidGracePeriod",
+      "msg": "Grace period exceeds the maximum"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidFee",
+      "msg": "Fee exceeds the maximum"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidMultiplier",
+      "msg": "Credit multiplier is zero or exceeds the maximum"
+    },
+    {
+      "code": 6006,
+      "name": "LoanNotActive",
+      "msg": "Loan is not active"
+    },
+    {
+      "code": 6007,
+      "name": "NotLiquidatable",
+      "msg": "Loan does not meet the liquidation condition"
+    },
+    {
+      "code": 6008,
+      "name": "ExceedsCreditLimit",
+      "msg": "Borrowing this would exceed the credit limit"
+    },
+    {
+      "code": 6009,
+      "name": "MerchantNotEligible",
+      "msg": "Merchant is inactive or the order exceeds its cap"
+    },
+    {
+      "code": 6010,
+      "name": "InsufficientLiquidity",
+      "msg": "Insufficient protocol liquidity to pay the merchant"
+    },
+    {
+      "code": 6011,
+      "name": "InsufficientCollateral",
+      "msg": "Collateral balance is too low"
+    },
+    {
+      "code": 6012,
+      "name": "DebtOutstanding",
+      "msg": "Collateral is locked while debt is outstanding"
+    },
+    {
+      "code": 6013,
+      "name": "PlanNotActive",
+      "msg": "Subscription plan is not active"
+    },
+    {
+      "code": 6014,
+      "name": "AlreadySubscribed",
+      "msg": "Already subscribed to this plan"
+    },
+    {
+      "code": 6015,
+      "name": "SubscriptionNotActive",
+      "msg": "Subscription is not active"
+    },
+    {
+      "code": 6016,
+      "name": "NotDue",
+      "msg": "Subscription charge is not due yet"
+    },
+    {
+      "code": 6017,
+      "name": "NotAuthorized",
+      "msg": "Caller is neither the subscriber nor the merchant"
+    },
+    {
+      "code": 6018,
+      "name": "InvalidPeriod",
+      "msg": "Period must be between 1 hour and 365 days"
+    },
+    {
+      "code": 6019,
+      "name": "MathOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6020,
+      "name": "StringTooLong",
+      "msg": "String exceeds its maximum length"
+    },
+    {
+      "code": 6021,
+      "name": "NotDelegated",
+      "msg": "Token account is not delegated to the protocol"
+    },
+    {
+      "code": 6022,
+      "name": "InsufficientDelegation",
+      "msg": "Delegated amount does not cover what is owed"
+    },
+    {
+      "code": 6023,
+      "name": "TokenOwnerMismatch",
+      "msg": "Token account owner does not match the expected party"
+    },
+    {
+      "code": 6024,
+      "name": "MintMismatch",
+      "msg": "Token account mint is not the protocol stablecoin"
+    },
+    {
+      "code": 6025,
+      "name": "NotUnderwriter",
+      "msg": "Not the underwriter"
+    },
+    {
+      "code": 6026,
+      "name": "EvidenceFromTheFuture",
+      "msg": "Evidence is from the future"
+    },
+    {
+      "code": 6027,
+      "name": "EvidenceStale",
+      "msg": "Evidence is stale"
+    },
+    {
+      "code": 6028,
+      "name": "AlreadyUnderwritten",
+      "msg": "Borrower already has a record"
+    }
+  ],
+  "types": [
+    {
+      "name": "ChargeMissed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan_id",
+            "type": "u64"
+          },
+          {
+            "name": "subscriber",
+            "type": "pubkey"
+          },
+          {
+            "name": "misses",
+            "type": "u32"
+          },
+          {
+            "name": "next_charge_at",
+            "type": "i64"
+          },
+          {
+            "name": "reason",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CollateralLocked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "new_total",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CollateralSeized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CollateralWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "new_total",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreditProfile",
+      "docs": [
+        "Per-user credit state.",
+        "",
+        "On EVM this was split across `ScoreManager._profiles`,",
+        "`LoanEngine.activeDebtOf` and `CollateralVault.lockedOf` — three contracts",
+        "that had to be kept consistent with each other through `setWriter` and",
+        "`setSeizer` grants. Inside one program they are one account, so the",
+        "consistency problem does not exist."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "score",
+            "type": "u16"
+          },
+          {
+            "name": "on_time_payments",
+            "type": "u32"
+          },
+          {
+            "name": "late_payments",
+            "type": "u32"
+          },
+          {
+            "name": "liquidations",
+            "type": "u32"
+          },
+          {
+            "name": "active_debt",
+            "docs": [
+              "Everything this user currently owes across every open plan."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "locked_collateral",
+            "type": "u64"
+          },
+          {
+            "name": "seized_collateral",
+            "docs": [
+              "Set when a liquidation seizes collateral, so it cannot be double-seized."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "first_seen_at",
+            "type": "i64"
+          },
+          {
+            "name": "underwritten_at",
+            "docs": [
+              "When this line was underwritten from chain history, or 0 if it opened",
+              "at the flat starting score."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "wallet_age_days",
+            "docs": [
+              "The evidence the opening score was computed from, kept so a borrower can",
+              "be shown why their limit is what it is, and so a disputed line can be",
+              "recomputed rather than argued about."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "transaction_count",
+            "type": "u32"
+          },
+          {
+            "name": "token_accounts",
+            "type": "u32"
+          },
+          {
+            "name": "stable_balance",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeesSwept",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "to",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FinancedOrder",
+      "docs": [
+        "The record that an order has already been financed.",
+        "",
+        "Exists for its address, in exactly the way `Payment` does. A direct payment",
+        "could never be taken twice because the payment account is seeded by",
+        "(merchant, order) and `init` fails the second time — but an installment",
+        "plan had no such guard, so scanning the same Solana Pay code twice opened",
+        "two loans and charged the customer twice for one basket. Verified: it did.",
+        "",
+        "The check cannot be forgotten here either, because it is not a check."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "order_ref",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "loan_id",
+            "docs": [
+              "The plan that settled it, so the guard is a receipt rather than a lock."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "financed_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InstallmentPaid",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "loan_id",
+            "type": "u64"
+          },
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "installment_index",
+            "docs": [
+              "0-based, to match `installment_due_at`, so an indexer can join the event",
+              "to the schedule without an off-by-one."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "on_time",
+            "type": "bool"
+          },
+          {
+            "name": "installments_paid",
+            "docs": [
+              "Installments the money received actually covers, after this payment."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "outstanding",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LiquidityFunded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LiquidityWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "to",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Loan",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "merchant",
+            "docs": [
+              "The merchant's registry PDA, not their wallet."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "borrower_token_account",
+            "docs": [
+              "The token account the borrower is charged from. Pinned at origination so",
+              "a keeper cannot be pointed at a different account later."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "principal",
+            "type": "u64"
+          },
+          {
+            "name": "total_owed",
+            "type": "u64"
+          },
+          {
+            "name": "total_repaid",
+            "type": "u64"
+          },
+          {
+            "name": "installment_count",
+            "type": "u32"
+          },
+          {
+            "name": "installments_paid",
+            "type": "u32"
+          },
+          {
+            "name": "started_at",
+            "type": "i64"
+          },
+          {
+            "name": "interval_seconds",
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "LoanStatus"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LoanCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "loan_id",
+            "type": "u64"
+          },
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "principal",
+            "type": "u64"
+          },
+          {
+            "name": "total_owed",
+            "type": "u64"
+          },
+          {
+            "name": "installments",
+            "type": "u32"
+          },
+          {
+            "name": "started_at",
+            "type": "i64"
+          },
+          {
+            "name": "interval_seconds",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LoanFullyRepaid",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "loan_id",
+            "type": "u64"
+          },
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LoanLiquidated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "loan_id",
+            "type": "u64"
+          },
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "outstanding",
+            "type": "u64"
+          },
+          {
+            "name": "recovered",
+            "type": "u64"
+          },
+          {
+            "name": "bad_debt",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LoanStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Repaid"
+          },
+          {
+            "name": "Liquidated"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LoanStatusChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "loan_id",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "LoanStatus"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Merchant",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "payout",
+            "docs": [
+              "Token account that receives settlement."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "metadata_uri",
+            "type": "string"
+          },
+          {
+            "name": "max_order_value",
+            "docs": [
+              "BNPL exposure is a function of who is selling as much as who is buying."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_settled",
+            "type": "u64"
+          },
+          {
+            "name": "registered_at",
+            "type": "i64"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MerchantActivated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MerchantRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Payment",
+      "docs": [
+        "Seeded by (merchant, order id), so a retrying checkout cannot pay twice:",
+        "the second `init` fails because the address is already occupied."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "payer",
+            "type": "pubkey"
+          },
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "order_ref",
+            "docs": [
+              "The 32-byte reference this payment settles. Also its PDA seed."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          },
+          {
+            "name": "paid_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PaymentMade",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "payer",
+            "type": "pubkey"
+          },
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          },
+          {
+            "name": "order_ref",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Plan",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "merchant",
+            "docs": [
+              "The merchant registry PDA that owns this plan."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "price_per_period",
+            "type": "u64"
+          },
+          {
+            "name": "period_seconds",
+            "type": "i64"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlanCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan_id",
+            "type": "u64"
+          },
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "price_per_period",
+            "type": "u64"
+          },
+          {
+            "name": "period_seconds",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Protocol",
+      "docs": [
+        "Global configuration and the protocol's own ledgers.",
+        "",
+        "This PDA is also the authority on the liquidity and collateral vaults, and",
+        "the delegate every borrower approves. One signer for the whole protocol."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "stablecoin",
+            "docs": [
+              "The stablecoin mint. Every token account the protocol touches must match."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "docs": [
+              "Where protocol fees are swept. A token account, not a wallet."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "grace_period",
+            "docs": [
+              "How long an installment may be overdue before the loan is liquidatable.",
+              "",
+              "Set at initialization rather than as a constant: a consumer book wants",
+              "days, a machine-to-machine book wants minutes, and a devnet deployment",
+              "wants seconds so the liquidation path can be demonstrated without",
+              "waiting three days."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "min_interval_seconds",
+            "docs": [
+              "Floor on an installment interval and a subscription period. Fixed at",
+              "initialization, like the grace period, so it cannot be lowered under a",
+              "schedule that is already running."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "loan_count",
+            "type": "u64"
+          },
+          {
+            "name": "plan_count",
+            "type": "u64"
+          },
+          {
+            "name": "payment_count",
+            "type": "u64"
+          },
+          {
+            "name": "subscription_count",
+            "type": "u64"
+          },
+          {
+            "name": "protocol_fees_accrued",
+            "docs": [
+              "Accrued protocol share of interest, not yet swept."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bad_debt",
+            "docs": [
+              "Unrecovered value from liquidations. The protocol's own loss ledger."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "fee_bps",
+            "docs": [
+              "Fee on direct payments and subscription charges."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "credit_multiplier_bps",
+            "docs": [
+              "Basis points of credit granted per unit of locked collateral."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "underwriter",
+            "docs": [
+              "Who may attest to a wallet's history when opening its first line.",
+              "",
+              "Separate from `authority` on purpose. The underwriter signs constantly —",
+              "once per new borrower — so it wants to be a warm key on a service, while",
+              "the authority moves protocol money and should not be. It attests to",
+              "facts, never to a score: the arithmetic lives in `underwrite_from`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "liquidity_bump",
+            "type": "u8"
+          },
+          {
+            "name": "collateral_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ScoreChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_score",
+            "type": "u16"
+          },
+          {
+            "name": "new_score",
+            "type": "u16"
+          },
+          {
+            "name": "reason",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Cancelled"
+          },
+          {
+            "name": "Lapsed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Subscribed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan_id",
+            "type": "u64"
+          },
+          {
+            "name": "subscriber",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Subscription",
+      "docs": [
+        "Seeded by (subscriber, plan), so one live subscription per pair is a",
+        "property of the address rather than a check that can be forgotten."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subscriber",
+            "type": "pubkey"
+          },
+          {
+            "name": "plan",
+            "type": "pubkey"
+          },
+          {
+            "name": "subscriber_token_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "started_at",
+            "type": "i64"
+          },
+          {
+            "name": "next_charge_at",
+            "type": "i64"
+          },
+          {
+            "name": "periods_charged",
+            "type": "u32"
+          },
+          {
+            "name": "missed_charges",
+            "type": "u32"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "SubStatus"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubscriptionCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan_id",
+            "type": "u64"
+          },
+          {
+            "name": "subscriber",
+            "type": "pubkey"
+          },
+          {
+            "name": "by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubscriptionCharged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan_id",
+            "type": "u64"
+          },
+          {
+            "name": "subscriber",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          },
+          {
+            "name": "period",
+            "type": "u32"
+          },
+          {
+            "name": "next_charge_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubscriptionLapsed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan_id",
+            "type": "u64"
+          },
+          {
+            "name": "subscriber",
+            "type": "pubkey"
+          },
+          {
+            "name": "misses",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Underwritten",
+      "docs": [
+        "Emitted when a line is opened from chain history rather than a flat score.",
+        "",
+        "Carries the evidence, not just the result. An indexer, a borrower disputing",
+        "their limit, or anyone auditing the underwriter can recompute the score from",
+        "this event and the on-chain weights, and check the facts against the same",
+        "cluster the underwriter read."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "score",
+            "type": "u16"
+          },
+          {
+            "name": "wallet_age_days",
+            "type": "u32"
+          },
+          {
+            "name": "transaction_count",
+            "type": "u32"
+          },
+          {
+            "name": "token_accounts",
+            "type": "u32"
+          },
+          {
+            "name": "stable_balance",
+            "type": "u64"
+          },
+          {
+            "name": "observed_at",
+            "type": "i64"
+          },
+          {
+            "name": "underwritten_at",
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ]
+}

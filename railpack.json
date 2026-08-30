@@ -1,0 +1,8 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "node",
+  "packages": { "node": "22" },
+  "deploy": {
+    "startCommand": "node --experimental-strip-types apps/gateway/src/server.ts"
+  }
+}

@@ -88,7 +88,7 @@ packages/sdk-solana     createPolaris() — pay, subscribe, payLater
 mobile/                 the Android app — Expo, signs on the device
 apps/gateway            the underwriter, and a Solana Pay endpoint
 scripts/lifecycle.ts    stand it up and run a loan through its whole life
-tests/                  153 integration tests on bankrun
+tests/                  42 integration tests on bankrun
 docs/SOLANA-PORT.md     the port plan and every decision in it
 packages/contracts      the Solidity original, kept as the reference
 ```
@@ -303,7 +303,7 @@ signer is the one piece a shipped build has to replace — see *What is not done
 
 ```bash
 pnpm run program:test        # 18 — the arithmetic that costs money
-pnpm run anchor:test         # 153 — every exploit, on chain
+pnpm run anchor:test         # 42 — every exploit, on chain
 pnpm --filter @polaris/keeper-solana test   # 20 — the dunning ladder
 pnpm --filter @polaris/sdk-solana test      # 13 — the SDK against a live cluster
 pnpm --filter @polaris/gateway test         # 14 — underwriting and Solana Pay
