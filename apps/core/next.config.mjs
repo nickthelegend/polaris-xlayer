@@ -58,7 +58,8 @@ const nextConfig = {
       buffer: require.resolve("buffer"),
     };
 
-    // Required for @zama-fhe/relayer-sdk WASM module (webpack fallback)
+    // WASM support. Originally added for @zama-fhe/relayer-sdk, which is no
+    // longer a dependency; kept because other transitive deps still load WASM.
     config.experiments = {
       ...config.experiments,
       asyncWebAssembly: true,

@@ -67,12 +67,13 @@ demo store exists to make that crossing visible.
 - Worked example the product actually computes: a **$200** purchase split into
   four becomes **4 × 50.38**, repaying **201.53** — principal plus **1.53**
   interest pro-rated over 28 days. The merchant receives **200.00** that day.
-- **Chain inconsistency, unresolved and load-bearing.** The landing copy says
-  Solana; every deployed app runs on **Sepolia** with Fhenix FHE (`chainId:
-  11155111`). A separate Solana implementation exists in the sibling
-  `polaris-solana` repo. Future work must not silently pick a side. [inferred]
-- The merchant API's database credentials are currently invalid, so no bill can
-  be created and no checkout can complete end to end. [inferred, verified live]
+- **Chain: Solana, resolved.** An earlier incarnation ran on Sepolia with
+  Fhenix FHE, and for a while the landing copy and the deployed apps disagreed
+  about which chain the product was on. That is settled: everything is Solana,
+  on devnet, against program `CpRqbMywzAEKkEALZtrXqPYM36E5RrFewYnRtUYEEvUS`,
+  and the EVM implementation is history rather than a parallel target.
+- The merchant API runs against a real MongoDB; bills create and checkout
+  completes end to end. [verified live]
 
 ## Brand Commitments
 

@@ -22,6 +22,31 @@ Solidity original as the reference this was checked against.
 
 ---
 
+## Layout
+
+Everything the product is made of lives here. The web surfaces joined this
+repository from their own repos, each brought in with its history intact.
+
+| Path | What it is | Live |
+|---|---|---|
+| `programs/` | The Anchor program — 23 instructions, one program | `CpRqbMywzAEKkEALZtrXqPYM36E5RrFewYnRtUYEEvUS` (devnet) |
+| `mobile/` | The shopper's Android app — credit line, checkout, activity | |
+| `merchant-app/` | The merchant terminal, Android. Read-only, holds no key. Drives the iMin thermal printer | |
+| `keeper-solana/` | The scheduler that collects instalments and liquidates defaults | |
+| `apps/gateway/` | Solana Pay transaction-request endpoint | Railway |
+| `apps/core/` | Protocol dashboard | |
+| `apps/merchant/` | Merchant dashboard against the keeper and gateway | |
+| `landing/` | The marketing site | [polarispay.app](https://polarispay.app) |
+| `merchant-web/` | Merchant checkout platform — app keys, bills, webhooks | [merchant.polarispay.app](https://merchant.polarispay.app) |
+| `shopping/` | A real storefront that pays through Polaris | |
+| `packages/contracts/` | The Solidity original, kept as the reference this was checked against | |
+
+An earlier incarnation of this product ran on Sepolia with Fhenix FHE. It does
+not any more, anywhere in this repository; where the old chain is still named
+it is being named as history.
+
+---
+
 ## What changed, and why it matters
 
 | KeeperHub primitive | Why EVM needed it | Solana |

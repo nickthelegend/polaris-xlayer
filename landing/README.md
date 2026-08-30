@@ -35,13 +35,14 @@ Navigate to [http://localhost:3000](http://localhost:3000) to view the landing p
 - `components/`: Modular marketing components (Hero, Features, Roadmap, FAQ).
 
 ## 🌍 The Polaris Ecosystem
-For the protocol's core logic and user dashboard, check the [`polaris-core`](../polaris-core) and [`polaris-protocol`](../polaris-protocol) repositories.
+The program, the two Android apps, the gateway and the keeper all live in this
+repository — see the layout in the root `README.md`.
 
 ---
 
 ## 🎨 Branding & Marketing Core
 The landing page highlights the core values of Polaris:
-* **Fhenix CoFHE Integration**: Highlights the cryptographic shield that guards institutional capital and retail debt.
-* **Premium Dark Mode**: Modern branding using Tailwind CSS v4, Framer Motion, and Geist typography.
-* **Confidential DeFi**: Transparent messaging on how Fully Homomorphic Encryption solves the public-ledger privacy bottleneck.
+* **Credit, built into the payment**: pay in full, subscribe, or split into four against a line underwritten from the wallet's own on-chain record.
+* **The board**: a departure-board visual system — ruled rows, fixed columns, monospaced figures, one lime lamp marking state. See `DESIGN.md`.
+* **Every figure is program output**: no invented numbers on the page; the evidence is listed in `PRODUCT.md`.
 

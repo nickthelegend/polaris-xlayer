@@ -42,9 +42,12 @@ The Merchant App coordinates with the `polaris-core` API to create bills and aut
 
 ---
 
-## ⚙️ Sepolia Contract Configurations
-The app is wired directly to the active Fhenix Sepolia smart contracts. The configuration can be inspected and updated in:
-* [`lib/constants.ts`](file:///d:/Project/fhenix/polaris-merchant-app-fhenix/lib/constants.ts)
+## ⚙️ Chain configuration
+The app reads Solana devnet through the gateway; the deployed program id and
+cluster live in the workspace's `deployments/`. It builds no transaction and
+holds no key — a merchant's trade is public state under their own address, so
+the dashboard is read-only by construction.
 
-It imports JSON ABIs directly to coordinate payments and settle balances using confidential Fhenix-based routing.
+An earlier version of this app was wired to Fhenix Sepolia contracts. That is
+no longer the case anywhere in this repository.
 
