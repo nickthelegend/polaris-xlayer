@@ -64,7 +64,11 @@ export default function CheckoutPage() {
         const result = await initiatePolarisPayment(total, `Order for ${items.length} Modules`);
 
         if (result.error) {
-            alert(`Error: ${result.error}`);
+            // A native alert() blocks the page thread, which froze the tab hard
+            // enough to stall navigation and devtools alike. The app already
+            // renders toasts; a failed payment is not a reason to lock the UI.
+            toast.error(result.error, { theme: "dark" });
+            setOrderStatus("error");
             setLoading(false);
         } else if (result.checkoutUrl) {
             // Open the Polaris Checkout Hub in a new popup window
