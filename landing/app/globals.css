@@ -1,0 +1,172 @@
+@import "tailwindcss";
+
+/*
+  POLARIS PAY — THE BOARD
+  ───────────────────────
+  The world is a departure board. An instalment ladder is a schedule of dated
+  future events, which is the same object as a board in a station hall:
+  Sep 11 · SCHEDULED · 50.38 is a departure row. That is why this page is ruled
+  rows and fixed columns rather than cards, why every figure is right-aligned
+  and monospaced, and why the accent behaves like an illuminated lamp rather
+  than a glow.
+
+  Three disciplines borrowed from directions this one beat:
+    · the graticule    — every element sits on a declared division of a visible
+                         measuring grid; no arbitrary padding anywhere
+    · the leader line  — annotations point at the node they describe
+    · scale contrast   — one oversized figure against tiny tracked labels
+
+  Palette and faces are brand truth (PRODUCT.md § Brand Commitments), not
+  choices made here: the ground and lime come from the product's own mark, and
+  the two faces are pinned.
+*/
+
+@theme {
+  --color-stencil: #000000;   /* mask stencil only — never painted */
+  --color-hall: #04070f;        /* the dark of the hall */
+  --color-panel: #080d16;       /* a board panel */
+  --color-flap: #0d1420;        /* an unlit flap */
+  --color-lamp: #bffa62;        /* the lit element — emissive, never a halo */
+  --color-ink: #f5f9ff;
+  --color-dim: #64b3c0;         /* the second lamp, used twice on the page */
+  --color-rule: rgb(245 249 255 / 0.11);
+  --color-rule-soft: rgb(245 249 255 / 0.055);
+
+  --font-board: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-figure: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  /* The graticule. One division is the atom of every measurement on the page. */
+  --div: 12px;
+
+  --radius-none: 0px;
+}
+
+:root { color-scheme: dark; }
+
+html {
+  background: var(--color-hall);
+  scroll-padding-top: calc(var(--div) * 8);
+}
+
+body {
+  background: var(--color-hall);
+  color: var(--color-ink);
+  font-family: var(--font-board);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── The measuring grid ─────────────────────────────────────────────────────
+   A real graticule, not texture: 10 divisions to a major line, so a reader can
+   count. It is the reason nothing on this page needs a decorative background. */
+.graticule {
+  background-image:
+    linear-gradient(rgb(245 249 255 / 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(245 249 255 / 0.022) 1px, transparent 1px);
+  background-size: calc(var(--div) * 14) calc(var(--div) * 14);
+  background-position: center top;
+  /* Etched, not ruled: the graticule is a measuring reference the eye can find
+     when it looks for it, never a table the content has to compete with. It
+     fades out toward the section edges so it reads as a field, not a grid. */
+  -webkit-mask-image: radial-gradient(ellipse 120% 80% at 50% 40%, var(--color-stencil) 35%, transparent 100%);
+          mask-image: radial-gradient(ellipse 120% 80% at 50% 40%, var(--color-stencil) 35%, transparent 100%);
+}
+
+/* ── Board type ─────────────────────────────────────────────────────────────
+   Signage caps: the labels on a board are set tight and small, and the
+   destinations are set large. Both are Space Grotesk; the split is scale. */
+.label {
+  font-size: 0.625rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: rgb(245 249 255 / 0.42);
+}
+
+.destination {
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 0.94;
+}
+
+/* Every figure the system computed. Tabular so a changing value cannot reflow
+   the digits beside it, and lining so columns align down the board. */
+.figure {
+  font-family: var(--font-figure);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ── Rows ───────────────────────────────────────────────────────────────────
+   The board is rules, not boxes. A row is defined by the hairline under it. */
+.row {
+  border-bottom: 1px solid var(--color-rule);
+}
+.row:last-child { border-bottom: 0; }
+
+/* The lit state of a row. A lamp behind the flap, not a shadow around it. */
+.lit {
+  background: linear-gradient(90deg, rgb(191 250 98 / 0.07), transparent 62%);
+}
+
+/* ── Press feedback ─────────────────────────────────────────────────────────
+   The site had no :active state anywhere — a pressable that does not
+   acknowledge the press is the one real feedback gap on this page.
+
+   This is CSS and not GSAP on purpose. Press feedback has to land inside
+   ~140ms of the pointer going down; routing it through a JS timeline adds
+   latency to the exact interaction that must feel instant, and it would stop
+   working before hydration. GSAP owns the scroll-driven explanation sequences
+   below, where its timeline actually earns its place. */
+.press {
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.press:active {
+  transform: scale(0.975);
+}
+@media (prefers-reduced-motion: reduce) {
+  .press:active { transform: none; }
+}
+
+/* ── The split-flap ─────────────────────────────────────────────────────────
+   The page's one authored moment. A board updates by flipping its flaps, so
+   rows arrive by rotating on their own top edge rather than sliding in. */
+.flap {
+  transform-origin: top center;
+  backface-visibility: hidden;
+}
+
+/* ── Motion arming ──────────────────────────────────────────────────────────
+   Content is hidden ONLY once JS has proven it can animate. `html.armed` is
+   set by an inline script that refuses to arm a hidden document, because the
+   animation runs on requestAnimationFrame and a throttled tab never ticks —
+   a page that hides itself in CSS and waits for JS is a blank page waiting to
+   happen, and this project has already shipped that bug once. */
+html.armed [data-flap] {
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.armed [data-flap] { opacity: 1 !important; transform: none !important; }
+  html { scroll-behavior: auto; }
+}
+
+/* ── Browser surfaces ───────────────────────────────────────────────────────
+   The parts not drawn here still belong to the board. */
+::selection { background: var(--color-lamp); color: var(--color-hall); }
+
+:focus-visible {
+  outline: 2px solid var(--color-lamp);
+  outline-offset: 2px;
+}
+
+* { scrollbar-color: rgb(245 249 255 / 0.16) transparent; scrollbar-width: thin; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: var(--color-hall); }
+*::-webkit-scrollbar-thumb {
+  background: rgb(245 249 255 / 0.16);
+  border: 3px solid var(--color-hall);
+}
+*::-webkit-scrollbar-thumb:hover { background: rgb(191 250 98 / 0.5); }
+
+a { text-underline-offset: 0.28em; text-decoration-thickness: 1px; }
