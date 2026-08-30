@@ -6,7 +6,7 @@ import Image from 'next/image';
 
 export default function Shop() {
     return (
-        <div className="min-h-screen bg-gray-50 text-gray-900 font-sans selection:bg-teal-500 selection:text-white">
+        <div className="min-h-screen bg-gray-50 text-gray-900 font-sans selection:bg-primary/30 selection:text-white">
             <header className="bg-white border-b border-gray-100 sticky top-0 z-50">
                 <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-2">

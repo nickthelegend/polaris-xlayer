@@ -3,6 +3,8 @@ import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+
     const { id } = await params;
     const walletAddress = req.headers.get('x-wallet-address');
 
@@ -22,9 +24,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     return NextResponse.json({ app });
+  } catch (err) {
+    // POLARIS_GUARDED: a throw must never become an empty 500 —
+    // clients call res.json() on the reply and die on a blank body.
+    console.error("[api] unhandled", err);
+    const message = err instanceof Error ? err.message : "Internal error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+
     const { id } = await params;
     const walletAddress = req.headers.get('x-wallet-address');
     const body = await req.json();
@@ -48,4 +59,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     return NextResponse.json({ app: result });
+  } catch (err) {
+    // POLARIS_GUARDED: a throw must never become an empty 500 —
+    // clients call res.json() on the reply and die on a blank body.
+    console.error("[api] unhandled", err);
+    const message = err instanceof Error ? err.message : "Internal error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

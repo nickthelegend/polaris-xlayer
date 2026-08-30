@@ -17,13 +17,20 @@ export default function Header() {
             <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
                 <div className="flex items-center gap-10">
                     <Link href="/" className="flex items-center gap-3 group">
+                        {/* One mark across the estate. Was /logo.png, a chrome-bevelled
+                            italic "Polaris" wordmark belonging to the ATV company and
+                            inherited with the template. This is the product's own star
+                            -- the same file polarispay.app serves, byte for byte. */}
                         <Image
-                            src="/logo.png"
-                            alt="Polaris Logo"
-                            width={140}
-                            height={40}
-                            className="h-9 w-auto hover:brightness-110 transition-all"
+                            src="/star.png"
+                            alt=""
+                            width={22}
+                            height={24}
+                            className="h-6 w-auto"
                         />
+                        <span className="text-[17px] font-medium tracking-[-0.03em] text-white">
+                            Polaris Pay
+                        </span>
                     </Link>
 
                     <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-white/50">

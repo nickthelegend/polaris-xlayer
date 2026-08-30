@@ -84,9 +84,11 @@
 }
 
 .grid-bg {
-  background-image: linear-gradient(rgba(166, 242, 74, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(166, 242, 74, 0.04) 1px, transparent 1px);
-  background-size: 80px 80px;
+  /* Deliberately empty. This was a two-axis hairline grid tiled at 80px — a
+     decorative field, not a measuring reference, and one of the clearest
+     generated-UI signatures. The class is kept so the four pages that carry it
+     need no edit, but it paints nothing: the page's own structure is the
+     structure. */
 }
 
 .glow-bg {

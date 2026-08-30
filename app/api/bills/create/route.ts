@@ -3,6 +3,8 @@ import crypto from "crypto";
 import { getDb } from "@/lib/mongodb";
 
 export async function POST(req: Request) {
+  try {
+
   const clientId = req.headers.get("x-client-id");
   const clientSecret = req.headers.get("x-client-secret");
 
@@ -48,4 +50,11 @@ export async function POST(req: Request) {
     chainId: 11155111, // Sepolia
     status: "pending",
   });
+  } catch (err) {
+    // POLARIS_GUARDED: a throw must never become an empty 500 —
+    // clients call res.json() on the reply and die on a blank body.
+    console.error("[api] unhandled", err);
+    const message = err instanceof Error ? err.message : "Internal error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

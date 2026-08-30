@@ -20,14 +20,21 @@ export default function Home() {
                     </div>
 
                     <div className="flex justify-center mb-10 animate-in fade-in slide-in-from-bottom-6 duration-1000">
-                        <Image
-                            src="/logo.png"
-                            alt="Polaris Logo"
-                            width={600}
-                            height={150}
-                            className="w-full max-w-[500px] h-auto"
-                            priority
-                        />
+                        {/* The hero lockup: the star set beside the name, rather than
+                            the borrowed chrome wordmark this template shipped with. */}
+                        <div className="flex items-center gap-5">
+                            <Image
+                                src="/star.png"
+                                alt=""
+                                width={66}
+                                height={72}
+                                className="h-14 w-auto sm:h-[72px]"
+                                priority
+                            />
+                            <span className="text-5xl sm:text-6xl font-medium tracking-[-0.04em] text-white">
+                                Polaris Pay
+                            </span>
+                        </div>
                     </div>
 
                     <p className="text-lg text-white/50 max-w-2xl mx-auto mb-10 leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-100 font-medium">
