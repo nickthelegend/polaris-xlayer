@@ -46,12 +46,30 @@ contract StockPriceOracle is Ownable {
     mapping(address => string) public sourceOf;
     mapping(address => bool) public isRelayer;
 
-    /// A price older than this is not a price. 15 minutes by default.
+    /**
+     * A price older than this is not a price — while the venue is open.
+     */
     uint64 public maxAge = 15 minutes;
+
+    /**
+     * And while it is shut.
+     *
+     * @dev These have to be two numbers. When the market closes, the most
+     *      recent print IS the closing print, and it only gets older until
+     *      the venue reopens: a single 15-minute bound would reject every
+     *      price all weekend and no after-hours loan could ever be written.
+     *      That would quietly delete the product's own after-hours path,
+     *      which exists and is priced for with a haircut.
+     *
+     *      Four days covers a Friday close through a Monday holiday. The
+     *      staleness risk that buys is exactly what `closedMarketHaircutBps`
+     *      on the engine is charging for.
+     */
+    uint64 public maxAgeWhenClosed = 4 days;
 
     event PricePosted(address indexed stock, uint256 usdPerShare, uint64 printedAt, bool marketOpen, string source);
     event RelayerSet(address indexed relayer, bool allowed);
-    event MaxAgeSet(uint64 seconds_);
+    event MaxAgeSet(uint64 whileOpen, uint64 whileClosed);
 
     error NotRelayer();
     error NoPrice(address stock);
@@ -74,10 +92,17 @@ contract StockPriceOracle is Ownable {
         emit RelayerSet(relayer, allowed);
     }
 
-    function setMaxAge(uint64 seconds_) external onlyOwner {
-        require(seconds_ >= 60, "maxAge too tight");
-        maxAge = seconds_;
-        emit MaxAgeSet(seconds_);
+    function setMaxAge(uint64 whileOpen, uint64 whileClosed) external onlyOwner {
+        require(whileOpen >= 60, "maxAge too tight");
+        require(whileClosed >= whileOpen, "closed bound must be the looser one");
+        maxAge = whileOpen;
+        maxAgeWhenClosed = whileClosed;
+        emit MaxAgeSet(whileOpen, whileClosed);
+    }
+
+    /// @notice The bound that applies to a print, given whether the venue was open.
+    function ageLimit(bool marketOpen) public view returns (uint64) {
+        return marketOpen ? maxAge : maxAgeWhenClosed;
     }
 
     /**
@@ -104,7 +129,7 @@ contract StockPriceOracle is Ownable {
         Price memory p = _prices[stock];
         if (p.usdPerShare == 0) revert NoPrice(stock);
         uint64 age = uint64(block.timestamp) - p.printedAt;
-        if (age > maxAge) revert StalePrice(stock, p.printedAt, age);
+        if (age > ageLimit(p.marketOpen)) revert StalePrice(stock, p.printedAt, age);
         return (p.usdPerShare, p.printedAt, p.marketOpen);
     }
 
@@ -117,6 +142,6 @@ contract StockPriceOracle is Ownable {
         Price memory p = _prices[stock];
         if (p.usdPerShare == 0) return (0, 0, false, false);
         uint64 age = uint64(block.timestamp) - p.printedAt;
-        return (p.usdPerShare, p.printedAt, p.marketOpen, age <= maxAge);
+        return (p.usdPerShare, p.printedAt, p.marketOpen, age <= ageLimit(p.marketOpen));
     }
 }

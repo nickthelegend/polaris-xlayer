@@ -1,0 +1,61 @@
+{
+  "_comment": "Every address here was read off the chain with eth_call / eth_getCode, not copied from documentation. The official X Layer docs still say the testnet chain id is 195; the live RPC answers 1952. Verified 2026-08-30.",
+  "mainnet": {
+    "name": "X Layer",
+    "chainId": 196,
+    "rpc": "https://rpc.xlayer.tech",
+    "explorer": "https://www.oklink.com/xlayer",
+    "gasToken": "OKB",
+    "assets": {
+      "USDT0": {
+        "address": "0x779Ded0c9e1022225f8E0630b35a9b54bE713736",
+        "decimals": 6,
+        "symbol": "USD₮0",
+        "_note": "The symbol contains U+20AE (₮), not an ASCII T. String-matching on \"USDT0\" will not find this token.",
+        "oft": "0x94bcca6bdfd6a61817ab0e960bfede4984505554"
+      },
+      "USDC_native": "0xB6CEceAB302E2E4948951eE7843FC24E92933061",
+      "USDC_bridged": "0x74b7f16337b8972027f6196a17a631ac6de26d22",
+      "_usdcNote": "Two contracts on X Layer both report symbol() == \"USDC\". The native Circle one and the bridged USDC.e. Pick deliberately."
+    },
+    "chainlink": {
+      "dataStreamsVerifierProxy": "0xcE73c8ad08CBDEaCa6078BF0627C8fe0a9a536E7",
+      "l2SequencerUptimeFeed": "0x45c2b8C204568A03Dc7A2E32B71D67Fe97F908A9",
+      "pushFeeds": {
+        "BTC/USD": "0x4D6f6488a2B3a5f7b088f276887f608a1e9805c4",
+        "ETH/USD": "0x8b85b50535551F8E8cDAF78dA235b5Cf1005907b",
+        "OKB/USD": "0x4Ff345b18a2bF894F8627F41501FBf30d5C5e7BE",
+        "USDC/USD": "0xB8a08c178D96C315FbFB5661ABD208477391B"
+      },
+      "_equityNote": "There is no equity push feed on X Layer. All 26 X Layer push feeds are crypto. Equity prices exist only as Chainlink Data Streams, which is a paid subscription and whose on-chain StreamsLookup pattern is NOT supported on X Layer. That is why StockPriceOracle takes a relayed print with its source and timestamp recorded on chain, rather than pretending to read a feed that does not exist."
+    }
+  },
+  "testnet": {
+    "name": "X Layer Testnet",
+    "chainId": 1952,
+    "_chainIdNote": "Official docs say 195. The live RPC returns 0x7a0 = 1952. The old X1 testnet on 195 no longer answers.",
+    "rpc": "https://testrpc.xlayer.tech",
+    "explorer": "https://www.oklink.com/xlayer-test",
+    "gasToken": "OKB",
+    "faucet": {
+      "url": "https://web3.okx.com/xlayer/faucet/xlayerfaucet",
+      "amountPerDay": "0.2 OKB",
+      "requiresLogin": false,
+      "requiresCaptcha": true,
+      "_note": "GeeTest v4 slider CAPTCHA plus OKX device fingerprinting. No account or wallet connection needed — an address is pasted in — but the CAPTCHA cannot be automated. 0.2 OKB is ~2400x the cost of a full Stockline deployment."
+    },
+    "assets": {
+      "USDT0": null,
+      "_note": "USDT0 is not deployed on X Layer testnet. eth_getCode returns 0x for both the token and the OFT. Stockline deploys a labelled stand-in there instead."
+    },
+    "chainlink": {
+      "dataStreamsVerifierProxy": "0x72790f9eB82db492a7DDb6d2af22A270Dcc3Db64",
+      "pushFeeds": {
+        "USDT/USD": "0xC2D024Cf0Ed041A7242B99E44dea2F2E17253275",
+        "ETH/USD": "0xdA4C8f84f670Aa8884aC3E11417b98E39A5C7da8",
+        "BTC/USD": "0x486b9BcBBC2607edB9353631b072B1148aF8f0F4",
+        "OKB/USD": "0xF6195DE070F6bf0da411Fb6F1e109a424a6C8c0e"
+      }
+    }
+  }
+}

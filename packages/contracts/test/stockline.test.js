@@ -294,3 +294,64 @@ describe("Stockline", () => {
     ).to.be.revertedWithCustomError(oracle, "PriceInFuture");
   });
 });
+
+describe("Stockline — staleness across a market close", () => {
+  let owner, borrower, merchant, funder;
+  let stock, usdt, oracle, pool, engine;
+  const usd = (n) => BigInt(Math.round(n * 1e8));
+  const stable = (n) => BigInt(Math.round(n * 1e6));
+  const shares = (n) => BigInt(Math.round(n * 1e6)) * 10n ** 12n;
+  const TENOR = 7 * 24 * 60 * 60;
+
+  beforeEach(async () => {
+    [owner, borrower, merchant, funder] = await ethers.getSigners();
+    stock = await (await ethers.getContractFactory("TestnetStock")).deploy("t", "tXAAPL", 18, owner.address);
+    usdt = await (await ethers.getContractFactory("MockUSDC")).deploy();
+    oracle = await (await ethers.getContractFactory("StockPriceOracle")).deploy(owner.address);
+    pool = await (await ethers.getContractFactory("LiquidityPool")).deploy(await usdt.getAddress(), owner.address);
+    engine = await (await ethers.getContractFactory("StocklineEngine")).deploy(
+      await usdt.getAddress(), await oracle.getAddress(), await pool.getAddress(), owner.address
+    );
+    await pool.setEngine(await engine.getAddress());
+    await engine.setAcceptedStock(await stock.getAddress(), true);
+    await usdt.mint(funder.address, stable(1_000_000));
+    await usdt.connect(funder).approve(await pool.getAddress(), stable(1_000_000));
+    await pool.connect(funder).fund(stable(1_000_000));
+    await stock.mint(borrower.address, shares(100));
+    await stock.connect(borrower).approve(await engine.getAddress(), ethers.MaxUint256);
+  });
+
+  it("still writes a loan on a Saturday, against Friday's close", async () => {
+    // The venue shut two days ago. The closing print is the only print there
+    // is, and the after-hours haircut is what pays for using it.
+    const closedAt = (await time.latest()) - 2 * 24 * 60 * 60;
+    await oracle.postPrice(await stock.getAddress(), usd(220), closedAt, false, "NasdaqGS close");
+    const q = await engine.quote(await stock.getAddress(), shares(10), TENOR);
+    expect(q.marketOpen).to.equal(false);
+    expect(q.ltvBps).to.equal(3_150n);
+    await expect(
+      engine.connect(borrower).openLoan(
+        await stock.getAddress(), shares(10), merchant.address, ethers.id("sat"), q.maxBorrow, TENOR
+      )
+    ).to.not.be.reverted;
+  });
+
+  it("still rejects a print older than the closed-market bound", async () => {
+    const ancient = (await time.latest()) - 5 * 24 * 60 * 60;
+    await oracle.postPrice(await stock.getAddress(), usd(220), ancient, false, "stale");
+    await expect(engine.quote(await stock.getAddress(), shares(10), TENOR))
+      .to.be.revertedWithCustomError(oracle, "StalePrice");
+  });
+
+  it("holds the tight bound while the venue is open", async () => {
+    const twentyMinsAgo = (await time.latest()) - 20 * 60;
+    await oracle.postPrice(await stock.getAddress(), usd(220), twentyMinsAgo, true, "live");
+    await expect(engine.quote(await stock.getAddress(), shares(10), TENOR))
+      .to.be.revertedWithCustomError(oracle, "StalePrice");
+  });
+
+  it("will not let the closed bound be set tighter than the open one", async () => {
+    await expect(oracle.setMaxAge(3600, 60)).to.be.revertedWith("closed bound must be the looser one");
+    await expect(oracle.setMaxAge(900, 4 * 86400)).to.not.be.reverted;
+  });
+});

@@ -83,13 +83,64 @@ meets the real assets; swapping them in is a change of address in the
 deployment and nothing else. Each deployment record lists its stand-ins
 explicitly under `standIns` rather than glossing over them.
 
+## The oracle, and why it is not Chainlink
+
+Chainlink **is** on X Layer — Data Streams on both networks, and 26 push feeds
+on mainnet. None of them is an equity. All 26 are crypto pairs. Equity prices
+exist on Chainlink only as Data Streams, which is a paid subscription, and
+whose on-chain `StreamsLookup` pattern X Layer does not support.
+
+So `StockPriceOracle` carries a relayed print and records its provenance: the
+venue's own timestamp, whether the venue was open, and a `source` string, all
+on chain and all on the receipt. The relayer is trusted, and that is stated
+rather than dressed up — but the number it publishes can be checked against
+the exchange by anyone.
+
+The scale is 1e8, the same as a Chainlink aggregator, so a real feed can drop
+in behind this interface the day one exists.
+
+### Two staleness bounds, not one
+
+While the venue is open a price older than 15 minutes is rejected. While it is
+shut, the bound is four days.
+
+This is not laziness. When the market closes, the most recent print *is* the
+closing print, and it only gets older until the venue reopens. A single
+15-minute bound would reject every price all weekend, and the product's own
+after-hours path — which exists and is priced for with a haircut — would
+quietly stop working. The live AAPL print at the time of writing was 17 hours
+old; under one bound, no Saturday checkout would have been possible at all.
+
 ## Running it
 
 ```bash
 cd packages/contracts
 npm install
-npx hardhat test test/stockline.test.js
+npx hardhat test test/stockline.test.js              # 25 tests
 npx hardhat run scripts/deploy-stockline.js --network xlayerTestnet
+npx hardhat run scripts/relayer.js  --network xlayerTestnet   # carries the print
+npx hardhat run scripts/keeper.js   --network xlayerTestnet   # clears bad positions
+npx hardhat run scripts/e2e-stockline.js --network xlayerTestnet
+```
+
+`e2e-stockline.js` is the demo: it opens against the **live** venue print,
+pays a merchant, repays and unlocks, then opens a second position and moves
+the price through the threshold to show liquidation returning the remainder.
+On a local chain it runs in full:
+
+```
+AAPL  $325.13  market CLOSED  source: NasdaqGS close
+  10 shares are worth   $3251.30
+  ceiling at 31.5% LTV  $1024.16      <- the after-hours haircut, applied
+  merchant received     $512.08       (immediately, from the pool)
+  health factor         3.14
+  ... repay ...
+  shopper holds         10.0000 shares — all of them
+  pool earned           $6.30
+  ... second position at the full ceiling, then price -45% ...
+  price now $178.82  health 0.86  liquidatable: true
+  shopper got back      3.9124 shares — only what was needed was sold
+  seized + returned     10.0000 of 10.0000 locked
 ```
 
 To deploy against real assets instead of stand-ins:
