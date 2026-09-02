@@ -21,9 +21,9 @@ const EVERY_MS = Number(process.env.KEEPER_INTERVAL_MS || 30_000);
 const DRY_RUN = process.env.KEEPER_DRY_RUN === "1";
 
 async function main() {
-  const file = path.join(__dirname, "..", "deployments", `stockline-${network.name}.json`);
+  const file = path.join(__dirname, "..", "deployments", `polaris-${network.name}.json`);
   const dep = JSON.parse(fs.readFileSync(file, "utf8"));
-  const engine = await ethers.getContractAt("StocklineEngine", dep.contracts.engine);
+  const engine = await ethers.getContractAt("PolarisEngine", dep.contracts.engine);
   const stable = await ethers.getContractAt("MockUSDC", dep.contracts.stable);
   const [signer] = await ethers.getSigners();
   console.log(`keeper ${signer.address}${DRY_RUN ? "  (dry run)" : ""}\nengine ${dep.contracts.engine}\n`);

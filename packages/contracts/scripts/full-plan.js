@@ -21,46 +21,46 @@ const settled = async (tx) => {
 };
 
 async function main() {
-  const dep = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "deployments", `stockline-${network.name}.json`), "utf8"));
-  const engine = await ethers.getContractAt("StocklineEngine", dep.contracts.engine);
+  const dep = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "deployments", `polaris-${network.name}.json`), "utf8"));
+  const engine = await ethers.getContractAt("PolarisEngine", dep.contracts.engine);
   const pool = await ethers.getContractAt("LiquidityPool", dep.contracts.pool);
   const stock = await ethers.getContractAt("TestnetStock", dep.contracts.stock);
   const oracle = await ethers.getContractAt("StockPriceOracle", dep.contracts.oracle);
 
   console.log("\nB · API\n");
-  await post("/api/price", { mode: "relay" });
-  let r = await get("/api/state");
+  await post("/api/stock/price", { mode: "relay" });
+  let r = await get("/api/stock/state");
   rec("B1", r.status === 200 && r.body.blockNumber > 0 && Array.isArray(r.body.loans), `state 200, block ${r.body.blockNumber}, ${r.body.loans?.length} loans`);
 
-  r = await post("/api/quote", { shares: 10, tenorDays: 7 });
+  r = await post("/api/stock/quote", { shares: 10, tenorDays: 7 });
   const q = r.body;
   const ceiling = BigInt(q.collateralValue) * BigInt(q.ltvBps) / 10000n;
   rec("B2", r.status === 200 && BigInt(q.maxBorrow) + BigInt(q.feeOnMax) <= ceiling && [3500, 3150].includes(q.ltvBps),
       `ltv ${q.ltvBps}bps, borrow+fee ${BigInt(q.maxBorrow)+BigInt(q.feeOnMax)} <= ceiling ${ceiling}`);
 
-  r = await post("/api/quote", { shares: 0 });            rec("B3", r.status === 400 && /greater than zero/.test(r.body.error), r.body.error);
-  r = await post("/api/quote", { shares: "abc" });         rec("B4", r.status === 400 && /greater than zero/.test(r.body.error), r.body.error);
-  r = await post("/api/quote", { shares: 1, tenorDays: 3 });rec("B5", r.status === 400 && /7 and 14/.test(r.body.error), r.body.error);
+  r = await post("/api/stock/quote", { shares: 0 });            rec("B3", r.status === 400 && /greater than zero/.test(r.body.error), r.body.error);
+  r = await post("/api/stock/quote", { shares: "abc" });         rec("B4", r.status === 400 && /greater than zero/.test(r.body.error), r.body.error);
+  r = await post("/api/stock/quote", { shares: 1, tenorDays: 3 });rec("B5", r.status === 400 && /7 and 14/.test(r.body.error), r.body.error);
 
   const ref = "plan-" + Date.now();
-  const q1 = (await post("/api/quote", { shares: 2, tenorDays: 7 })).body;
-  const before = await get("/api/state");
-  r = await post("/api/checkout", { shares: 2, borrowAmount: q1.maxBorrow, orderRef: ref, tenorDays: 7 });
+  const q1 = (await post("/api/stock/quote", { shares: 2, tenorDays: 7 })).body;
+  const before = await get("/api/stock/state");
+  r = await post("/api/stock/checkout", { shares: 2, borrowAmount: q1.maxBorrow, orderRef: ref, tenorDays: 7 });
   const loanId = r.body.loanId;
   rec("B6", r.status === 200 && typeof loanId === "number" && /^0x/.test(r.body.hash), `loan ${loanId} tx ${String(r.body.hash).slice(0,14)}…`);
 
-  const dup = await post("/api/checkout", { shares: 2, borrowAmount: q1.maxBorrow, orderRef: ref, tenorDays: 7 });
-  const afterDup = await get("/api/state");
+  const dup = await post("/api/stock/checkout", { shares: 2, borrowAmount: q1.maxBorrow, orderRef: ref, tenorDays: 7 });
+  const afterDup = await get("/api/stock/state");
   rec("B7", dup.status === 409 && afterDup.body.loans.length === before.body.loans.length + 1,
       `${dup.status}, exactly one loan created`);
 
-  r = await post("/api/checkout", { shares: 99999, borrowAmount: "1", orderRef: "x"+Date.now() });
+  r = await post("/api/stock/checkout", { shares: 99999, borrowAmount: "1", orderRef: "x"+Date.now() });
   rec("B8", r.status === 400 && /You hold/.test(r.body.error), r.body.error.slice(0, 60));
-  r = await post("/api/checkout", { shares: 1, borrowAmount: "1", orderRef: "  " });
+  r = await post("/api/stock/checkout", { shares: 1, borrowAmount: "1", orderRef: "  " });
   rec("B9", r.status === 400 && /reference is required/.test(r.body.error), r.body.error);
 
   console.log("\nC · flows\n");
-  const st1 = await get("/api/state");
+  const st1 = await get("/api/stock/state");
   const merchBefore = BigInt(st1.body.balances.merchantStable);
   const engBefore = BigInt(st1.body.balances.engineShares);
   const l = st1.body.loans.find(x => x.id === loanId);
@@ -68,57 +68,57 @@ async function main() {
   rec("C3", BigInt(l.shares) === ethers.parseUnits("2", 18), `locked ${ethers.formatUnits(l.shares,18)} shares`);
   rec("C4", l.status === 1 && Number(l.healthFactor) > 1, `active, health ${l.healthFactor}`);
 
-  const rp = await post("/api/repay", { loanId, action: "repay" });
-  const st2 = await get("/api/state");
+  const rp = await post("/api/stock/repay", { loanId, action: "repay" });
+  const st2 = await get("/api/stock/state");
   const l2 = st2.body.loans.find(x => x.id === loanId);
   rec("C5", rp.status === 200 && l2.status === 2 && BigInt(st2.body.balances.engineShares) === engBefore - BigInt(l.shares),
       `repaid, ${ethers.formatUnits(l.shares,18)} shares returned`);
   rec("B10", rp.status === 200, `repay 200`);
-  r = await post("/api/repay", { loanId, action: "repay" });
+  r = await post("/api/stock/repay", { loanId, action: "repay" });
   rec("B11", r.status === 409 && /already closed/.test(r.body.error), r.body.error);
 
   // refund
   const refRef = "refund-" + Date.now();
-  const q2 = (await post("/api/quote", { shares: 1, tenorDays: 7 })).body;
-  const c2 = await post("/api/checkout", { shares: 1, borrowAmount: q2.maxBorrow, orderRef: refRef, tenorDays: 7 });
-  const stA = await get("/api/state");
+  const q2 = (await post("/api/stock/quote", { shares: 1, tenorDays: 7 })).body;
+  const c2 = await post("/api/stock/checkout", { shares: 1, borrowAmount: q2.maxBorrow, orderRef: refRef, tenorDays: 7 });
+  const stA = await get("/api/stock/state");
   const mA = BigInt(stA.body.balances.merchantStable);
-  const rf = await post("/api/repay", { loanId: c2.body.loanId, action: "refund" });
-  const stB = await get("/api/state");
+  const rf = await post("/api/stock/repay", { loanId: c2.body.loanId, action: "refund" });
+  const stB = await get("/api/stock/state");
   const lr = stB.body.loans.find(x => x.id === c2.body.loanId);
   const owed = BigInt(q2.maxBorrow) + BigInt(q2.feeOnMax);
   rec("C6", rf.status === 200 && lr.status === 4 && mA - BigInt(stB.body.balances.merchantStable) === owed,
       `refunded, merchant returned ${ethers.formatUnits(owed,6)}`);
 
   // healthy loan cannot be liquidated
-  const q3 = (await post("/api/quote", { shares: 1, tenorDays: 7 })).body;
-  const c3 = await post("/api/checkout", { shares: 1, borrowAmount: q3.maxBorrow, orderRef: "liq-"+Date.now(), tenorDays: 7 });
-  r = await post("/api/repay", { loanId: c3.body.loanId, action: "liquidate" });
+  const q3 = (await post("/api/stock/quote", { shares: 1, tenorDays: 7 })).body;
+  const c3 = await post("/api/stock/checkout", { shares: 1, borrowAmount: q3.maxBorrow, orderRef: "liq-"+Date.now(), tenorDays: 7 });
+  r = await post("/api/stock/repay", { loanId: c3.body.loanId, action: "liquidate" });
   rec("B12", r.status === 409 && /healthy/.test(r.body.error), r.body.error);
 
   // crash, then liquidate
-  const crash = await post("/api/price", { mode: "move", pct: -45 });
+  const crash = await post("/api/stock/price", { mode: "move", pct: -45 });
   rec("B14", crash.status === 200 && /demo move/.test(crash.body.source), `$${(Number(crash.body.usdPerShare)/1e8).toFixed(2)} — ${crash.body.source}`);
-  const stC = await get("/api/state");
+  const stC = await get("/api/stock/state");
   const lc = stC.body.loans.find(x => x.id === c3.body.loanId);
   const shopBefore = BigInt(stC.body.balances.shopperShares);
   const engC = BigInt(stC.body.balances.engineShares);
-  const liq = await post("/api/repay", { loanId: c3.body.loanId, action: "liquidate" });
-  const stD = await get("/api/state");
+  const liq = await post("/api/stock/repay", { loanId: c3.body.loanId, action: "liquidate" });
+  const stD = await get("/api/stock/state");
   const returned = BigInt(stD.body.balances.shopperShares) - shopBefore;
   const seized = (engC - BigInt(stD.body.balances.engineShares)) - returned;
   rec("C7", liq.status === 200 && seized + returned === BigInt(lc.shares) && returned > 0n,
       `seized ${ethers.formatUnits(seized,18)} + returned ${ethers.formatUnits(returned,18)} == locked ${ethers.formatUnits(lc.shares,18)}`);
 
-  const back = await post("/api/price", { mode: "relay" });
+  const back = await post("/api/stock/price", { mode: "relay" });
   rec("C8", back.status === 200 && !/demo move/.test(back.body.source), `${back.body.source} — label cleared`);
-  r = await post("/api/price", { mode: "move", pct: -200 }); rec("B15", r.status === 400 && /above -100/.test(r.body.error), r.body.error);
-  const shSt = await get("/api/state");
-  const fa = await post("/api/faucet", { shares: 5 });
-  const shSt2 = await get("/api/state");
+  r = await post("/api/stock/price", { mode: "move", pct: -200 }); rec("B15", r.status === 400 && /above -100/.test(r.body.error), r.body.error);
+  const shSt = await get("/api/stock/state");
+  const fa = await post("/api/stock/faucet", { shares: 5 });
+  const shSt2 = await get("/api/stock/state");
   rec("B16", fa.status === 200 && BigInt(shSt2.body.balances.shopperShares) - BigInt(shSt.body.balances.shopperShares) === ethers.parseUnits("5", 18), "+5.0000 shares");
-  r = await post("/api/faucet", { shares: 500 }); rec("B17", r.status === 400 && /between 0 and 100/.test(r.body.error), r.body.error);
-  r = await get("/api/state?as=merchant"); rec("A5", r.status === 200 && r.body.loans.length === 0, "merchant view is empty");
+  r = await post("/api/stock/faucet", { shares: 500 }); rec("B17", r.status === 400 && /between 0 and 100/.test(r.body.error), r.body.error);
+  r = await get("/api/stock/state?as=merchant"); rec("A5", r.status === 200 && r.body.loans.length === 0, "merchant view is empty");
 
   console.log("\nD · invariants\n");
   const n = Number(await engine.loanCount());

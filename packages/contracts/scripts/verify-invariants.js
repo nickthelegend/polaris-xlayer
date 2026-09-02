@@ -6,8 +6,8 @@ const { ethers, network } = require("hardhat");
 const fs = require("fs"); const path = require("path");
 
 async function main() {
-  const dep = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "deployments", `stockline-${network.name}.json`), "utf8"));
-  const engine = await ethers.getContractAt("StocklineEngine", dep.contracts.engine);
+  const dep = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "deployments", `polaris-${network.name}.json`), "utf8"));
+  const engine = await ethers.getContractAt("PolarisEngine", dep.contracts.engine);
   const pool = await ethers.getContractAt("LiquidityPool", dep.contracts.pool);
   const stock = await ethers.getContractAt("TestnetStock", dep.contracts.stock);
 

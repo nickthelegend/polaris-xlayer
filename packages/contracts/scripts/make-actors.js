@@ -23,7 +23,7 @@ async function main() {
   const actors = ROLES.map((role) => {
     // A private key is just 32 bytes; hashing the deployer's with the role
     // name gives a stable, reproducible one per role.
-    const pk = ethers.keccak256(ethers.toUtf8Bytes(root + ":stockline:" + role));
+    const pk = ethers.keccak256(ethers.toUtf8Bytes(root + ":polaris:" + role));
     return { role, ...new ethers.Wallet(pk), privateKey: pk, address: new ethers.Wallet(pk).address };
   });
 

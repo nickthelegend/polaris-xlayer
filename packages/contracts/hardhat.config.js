@@ -16,7 +16,7 @@ module.exports = {
     version: "0.8.24",
     settings: {
       optimizer: { enabled: true, runs: 200 },
-      // StocklineEngine.openLoan carries enough locals to blow the stack under
+      // PolarisEngine.openLoan carries enough locals to blow the stack under
       // the legacy pipeline. viaIR also produces smaller runtime code, which
       // matters on an L2 where deployment is priced by calldata bytes.
       viaIR: true,

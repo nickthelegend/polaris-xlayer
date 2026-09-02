@@ -1,7 +1,7 @@
 /**
  * The price relayer.
  *
- * Stockline lends against equity, so somebody has to carry the venue's price
+ * Polaris lends against equity, so somebody has to carry the venue's price
  * on chain. Chainlink cannot do it here: there is no equity push feed on X
  * Layer (all 26 of its feeds are crypto), and equity prices exist only as Data
  * Streams — which is a paid subscription and whose on-chain StreamsLookup
@@ -27,7 +27,7 @@ const ONCE = process.env.RELAY_ONCE === "1";
 
 async function fetchPrint(symbol) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1m&range=1d`;
-  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 stockline-relayer" } });
+  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 polaris-relayer" } });
   if (!res.ok) throw new Error(`quote http ${res.status}`);
   const meta = (await res.json())?.chart?.result?.[0]?.meta;
   if (!meta?.regularMarketPrice) throw new Error("no price in response");
@@ -47,8 +47,8 @@ async function fetchPrint(symbol) {
 }
 
 async function main() {
-  const file = path.join(__dirname, "..", "deployments", `stockline-${network.name}.json`);
-  if (!fs.existsSync(file)) throw new Error(`no deployment for ${network.name}; run deploy-stockline.js first`);
+  const file = path.join(__dirname, "..", "deployments", `polaris-${network.name}.json`);
+  if (!fs.existsSync(file)) throw new Error(`no deployment for ${network.name}; run deploy-polaris.js first`);
   const dep = JSON.parse(fs.readFileSync(file, "utf8"));
   const oracle = await ethers.getContractAt("StockPriceOracle", dep.contracts.oracle);
   const stock = dep.contracts.stock;

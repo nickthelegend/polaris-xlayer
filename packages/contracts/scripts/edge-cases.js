@@ -31,7 +31,7 @@ const post = async (p, body) => {
 };
 
 async function main() {
-  const dep = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "deployments", `stockline-${network.name}.json`), "utf8"));
+  const dep = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "deployments", `polaris-${network.name}.json`), "utf8"));
   const oracle = await ethers.getContractAt("StockPriceOracle", dep.contracts.oracle);
   const pool = await ethers.getContractAt("LiquidityPool", dep.contracts.pool);
   const stable = await ethers.getContractAt("MockUSDC", dep.contracts.stable);

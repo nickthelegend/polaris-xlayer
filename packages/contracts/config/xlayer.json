@@ -43,11 +43,11 @@
       "amountPerDay": "0.2 OKB",
       "requiresLogin": false,
       "requiresCaptcha": true,
-      "_note": "GeeTest v4 slider CAPTCHA plus OKX device fingerprinting. No account or wallet connection needed — an address is pasted in — but the CAPTCHA cannot be automated. 0.2 OKB is ~2400x the cost of a full Stockline deployment."
+      "_note": "GeeTest v4 slider CAPTCHA plus OKX device fingerprinting. No account or wallet connection needed — an address is pasted in — but the CAPTCHA cannot be automated. 0.2 OKB is ~2400x the cost of a full Polaris deployment."
     },
     "assets": {
       "USDT0": null,
-      "_note": "USDT0 is not deployed on X Layer testnet. eth_getCode returns 0x for both the token and the OFT. Stockline deploys a labelled stand-in there instead."
+      "_note": "USDT0 is not deployed on X Layer testnet. eth_getCode returns 0x for both the token and the OFT. Polaris deploys a labelled stand-in there instead."
     },
     "chainlink": {
       "dataStreamsVerifierProxy": "0x72790f9eB82db492a7DDb6d2af22A270Dcc3Db64",
@@ -77,6 +77,6 @@
       "mainnet": "0xAecF995ABf9E7eDE7ae0CE65E60622C9eD84823a",
       "_note": "The OP standard bridge is deliberately disabled on X Layer: depositETH, bridgeETH, depositERC20 and a plain ETH transfer all revert with the string 'not allow bridge'. Do not design a flow that assumes users can bridge in through it."
     },
-    "_lendingImplication": "Being an L2 with a single sequencer is the material fact for a lending protocol: if the sequencer stalls, borrowers cannot reach the chain to repay while prices keep moving, and every position becomes liquidatable the moment it resumes. StocklineEngine reads Chainlink's L2 Sequencer Uptime feed and refuses to liquidate during an outage and for a grace period after recovery."
+    "_lendingImplication": "Being an L2 with a single sequencer is the material fact for a lending protocol: if the sequencer stalls, borrowers cannot reach the chain to repay while prices keep moving, and every position becomes liquidatable the moment it resumes. PolarisEngine reads Chainlink's L2 Sequencer Uptime feed and refuses to liquidate during an outage and for a grace period after recovery."
   }
 }

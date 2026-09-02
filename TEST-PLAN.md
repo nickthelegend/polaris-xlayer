@@ -1,19 +1,19 @@
-# Stockline on X Layer — test plan
+# Polaris on X Layer — test plan
 
 Written **before** testing. Every item states what "correct" means as a
 specific observable result. An item passes only when the real product produces
 exactly that, with a clean console and no failed network requests.
 
-Surface under test: `stockline-web` (Next.js, port 3200) against the live
-deployment on **X Layer testnet, chain 1952**:
+Surface under test: the Polaris app, `apps/core`, at `/stock` (Next.js,
+port 3200) against the live deployment on **X Layer testnet, chain 1952**:
 
 | | |
 |---|---|
-| engine | `0x81fABc31c455F88d6FAA733Dd695bebFE2083C7D` |
-| pool | `0xAd4992d13682C31c374719A0a4520636cb5deD4d` |
-| oracle | `0x51B91e1733e53F39E528C32823fe97FD3A96bf75` |
-| stock (stand-in) | `0x957a46693F66B4676FF08DAF25323eb9124Eb278` |
-| stable (stand-in) | `0x35cbD9F7432065309DF6FAEF0e4313e2093F1958` |
+| engine | `0xb649453f78b01F832d97fDD8a12Bf27ac5abf446` |
+| pool | `0x8a9b94F94aa8254e43B5b0e923B4F12FAE6Fc56C` |
+| oracle | `0xfc9Faf97234F2Dc45BAb93c187F393B149056e58` |
+| stock (stand-in) | `0x5B74fdfE5943cC84Fe46f9a783b9AB9a2fD2Bec9` |
+| stable (stand-in) | `0x437D8039EaB3b8BbEDc4101Bc97f6812829816D6` |
 | shopper | `0xf2B99773b24c8593E071FDD4a7dFB1F925a209d0` |
 | merchant | `0x095Ba9281e2ee960d0a553858AB76FaA830BEbbF` |
 | liquidator | `0xc6f7274E64A7B520063ed06855ACa4A42f72fCF8` |
@@ -162,3 +162,35 @@ funded actors now exist on chain.
 - **OKX Pay merchant QR** — no public developer API exists.
 
 No item was marked PASS without the specific result the plan named.
+
+
+---
+
+# Folded into Polaris
+
+Stock credit was briefly built as a separate app. It is not a separate
+product, so it does not get a separate app: it now lives in `apps/core` — the
+Polaris app — at `/stock`, `/stock/positions` and `/stock/book`, behind the
+same header, the same fonts and the same design system as Credit, Limits and
+Merchants. The standalone app is deleted and the name "Stockline" appears
+nowhere in the tree.
+
+Moving it in exposed three things the parallel app had been hiding:
+
+**`@polarispay/db` was never built.** Its `main` points at `./dist` and no
+`dist` existed, so five inherited API routes returned 500 and, in dev, took
+the whole server down with them. Built.
+
+**The Mongo credential was dead.** The Atlas URI in the tree fails `bad auth`.
+Polaris runs against the Railway Mongo instead, which is live and holds the
+real `merchant_apps`, `merchant_bills`, `merchant_users` and `splitPlans`
+collections.
+
+**The inherited pages still pointed at Sepolia.** `/api/limits` returned 503
+because `POLARIS_LOAN_ENGINE` named a contract that does not exist on X Layer.
+The whole BNPL suite — MockUSDC, ScoreManager, MerchantRegistry,
+PolarisLoanEngine — is now deployed on X Layer testnet and the app points at
+it. Every page and every API route returns 200.
+
+The full plan was re-run against the folded-in deployment: **31/31 scripted
+items pass**, zero console errors, every network request 200.

@@ -1,0 +1,12 @@
+{
+  "network": "xlayerTestnet",
+  "chainId": 1952,
+  "deployer": "0xb51756B8Ee57Cc622669E3B3EF67FA305821Bf56",
+  "deployedAt": "2026-09-02T15:34:09.552Z",
+  "contracts": {
+    "MockUSDC": "0xF0d9aFcB83771563dcE8dE65941bcABdBA270da8",
+    "ScoreManager": "0x8b484257281EF42a9468f9271872Bd76fE399133",
+    "MerchantRegistry": "0xeD5D615D2F289835240e3F0cb9Bf15abA317a82e",
+    "PolarisLoanEngine": "0x06Ca46f78DB8712b5c698375B0fFf897165e67d2"
+  }
+}
