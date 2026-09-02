@@ -1,459 +1,174 @@
 # Polaris
 
-**A payments layer with credit built in, on Solana.**
+**Spend the stock. Don't sell the stock — on X Layer.**
 
-Three ways to pay: in full, on a subscription, or split into installments
-against an undercollateralized credit line. Polaris decides who gets credit and
-collects what is owed — installments drawn on the day they fall due, defaults
-liquidated the moment they qualify, merchants paid up front. Every one of those
-is a transaction that has to land, exactly once, or somebody loses money.
+A shopper holding tokenized equity checks out at a merchant who only takes
+stablecoin. Rather than closing the position, the shares are locked, the
+merchant is paid immediately from a pool, and the shopper still owns the stock.
 
-This is a port. The original is five Solidity contracts plus **KeeperHub**, an
-external platform that made sure transactions landed. Porting it produced one
-finding worth the whole exercise:
-
-> **Most of what a keeper platform sells is native to Solana.** Simulation,
-> atomic check-and-execute, fee sponsorship and replay protection are runtime
-> features here, not a product. The keeper stops being an execution layer and
-> becomes a scheduler — which is all it should ever have been.
-
-`docs/SOLANA-PORT.md` is the full mapping. `packages/contracts` keeps the
-Solidity original as the reference this was checked against.
+Live: **https://polaris-xlayer.vercel.app** · X Layer testnet, chain **1952**
 
 ---
 
-## Layout
+## What is actually deployed
 
-Everything the product is made of lives here. The web surfaces joined this
-repository from their own repos, each brought in with its history intact.
+| Contract | Address |
+|---|---|
+| `PolarisEngine` | `0xb649453f78b01F832d97fDD8a12Bf27ac5abf446` |
+| `LiquidityPool` | `0x8a9b94F94aa8254e43B5b0e923B4F12FAE6Fc56C` |
+| `StockPriceOracle` | `0xfc9Faf97234F2Dc45BAb93c187F393B149056e58` |
+| `TestnetStock` (tXAAPL) | `0x5B74fdfE5943cC84Fe46f9a783b9AB9a2fD2Bec9` |
+| Stand-in stablecoin (pUSDC) | `0x437D8039EaB3b8BbEDc4101Bc97f6812829816D6` |
 
-| Path | What it is | Live |
-|---|---|---|
-| `programs/` | The Anchor program — 23 instructions, one program | `CpRqbMywzAEKkEALZtrXqPYM36E5RrFewYnRtUYEEvUS` (devnet) |
-| `mobile/` | The shopper's Android app — credit line, checkout, activity | |
-| `merchant-app/` | The merchant terminal, Android. Read-only, holds no key. Drives the iMin thermal printer | |
-| `keeper-solana/` | The scheduler that collects instalments and liquidates defaults | |
-| `apps/gateway/` | Solana Pay transaction-request endpoint | Railway |
-| `apps/core/` | Protocol dashboard | |
-| `apps/merchant/` | Merchant dashboard against the keeper and gateway | |
-| `landing/` | The marketing site | [polarispay.app](https://polarispay.app) |
-| `merchant-web/` | Merchant checkout platform — app keys, bills, webhooks | [merchant.polarispay.app](https://merchant.polarispay.app) |
-| `shopping/` | A real storefront that pays through Polaris | |
-| `packages/contracts/` | The Solidity original, kept as the reference this was checked against | |
+The unsecured credit line — the earlier Polaris product — is also live on the
+same chain: `PolarisLoanEngine` `0x06Ca46f78DB8712b5c698375B0fFf897165e67d2`,
+`ScoreManager` `0x8b484257281EF42a9468f9271872Bd76fE399133`,
+`MerchantRegistry` `0xeD5D615D2F289835240e3F0cb9Bf15abA317a82e`.
 
-An earlier incarnation of this product ran on Sepolia with Fhenix FHE. It does
-not any more, anywhere in this repository; where the old chain is still named
-it is being named as history.
+Off-chain: the app on Vercel, a price relayer on Railway, and a MongoDB the
+merchant surfaces write to.
+
+### Two stand-ins, named on the page
+
+No real xStock and no USDT0 is deployed on X Layer testnet — `eth_getCode`
+returns `0x` for both. The tokenized share and the stablecoin above are
+stand-ins with the same decimals and interface, and the running app says so on
+the checkout page rather than letting a reviewer assume otherwise.
 
 ---
 
-## What changed, and why it matters
+## The product
 
-| KeeperHub primitive | Why EVM needed it | Solana |
-|---|---|---|
-| `simulate` before execute | Avoid burning gas on a revert | `simulateTransaction` — a native RPC method |
-| `check-and-execute` (atomic) | `checkLiquidatable` then `liquidate` had a window where a last-second repayment got liquidated on a stale read | **The window does not exist.** The check is a `require!` on the line above the action, in one instruction |
-| Gas-sponsored send | Keeper wallet needed ETH | **The fee payer is just a different signer.** The keeper holds SOL and no USDC, touches no borrower balance, and still lands the transaction |
-| `Idempotency-Key` | Retry storms double-charging | **Replay protection is a runtime property.** A signed transaction lands at most once per blockhash |
-| Terminal status reconciliation | Sponsored sends were invisible to the wallet | `getSignatureStatuses` at `finalized` |
-| Receipts | Disputable evidence | The signature *is* the receipt |
+One checkout, two ways to fund it.
 
-Five contracts became one program. `setWriter`, `setSeizer`, `setOriginator`,
-`setCollateralVault` and `setMerchantRegistry` exist on EVM only because
-Solidity contracts are mutually distrustful and have to be granted permission
-over each other's state. Inside one program that distrust is meaningless, and
-so is the class of bug where a deployment half-wires itself and lending
-silently breaks.
+- **Against your shares.** Lock tokenized equity, the merchant is paid from the
+  pool, you keep the position. 35% LTV while the venue is open, with a 10%
+  haircut on the LTV while it is shut.
+- **Against your record.** An unsecured limit priced off repayment history.
+  A merchant opens it at the till; you settle it under Activity.
 
-Two invariants come free from addressing rather than from a check that could be
-forgotten: a payment PDA seeded by `(merchant, order_ref)` makes a retried
-checkout idempotent, and a subscription PDA seeded by `(subscriber, plan)`
-makes a double-subscribe impossible.
+Four routes, because the shopper only ever does four things:
+`/` pay · `/activity` what you owe · `/merchant` get paid · `/docs`.
 
-## The pull model
+### Three decisions worth reading the code for
 
-Every collection path rests on one mechanism. At checkout the borrower
-authorizes the protocol once, and each installment is drawn later without them
-being online. On EVM that was an ERC-20 allowance. Here it is an **SPL
-delegate**, which is a close match with one difference that is a product
-constraint rather than a bug:
+**Liquidation sells only what it needs.** The liquidator repays the debt and
+takes collateral worth it plus a 5% bonus; the remainder goes back to the
+borrower in the same transaction. Losing a whole position over a small
+shortfall is the failure this product exists to prevent. Verified on chain: a
+3.0-share position liquidated into **1.696154 seized and 1.303846 returned**.
 
-|  | ERC-20 | SPL Token |
-|---|---|---|
-| Grant | `approve(spender, amount)` | `Approve { delegate, amount }` |
-| Draw | `transferFrom` | `Transfer` signed by the delegate |
-| Decrement on use | manual | **automatic** |
-| **Concurrent spenders** | unlimited | **exactly one** |
+**Two staleness bounds, not one.** Fifteen minutes while the venue is open,
+four days while it is shut. When the market closes the newest print is the
+closing print and only gets older — a single bound would reject every price all
+weekend and silently delete the after-hours path.
 
-A token account holds one delegate, so a borrower who authorizes Polaris cannot
-simultaneously authorize another protocol on the same account. Losing that
-delegate is therefore something the keeper has to handle as a first-class
-failure, not an edge case — see the dunning ladder.
+**Nothing is seized during an outage.** X Layer is an L2 with one sequencer. If
+it stalls you cannot reach the chain to repay while the price moves, so the
+engine reads Chainlink's uptime feed and refuses to liquidate during an outage
+and for an hour after — but never gates repayment. That feed does not exist on
+X Layer testnet, so the guard is inert there and is covered by unit tests.
 
-## Two things this build does that the original did not
+### Why the price is posted, not read from a feed
 
-**Origination is one transaction, signed by the borrower.** On EVM, `approve`
-and `createLoan` were two transactions sent in order by a permissioned
-originator, and a checkout that dropped the second left a standing allowance
-with no loan attached. Solana puts both instructions in one transaction: they
-both land or neither does, and the permissioned-originator role disappears.
+Chainlink cannot carry this one. X Layer has 26 push feeds and every one is
+crypto; equity prices exist only as Data Streams, a paid subscription whose
+on-chain `StreamsLookup` pattern X Layer does not support. So Polaris posts the
+print itself **and posts its provenance with it** — the source string and the
+venue's own timestamp go on chain, so the number can be checked against the
+exchange rather than taken on trust.
 
-**The permissionless instruction cannot choose an amount.** On EVM,
-`repay(loanId, amount)` was permissionless *and* took an arbitrary amount, so
-anyone could drain a borrower's entire standing allowance early.
-`collect_installment` takes no amount — it collects exactly what the schedule
-says is due today. Arbitrary amounts need the borrower's own signature.
+`services/price-relayer` runs this on Railway every four minutes. It is a
+service rather than a cron because Vercel's Hobby plan schedules once a day,
+two orders of magnitude short of a fifteen-minute bound.
 
-## Layout
-
-```
-programs/polaris        the program — one Anchor program, 23 instructions
-keeper-solana           the crank: collect · subscriptions · liquidate
-packages/sdk-solana     createPolaris() — pay, subscribe, payLater
-mobile/                 the Android app — Expo, signs on the device
-apps/gateway            the underwriter, and a Solana Pay endpoint
-scripts/lifecycle.ts    stand it up and run a loan through its whole life
-tests/                  42 integration tests on bankrun
-docs/SOLANA-PORT.md     the port plan and every decision in it
-packages/contracts      the Solidity original, kept as the reference
-```
+---
 
 ## Quick start
 
-Needs the Solana CLI, Anchor 0.32.1, Rust 1.89.0 (pinned in
-`rust-toolchain.toml`), and **Node 22.6 or newer** — several packages run
-TypeScript directly with `--experimental-strip-types`, which older Node does
-not have. If you have never used the Solana CLI here, give it a key first:
-`solana-keygen new`.
-
 ```bash
 pnpm install
+pnpm test                 # 356 tests across contracts, db, keeperhub, underwriting, mcp
 ```
 
-`anchor build` mints a program keypair, and it is not the one this repository
-was written against — a keypair is a secret and none is committed. `keys sync`
-rewrites `declare_id!` and `Anchor.toml` to whatever your build produced, so
-the program you run is internally consistent from the first command:
+Against the live chain:
 
 ```bash
-anchor build && anchor keys sync && anchor build
+pnpm --filter @polarispay/contracts exec hardhat run scripts/verify-invariants.js --network xlayerTestnet
 ```
+
+That reads every loan the engine has ever written and checks conservation on
+liquidation, pool accounting, orphaned collateral and the LTV ceiling — against
+the deployed contracts, not a fixture.
+
+Run the app:
 
 ```bash
-cargo test -p polaris --lib
+pnpm --filter polaris-app dev
 ```
 
-Run the whole thing against a local validator — origination, four collections,
-a default and a liquidation, in about five minutes:
-
-```bash
-solana-test-validator --bpf-program $(anchor keys list | awk '/polaris/{print $NF}') target/deploy/polaris.so --reset
-```
-
-The lifecycle spends real SOL, so fund the CLI key against the validator you
-just started — `reset-local.sh` below does this for you:
-
-```bash
-solana airdrop 500 --url http://127.0.0.1:8899
-```
-
-```bash
-POLARIS_CLUSTER=localnet pnpm exec tsx scripts/lifecycle.ts
-```
-
-The keeper reads what is due off the chain rather than a database, because the
-whole book is one `getProgramAccounts` call:
-
-```bash
-KEEPER_DRY_RUN=true POLARIS_CLUSTER=localnet pnpm --filter @polaris/keeper-solana start
-```
-
-Or stand the whole demo up in one command — validator, program, five merchants,
-a borrower with history, three loans and three subscription plans:
-
-```bash
-./scripts/reset-local.sh
-```
-
-Then the gateway, which underwrites new wallets and serves the Solana Pay
-checkout:
-
-```bash
-pnpm --filter @polaris/gateway start
-```
-
-[`docs/DEMO.md`](docs/DEMO.md) is the five-minute recording script.
-
-## Three payment modes
-
-```ts
-const polaris = createPolaris({ connection, wallet, idl });
-
-await polaris.pay({ merchant, amount: 25_000_000n, orderId });    // in full
-await polaris.subscribe({ plan });                                // recurring
-await polaris.payLater({ merchant, amount: 200_000_000n });       // 4 installments
-```
-
-`payLater` bundles the SPL `Approve` and the origination into one transaction,
-and sizes the delegation against **everything** the borrower owes — not just
-this purchase. One delegate slot backs every open plan at once, so sizing it
-for a single plan is how a book ends up with loans it cannot collect.
-
-## Where a credit line comes from
-
-The hardest problem in an undercollateralized book is the first loan. Everyone
-used to open at 600, which answered it by ignoring it: a wallet funded an hour
-ago and a wallet that has been paying for things for three years got the same
-500 USDC line.
-
-They are not the same risk, and on Solana the difference is public. `underwrite`
-takes four facts a wallet cannot hide and the **program** turns them into a
-score:
-
-```
-Wallet first used 2 years ago     · +48
-1,240 transactions signed         · +49
-7 tokens held                     · +14
-820.00 USDC on hand               · +8
-                                    ---
-                                    520 floor + 119 = 639
-```
-
-The underwriter attests to the facts and never to the result. A compromised
-service key cannot hand anyone an 850 — it would have to claim an age and an
-activity level anyone can check against the same RPC. Evidence older than
-fifteen minutes is refused, and a borrower with any record at all is refused
-outright, because by then the score is earned rather than attested.
-
-There is a ceiling on all of it. The best wallet history in the world opens a
-1,000 USDC line; 2,500 and 5,000 are reached by repaying. Three years of
-holding tokens is evidence of solvency, not of willingness to pay.
-
-Score any wallet without opening anything:
-
-```bash
-pnpm --filter @polaris/gateway underwrite <address> --read
-```
-
-## Paying by QR
-
-The gateway serves a [Solana Pay](https://docs.solanapay.com) transaction
-request. Any Solana Pay wallet scans the code and is handed **one** transaction
-carrying the SPL approval and the origination together — and if that wallet has
-never borrowed, a line underwritten from its own history moments earlier.
-
-```
-http://localhost:4100/checkout?merchant=<merchant PDA>&amount=180000000
-```
-
-The customer pays nothing to do it. `create_loan` takes a payer separate from
-the borrower, so the gateway covers rent as well as the fee and a shopper who
-has never held SOL can still open a plan. Sponsorship that stops at the fee is
-not sponsorship — it still leaves them unable to check out.
-
-Both still sign, so nobody opens a loan in another name.
-
-**The app reads them too.** The scanner in the middle of the tab bar decodes
-the code, asks the endpoint what it is, fetches the transaction and shows the
-merchant's own terms — *40.00 USDC in 4 payments of 10.08* — before anything is
-signed. A scanner that signs the moment it recognises a code is a scanner that
-can be pointed at a wall.
-
-It also takes a request directly, which is how Solana Pay reaches a wallet on a
-phone most of the time: the checkout page's *Open in a wallet* link is a
-`solana:` URL and the OS hands it over. The camera is for when the code is on
-someone else's screen.
-
-## The app
-
-An Expo app that opens a plan against the deployed program from an Android
-device — the credit line, the checkout, the schedule, and the activity feed all
-read from accounts rather than from a server.
-
-It generates its own signer on first launch and keeps it in the platform
-keystore, so **no private key is carried in this repository**. It shows its
-address on the home screen; fund that address on a test cluster with:
-
-```bash
-pnpm exec tsx scripts/fund.ts <address>
-```
-
-The app is installed on its own, not through the workspace. It is deliberately
-not a member of `pnpm-workspace.yaml`: Expo needs a hoisted `node_modules`, and
-`mobile/.npmrc` asks for one, while the thirteen packages beside it keep pnpm's
-isolated linker. So every command below runs from inside `mobile/`:
-
-```bash
-cd mobile && pnpm install --ignore-workspace
-```
-
-Mobile Wallet Adapter needs native code, so the app runs from a development
-build rather than Expo Go:
-
-```bash
-cd mobile && pnpm exec expo prebuild --platform android --clean
-```
-
-```bash
-cd mobile && pnpm exec expo run:android
-```
-
-An emulator on a machine with little free memory will hang on the GPU path;
-`-no-window -gpu off -memory 2048` boots it headless, and `adb screencap` is
-enough to see the app.
-
-### Reaching a local validator from the emulator
-
-An emulator's `localhost` is the emulator, so every host port the app talks to
-has to be reversed — **including 8900**:
-
-```bash
-adb reverse tcp:8899 tcp:8899 && adb reverse tcp:8900 tcp:8900 && adb reverse tcp:4100 tcp:4100
-```
-
-8900 is the validator's websocket, and it is the one everybody forgets. web3.js
-does not take it as a url — it derives it from the rpc port — so reversing only
-8899 leaves the app able to read the chain and unable to subscribe to it. The
-symptom is a red `ws error: undefined` toast and a screen that never updates
-itself, with every other call working perfectly. The keeper needs both ports for
-the same reason: `confirmTransaction` waits on a signature subscription.
-
-4100 is the payment gateway, needed for the scan-to-pay flow.
-
-
-Every instruction is built in `mobile/src/chain`, never in a screen, so the
-signer is the one piece a shipped build has to replace — see *What is not done*.
+---
 
 ## Tests
 
-```bash
-pnpm run program:test        # 18 — the arithmetic that costs money
-pnpm run anchor:test         # 42 — every exploit, on chain
-pnpm --filter @polaris/keeper-solana test   # 20 — the dunning ladder
-pnpm --filter @polaris/sdk-solana test      # 13 — the SDK against a live cluster
-pnpm --filter @polaris/gateway test         # 14 — underwriting and Solana Pay
-cd mobile && pnpm test                      # 69 — deep links, delegation, live diffs
-```
-
-`anchor test` starts its own validator and will refuse if you still have the
-one from the quick start on 8899. The bankrun suite does not need a validator
-at all, so run it directly instead:
-
-```bash
-pnpm exec ts-mocha -p ./tsconfig.anchor.json -t 1000000 'tests/**/*.ts'
-```
-
-
-97 in total, and all of them green. The reference build carries its own 308 --
-153 on the Solidity contracts, 82 on the database layer, 45 on KeeperHub, 20 on
-underwriting, 8 on the MCP server -- run with `pnpm test` at the root.
-
-The integration tests are named for the exploit rather than the function, so a
-regression reads as *dust buys liquidation immunity again* rather than *repay
-test 4 failed*. Each one is a bug the Solidity build was
-hardened against, re-proved here:
-
-- dust cannot buy liquidation immunity, or farm the credit score
-- self-liquidation recovers instead of writing the debt off for free
-- the real shortfall is booked as bad debt when there is nothing to take
-- the protocol fee never exceeds the interest actually earned, at 7, 30 and 40 days
-- one delegation cannot back more loans than it covers
-- a missed subscription period is skipped rather than stacked, and lapses after three
-
-They run on **bankrun**, not a validator, for one reason: every rule here is a
-function of time. The default grace period is three days, so a suite that
-cannot move the clock can only test origination.
-
-## Live
-
-| | |
+| Suite | Count |
 |---|---|
-| Consumer app | **https://web-production-985a5.up.railway.app** |
-| Merchant dashboard | **https://gateway-production-9ee1.up.railway.app/merchant** |
-| Checkout + Solana Pay endpoint | `https://gateway-production-9ee1.up.railway.app` |
+| `packages/contracts` — the engine, oracle, pool, liquidation, sequencer guard, hardening | 201 |
+| `packages/db` | 82 |
+| `packages/keeperhub` | 45 |
+| `packages/underwriting` | 20 |
+| `packages/mcp` | 8 |
 
-Both run against **devnet**, against the program below. Open the app and it
-underwrites the wallet your browser generates, from that wallet's own history —
-no sign-up, no key to bring. The merchant dashboard needs no key either: a
-merchant's trade is public state under their own address.
+Five adversarial reviewers went at the contracts across accounting, decimals,
+access control, oracle manipulation and liveness, and every claim was handed to
+a separate agent whose job was to refute it. 24 attacks were claimed, 2
+survived, both are fixed.
 
-The deployed service signs with a key that can do exactly one thing — attest a
-score. The protocol authority and the program's upgrade authority were rotated
-away from it first (`set_underwriter`), so nothing on that host can change the
-program or the protocol. It holds a few hundredths of a devnet SOL to pay for
-the accounts it opens; when that runs out the app says it has no credit line
-yet rather than inventing one.
+`TEST-PLAN.md` is the product-level plan: 67 items covering every page, every
+API route, every flow, the on-chain invariants and the external dependencies,
+each with what "correct" means written down before it was run.
 
-## Status
+---
 
-| | |
+## Layout
+
+| Path | What it is |
 |---|---|
-| Program | `CpRqbMywzAEKkEALZtrXqPYM36E5RrFewYnRtUYEEvUS` |
-| Devnet | **live** — deployed, initialised, and exercised |
-| Localnet | full lifecycle verified, including a liquidation |
-| Android | native dev build, running on an emulator against devnet |
-| Size | 593 KB, clean SBF build |
+| `apps/core/` | The product. Checkout, activity, merchant, docs — this is what is deployed |
+| `packages/contracts/` | The Solidity engine, oracle and pool, and their tests |
+| `services/price-relayer/` | The always-on price relayer, deployed to Railway |
+| `packages/db/` | Loan book and merchant records |
+| `packages/keeperhub/`, `packages/underwriting/`, `packages/mcp/` | Settlement, credit scoring, agent tooling |
+| `merchant-web/`, `shopping/`, `landing/` | Merchant platform, storefront, marketing site |
+| `mobile/`, `merchant-app/` | Expo apps; the merchant terminal drives an iMin thermal printer |
 
-Devnet carries the current build, an initialised protocol, a funded pool, and
-all three payment modes exercised against it from the app: a purchase paid in
-full, a purchase split into four, and a subscription with its first period
-charged — plus collateral locked and the credit limit moving from 200 to 275
-because of it. One command puts a deployment there, or confirms one:
+### Code from earlier ports, kept deliberately
 
-```bash
-POLARIS_CLUSTER=devnet pnpm exec tsx scripts/prove.ts
-```
+This repository carries two earlier incarnations of Polaris. They are **not**
+part of the X Layer submission and nothing above depends on them:
 
-`prove.ts` covers the credit line and an installment plan. For the third mode,
-put a subscription plan on the deployment too:
+- **Solana** — `programs/`, `keeper-solana/`, `packages/sdk-solana/`,
+  `apps/gateway/`, `Anchor.toml`, `Cargo.toml`. Its README is
+  `docs/SOLANA-README.md`. Building or testing these needs a Rust and Anchor
+  toolchain; `pnpm test` does not touch them.
+- **Sepolia with Fhenix FHE** — gone from the code. Where the old chain is
+  named it is named as history.
 
-```bash
-POLARIS_CLUSTER=devnet pnpm exec tsx scripts/devnet-plan.ts
-```
-
-`prove.ts` initialises the protocol, funds the pool and opens a real plan
-against it, using one wallet for every role so it costs almost nothing. Run it
-against any deployment to confirm that deployment for yourself rather than
-taking this file's word for it.
-
-To read the state of a deployment without touching it:
-
-```bash
-POLARIS_CLUSTER=devnet pnpm exec tsx scripts/inspect.ts
-```
-
-The last local lifecycle run, in `deployments/localnet.json`:
-
-```
-loan status      repaid
-repaid           400.000304 of 400.000304   (interest pro-rated over 240s)
-credit score     600 -> 648                 (4 installments, all on time)
-protocol fees    0.000060 of 0.000304 interest — exactly the 20% cap
-keeper spent     0.000020 SOL in fees
-keeper USDC      none — it never held any
-
-loan status      liquidated                 (second borrower, delegation revoked)
-recovered        0.000000 of 200.000152
-bad debt booked  200.000152
-credit score     600 -> 450
-```
+---
 
 ## What is not done
 
-**Signing with a wallet app has been exercised only as far as the wallet
-chooser.** The Mobile Wallet Adapter path is built and runs on a real Android
-build: tapping *Connect a wallet app* fires the `solana-wallet:` intent, and
-with no wallet installed the emulator's `ActivityNotFoundException` comes back
-as "No Solana wallet app is installed on this device." What has not been
-watched is a wallet actually signing — that needs a device with Phantom or
-Solflare on it, and the honest limit of this repository is that nobody has seen
-the approval sheet. Everything up to it is real.
-
-**The Solidity side is the reference, not the deliverable.** `packages/contracts`
-and the Next.js apps around it are the original build, kept so the port can be
-read against it. `packages/protocol` is an older design again, superseded and
-marked as such. The Solana program is what this repository is for.
+- **Mainnet.** Everything above is X Layer testnet. Nothing here has moved real
+  money.
+- **Real tokenized equity.** No xStock exists on X Layer; the collateral token
+  is a stand-in, labelled as one in the running app.
+- **The sequencer guard is untested in production**, because X Layer testnet
+  has no uptime feed to read.
+- **The credit line cannot be drawn from a browser.** `createLoan` takes the
+  borrower as an argument and is called by the merchant, so the app shows the
+  limit as a real on-chain profile rather than giving it a checkout button that
+  would not work.
 
 ## License
 
-MIT
+MIT.

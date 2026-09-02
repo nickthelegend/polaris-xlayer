@@ -106,7 +106,23 @@ export function explainWriteError(e: any, token = "tokens"): string {
       }
     }
   }
-  if (/insufficient funds/i.test(msg)) return "Not enough OKB to pay for gas on X Layer.";
+  /*
+   * No gas.
+   *
+   * This matched only "insufficient funds", which is not what viem says. Its
+   * actual wording is "The total cost (gas * gas fee + value) of executing
+   * this transaction exceeds the balance of the account" — so the one failure
+   * every newcomer hits first, with a wallet that has never touched X Layer,
+   * was the one error that reached them untranslated. Match what is really
+   * thrown, and say where the gas comes from: being told you have none is no
+   * help if you do not know where to get it.
+   */
+  if (/insufficient funds|exceeds the balance of the account|gas required exceeds/i.test(msg)) {
+    return (
+      "This wallet has no OKB to pay for gas on X Layer testnet. " +
+      "Claim some from the X Layer faucet at https://www.okx.com/xlayer/faucet, then try again."
+    );
+  }
   return msg || "The transaction failed.";
 }
 

@@ -34,19 +34,28 @@ export default function Book() {
   const post = useCallback(async (mode: string, pct?: number) => {
     setError(null); setOk(null); setBusy(mode + (pct ?? ""))
     const r = await fetch("/api/stock/price", {
-      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode, pct }),
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        // The key the operator pasted has to travel with the request. Holding
+        // it only to decide whether the button is greyed out made every button
+        // on this page post without it and take a 401 back: the field looked
+        // like it worked, and the route correctly refused every press.
+        "x-relayer-key": key,
+      },
+      body: JSON.stringify({ mode, pct }),
     })
     const j = await r.json()
     setBusy(null)
     if (!r.ok) { setError(j.error); return }
     setOk(j); mutate()
-  }, [mutate])
+  }, [mutate, key])
 
   if (!state) return <div className="py-16 text-white/50">Reading X Layer…</div>
 
   return (
     <div className="py-10">
-      <p className="label">Polaris · stock credit</p>
+      <p className="label">Polaris</p>
       <h1 className="mt-3 text-[clamp(2rem,5vw,3.4rem)] font-medium leading-[0.98] tracking-[-0.035em] text-white">
         The book &amp; the price
       </h1>

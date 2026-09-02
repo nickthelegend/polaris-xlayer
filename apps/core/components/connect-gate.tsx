@@ -53,6 +53,7 @@ export function ConnectGate({
   reason = "This page reads state that belongs to one wallet, so it needs to know which one is asking.",
   previewLabel = "Your plans",
   previewNote = "your own plans, limit and collection schedule",
+  pitch,
 }: {
   children: React.ReactNode
   title?: string
@@ -65,6 +66,14 @@ export function ConnectGate({
    * describing a different page.
    */
   previewNote?: string
+  /**
+   * What the page is for, shown to someone who has not connected.
+   *
+   * The gate answers "what do you want from me" but never "why would I".
+   * A page whose whole argument sits behind the wallet has to make that
+   * argument before the wallet, or the visitor never sees it.
+   */
+  pitch?: React.ReactNode
 }) {
   const { isConnected, isConnecting } = useAccount()
 
@@ -81,6 +90,7 @@ export function ConnectGate({
 
   if (!isConnected) {
     return (
+      <>
       <div className="split py-12 md:py-20">
         <div className="max-w-xl">
           <span className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-primary">
@@ -138,6 +148,9 @@ export function ConnectGate({
           </div>
         </div>
       </div>
+
+        {pitch}
+      </>
     )
   }
 

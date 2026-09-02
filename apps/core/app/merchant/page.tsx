@@ -40,12 +40,15 @@ function MerchantCounter() {
     if (!address) return ""
     const origin = typeof window === "undefined" ? "" : window.location.origin
     const q = new URLSearchParams({ merchant: address, ref: orderRef, shares })
-    return `${origin}/stock?${q.toString()}`
+    // The checkout is at the root. This pointed at /stock, which has not been a
+    // route since the two products merged — so every code a merchant printed
+    // sent the customer to a 404 with their basket in the query string.
+    return `${origin}/?${q.toString()}`
   }, [address, orderRef, shares])
 
   return (
     <div className="py-10">
-      <p className="label">Polaris · stock credit</p>
+      <p className="label">Polaris</p>
       <h1 className="mt-3 text-[clamp(2rem,5vw,3.4rem)] font-medium leading-[0.98] tracking-[-0.035em] text-white">
         Take a payment
       </h1>

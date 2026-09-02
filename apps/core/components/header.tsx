@@ -6,14 +6,21 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { ConnectWalletButton } from "@/components/wallet/connect-wallet-button"
 
+/*
+ * Four destinations, not eight.
+ *
+ * Polaris used to ship its two credit products as two parallel sets of tabs —
+ * stock credit on one side, BNPL on the other — which read as two apps sharing
+ * a header and forced a visitor to work out which one they were in. They are
+ * one product: you pay a merchant now and settle later, and the only thing
+ * that differs is what backs the limit. So the nav names what you are doing
+ * (pay, review, get paid, read), and the funding sources sit next to each
+ * other inside the checkout where the choice actually belongs.
+ */
 const NAV = [
-  { href: "/", label: "Stock credit" },
-  { href: "/stock/merchant", label: "Take a payment" },
-  { href: "/stock/positions", label: "Positions" },
-  { href: "/credit", label: "BNPL" },
-  { href: "/limits", label: "Limits" },
-  { href: "/merchants", label: "Merchants" },
-  { href: "/faucet", label: "Faucet" },
+  { href: "/", label: "Pay" },
+  { href: "/activity", label: "Activity" },
+  { href: "/merchant", label: "Get paid" },
   { href: "/docs", label: "Docs" },
 ]
 

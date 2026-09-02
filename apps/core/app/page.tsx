@@ -35,9 +35,87 @@ export default function StockCreditPage() {
       reason="This page locks your shares and signs for them. Nothing moves without your wallet, and nothing is signed on your behalf."
       previewLabel="Your stock credit"
       previewNote="what your shares are worth, what you can borrow against them, and what you owe"
+      pitch={<Pitch />}
     >
       <StockCredit />
     </ConnectGate>
+  )
+}
+
+/**
+ * What this is, for someone who has not connected anything.
+ *
+ * The gate used to be the whole first screen: a visitor with no wallet — which
+ * is every visitor, the first time — got "Connect the wallet holding your
+ * shares" and a redacted panel, and had to take on trust that something worth
+ * connecting to was behind it. The idea is the most persuasive thing here and
+ * it was the one thing being withheld.
+ */
+function Pitch() {
+  return (
+    <div className="mt-12 border-t border-white/10 pt-10">
+      <h2 className="text-[clamp(1.4rem,3vw,2rem)] font-medium leading-tight tracking-[-0.02em] text-white">
+        Spend the stock. Don&rsquo;t sell the stock.
+      </h2>
+      <p className="mt-3 max-w-[62ch] text-white/60">
+        You hold tokenized equity. The merchant only takes stablecoin. Today that means selling —
+        losing the position to buy a coffee. Polaris locks the shares instead, pays the merchant
+        now from a pre-funded pool, and gives them back when you repay.
+      </p>
+
+      <ol className="mt-8 grid gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 md:grid-cols-4">
+        {[
+          ["Scan", "The merchant\u2019s code carries the basket and their address."],
+          ["Lock", "Your shares move into the engine. You still own the position."],
+          ["Paid", "The merchant has stablecoin immediately, from the pool."],
+          ["Repay", "Inside 7\u201314 days, and every share comes back."],
+        ].map(([h, b], i) => (
+          <div key={h} className="bg-background p-5">
+            <p className="font-mono text-[11px] text-white/35">0{i + 1}</p>
+            <p className="mt-2 text-sm font-medium text-white">{h}</p>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-white/55">{b}</p>
+          </div>
+        ))}
+      </ol>
+
+      <div className="mt-8 grid gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 md:grid-cols-3">
+        {[
+          {
+            h: "Liquidation sells only what it needs",
+            b: "A liquidator repays the debt and takes collateral worth it plus a bonus; the remainder returns to the borrower in the same transaction.",
+          },
+          {
+            h: "Two staleness bounds, not one",
+            b: "Fifteen minutes while the venue is open, four days while it is shut \u2014 one bound would reject every price all weekend.",
+          },
+          {
+            h: "Nothing is seized during an outage",
+            b: "The engine reads the sequencer uptime feed and refuses to liquidate during an outage and for an hour after \u2014 but never gates repayment.",
+          },
+        ].map((c) => (
+          <div key={c.h} className="bg-background p-5">
+            <p className="text-sm font-medium text-white">{c.h}</p>
+            <p className="mt-2 text-[13px] leading-relaxed text-white/55">{c.b}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Anyone arriving without X Layer testnet gas cannot do a single thing
+          here, and the app is the only place that knows which chain it is on. */}
+      <p className="mt-8 text-[13px] text-white/50">
+        Running on <span className="text-white/75">X Layer testnet (chain 1952)</span>. You need a
+        little OKB for gas &mdash; claim it from the{" "}
+        <a
+          href="https://www.okx.com/xlayer/faucet"
+          target="_blank"
+          rel="noreferrer"
+          className="text-white underline underline-offset-4"
+        >
+          X Layer faucet
+        </a>
+        , then connect and use &ldquo;Get 25 test shares&rdquo; for the collateral.
+      </p>
+    </div>
   )
 }
 
@@ -63,6 +141,20 @@ function StockCredit() {
     { refreshInterval: 15000 },
   )
 
+  /*
+   * The other half of the same credit profile.
+   *
+   * Polaris grants a limit two ways: from what you have repaid before, and
+   * from stock you are willing to lock. Those used to live on separate pages
+   * under separate tabs, which made them look like separate products. They are
+   * one answer to one question — how much can I spend — so they are read
+   * together and shown together.
+   */
+  const { data: line } = useSWR(
+    address ? `/api/limits?address=${address}` : null,
+    fetcher,
+  )
+
   // A merchant's QR carries the checkout in the URL.
   const qrMerchant = params.get("merchant")
   const qrRef = params.get("ref")
@@ -82,7 +174,40 @@ function StockCredit() {
   const merchant = (qrMerchant ?? state?.merchant) as `0x${string}` | undefined
 
   const getQuote = useCallback(async () => {
-    setError(null); setQuote(null); setDone(null); setBusy("quote")
+    setError(null); setQuote(null); setDone(null)
+
+    /*
+     * Refuse before quoting, not after signing.
+     *
+     * The quote only ever asked the engine what a share count is worth, which
+     * is a question about the market and not about you. So a wallet holding
+     * nothing was quoted for ten shares and shown a green button offering to
+     * pay a merchant eleven hundred dollars — a purchase that cannot happen,
+     * priced and offered as though it could. The collateral has to actually be
+     * yours before any of the rest is worth showing.
+     */
+    const held = BigInt(state?.balances?.viewerShares ?? "0")
+    let want: bigint
+    try {
+      want = parseUnits(shares || "0", 18)
+    } catch {
+      setError("Enter the share count as a plain decimal number.")
+      return
+    }
+    if (want === 0n) {
+      setError("Enter a number of shares greater than zero.")
+      return
+    }
+    if (want > held) {
+      setError(
+        `This wallet holds ${sh(held.toString())} ${state?.tokens?.stockSymbol ?? "shares"}, ` +
+          `and locking ${shares} would need more than that.` +
+          (held === 0n ? " Use “Get 25 test shares” below to fund it on testnet." : "")
+      )
+      return
+    }
+
+    setBusy("quote")
     const r = await fetch("/api/stock/quote", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ shares, tenorDays: 7 }),
@@ -91,7 +216,7 @@ function StockCredit() {
     setBusy(null)
     if (!r.ok) { setError(j.error); return }
     setQuote(j)
-  }, [shares])
+  }, [shares, state])
 
   /** Approve if needed, then open the loan. Both signed by the connected wallet. */
   const pay = useCallback(async () => {
@@ -184,13 +309,27 @@ function StockCredit() {
     )
   }
 
-  const ltv = state.price.marketOpen
-    ? state.risk.maxLtvBps / 100
-    : (state.risk.maxLtvBps * (10000 - state.risk.closedMarketHaircutBps)) / 1e6
+  // The haircut is applied to the LTV itself while the venue is shut, so the
+  // effective ceiling moves with the session rather than the mark alone.
+  const ltvBps = state.price.marketOpen
+    ? BigInt(state.risk.maxLtvBps)
+    : (BigInt(state.risk.maxLtvBps) * BigInt(10000 - state.risk.closedMarketHaircutBps)) / 10000n
+  const ltv = Number(ltvBps) / 100
+
+  /*
+   * What this wallet could spend right now, in stablecoin units.
+   *
+   * shares are 1e18 and the print is 1e8, so dividing by 1e20 lands on the
+   * stablecoin's six decimals without ever going through a float — a price
+   * times a balance is exactly where binary floating point starts losing cents.
+   */
+  const collateralValue =
+    (BigInt(state.balances.viewerShares) * BigInt(state.price.usdPerShare)) / 10n ** 20n
+  const stockCeiling = (collateralValue * ltvBps) / 10000n
 
   return (
     <div className="py-10">
-      <p className="label">Polaris · stock credit</p>
+      <p className="label">Polaris</p>
       <h1 className="mt-3 max-w-[18ch] text-[clamp(2rem,5vw,3.4rem)] font-medium leading-[0.98] tracking-[-0.035em] text-white">
         Spend the stock. Don&rsquo;t sell the stock.
       </h1>
@@ -205,20 +344,87 @@ function StockCredit() {
         </div>
       )}
 
-      <div className="mt-8 grid gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { l: `${state.tokens.stockSymbol} price`, v: `$${usd(state.price.usdPerShare, 8)}`, s: `${state.price.marketOpen ? "market open" : "market closed"} · ${state.price.source}`, t: "text-emerald-300", id: "price" },
-          { l: "You hold", v: sh(state.balances.viewerShares), s: state.tokens.stockSymbol, t: "text-white", id: "shares" },
-          { l: "Pool available", v: `$${usd(state.pool.available)}`, s: "merchant is paid from here", t: "text-sky-300", id: "pool" },
-          { l: "Max LTV", v: `${ltv}%`, s: state.price.marketOpen ? "venue open" : "after-hours haircut applied", t: "text-white", id: "ltv" },
-        ].map((t) => (
-          <div key={t.l} className="bg-background p-5" data-testid={`tile-${t.id}`}>
-            <p className="label">{t.l}</p>
-            <p className={`mt-2 font-mono text-[26px] leading-none ${t.t}`}>{t.v}</p>
-            <p className="mt-2 text-[11px] text-white/40">{t.s}</p>
+      <section className="mt-8" aria-labelledby="capacity">
+        <h2 id="capacity" className="label">What you can spend</h2>
+        <div className="mt-3 grid gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 md:grid-cols-2">
+          {/* The funded, working path: lock shares, merchant is paid now. */}
+          <div className="bg-background p-6" data-testid="source-stock">
+            <div className="flex items-baseline justify-between">
+              <p className="text-sm font-medium text-white">Against your shares</p>
+              {/* A badge is a claim about state. Saying READY over $0.00 is
+                  the page insisting it works while showing that it cannot. */}
+              {stockCeiling > 0n ? (
+                <span className="rounded border border-emerald-300/40 px-2 py-0.5 text-[10px] uppercase tracking-[0.1em] text-emerald-200">
+                  Ready
+                </span>
+              ) : (
+                <span className="rounded border border-white/20 px-2 py-0.5 text-[10px] uppercase tracking-[0.1em] text-white/50">
+                  No shares yet
+                </span>
+              )}
+            </div>
+            <p className="mt-4 font-mono text-[34px] leading-none text-emerald-300" data-testid="stock-capacity">
+              ${usd(stockCeiling.toString())}
+            </p>
+            <p className="mt-2 text-[13px] text-white/55">
+              {sh(state.balances.viewerShares)} {state.tokens.stockSymbol} at $
+              {usd(state.price.usdPerShare, 8)}, at {ltv}% LTV
+              {!state.price.marketOpen && " with the after-hours haircut"}.
+            </p>
+            <p className="mt-3 text-[12px] text-white/40">
+              The shares lock and the merchant is paid from the pool. You keep the position.
+            </p>
           </div>
-        ))}
-      </div>
+
+          {/* The unsecured limit, read from the same chain. It is shown here
+              because it is the same product's other answer — but origination
+              is a merchant-side call, so this page does not pretend a shopper
+              can draw on it from a browser. */}
+          <div className="bg-background p-6" data-testid="source-line">
+            <div className="flex items-baseline justify-between">
+              <p className="text-sm font-medium text-white">Against your record</p>
+              <span className="rounded border border-white/20 px-2 py-0.5 text-[10px] uppercase tracking-[0.1em] text-white/60">
+                At the till
+              </span>
+            </div>
+            <p className="mt-4 font-mono text-[34px] leading-none text-white" data-testid="line-available">
+              {line ? `$${line.available}` : "—"}
+            </p>
+            <p className="mt-2 text-[13px] text-white/55">
+              {line ? `Score ${line.creditScore} · limit $${line.currentLimit}` : "Reading your score…"}
+            </p>
+            <p className="mt-3 text-[12px] text-white/40">
+              No collateral — this is what your repayment history is worth. A merchant opens it at
+              checkout; you settle it under Activity.
+            </p>
+            {/* Every address starts at the same score and limit, because that
+                is what the contract returns before you have repaid anything.
+                Left unexplained it reads as a hardcoded number, which is the
+                first thing a reviewer probes for. */}
+            {line && Number(line.used) === 0 && (
+              <p className="mt-2 text-[12px] text-white/35">
+                Everyone starts here. The score is read from{" "}
+                <span className="font-mono">ScoreManager</span> on chain and moves with what you
+                repay.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-px grid gap-px overflow-hidden rounded-b-lg border-x border-b border-white/10 bg-white/10 sm:grid-cols-3">
+          {[
+            { l: `${state.tokens.stockSymbol} price`, v: `$${usd(state.price.usdPerShare, 8)}`, s: `${state.price.marketOpen ? "market open" : "market closed"} · ${state.price.source}`, id: "price" },
+            { l: "You hold", v: `${sh(state.balances.viewerShares)} ${state.tokens.stockSymbol}`, s: "yours throughout", id: "shares" },
+            { l: "Pool available", v: `$${usd(state.pool.available)}`, s: "merchant is paid from here", id: "pool" },
+          ].map((t) => (
+            <div key={t.l} className="bg-background px-5 py-4" data-testid={`tile-${t.id}`}>
+              <p className="label">{t.l}</p>
+              <p className="mt-1.5 font-mono text-[15px] leading-none text-white">{t.v}</p>
+              <p className="mt-1.5 text-[11px] text-white/40">{t.s}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="surface mt-6 p-6 md:p-8">
         <h2 className="text-lg font-medium text-white">Pay with stock credit</h2>
@@ -255,8 +461,12 @@ function StockCredit() {
           <div className="mt-7 border-t border-white/10 pt-2" data-testid="quote">
             {[
               ["Collateral value", `$${usd(quote.collateralValue)}`, ""],
-              [`Ceiling at ${quote.ltvBps / 100}% LTV`, `$${usd(quote.maxBorrow)}`, ""],
-              ["Fee, 7 days", `$${usd(quote.feeOnMax)}`, ""],
+              [
+                `Ceiling at ${quote.ltvBps / 100}% LTV`,
+                `$${usd((BigInt(quote.maxBorrow) + BigInt(quote.feeOnMax)).toString())}`,
+                "",
+              ],
+              ["Fee, 7 days", `−$${usd(quote.feeOnMax)}`, "text-white/70"],
               ["Merchant is paid", `$${usd(quote.maxBorrow)}`, "text-emerald-300 text-lg"],
             ].concat(
               quote.cappedByPool
@@ -283,7 +493,7 @@ function StockCredit() {
               Signed. The merchant has been paid and your shares are locked.{" "}
               <a href={txUrl(done.hash)} target="_blank" rel="noreferrer" className="underline underline-offset-4">View the transaction</a>
               {" · "}
-              <Link href="/stock/positions" className="underline underline-offset-4">See your positions</Link>
+              <Link href="/activity" className="underline underline-offset-4">See your activity</Link>
             </p>
           </div>
         )}
@@ -317,7 +527,7 @@ function StockCredit() {
         Five adversarial reviewers went at these contracts across accounting, decimals, access
         control, oracle manipulation and liveness, and every claim was handed to a separate agent
         whose job was to refute it. <span className="text-white/70">24 attacks were claimed and 2
-        survived</span>; both are fixed. 48 tests, and the conservation invariants are checked
+        survived</span>; both are fixed. 201 tests, and the conservation invariants are checked
         against the live chain, not a fixture.
       </p>
 

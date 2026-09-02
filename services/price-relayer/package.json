@@ -1,0 +1,9 @@
+{
+  "name": "@polarispay/price-relayer",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Always-on price relayer for Polaris on X Layer.",
+  "main": "index.js",
+  "scripts": { "start": "node index.js" },
+  "dependencies": { "ethers": "^6.13.4" }
+}

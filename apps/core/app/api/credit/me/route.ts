@@ -4,9 +4,14 @@ import { collections, formatUnits } from "@polarispay/db";
 
 export const dynamic = "force-dynamic";
 
-const RPC = process.env.SEPOLIA_RPC_URL ?? "https://ethereum-sepolia-rpc.publicnode.com";
+// POLARIS_RPC_URL, not SEPOLIA_RPC_URL: the contracts are on X Layer, and a
+// fallback pointing at a chain they were never deployed to would answer every
+// read with zeros rather than failing loudly. SEPOLIA_RPC_URL is still read so
+// an older deployment keeps working.
+const RPC =
+  process.env.POLARIS_RPC_URL ?? process.env.SEPOLIA_RPC_URL ?? "https://testrpc.xlayer.tech";
 const SCORES = process.env.POLARIS_SCORE_MANAGER;
-const CHAIN_ID = Number(process.env.CHAIN_ID ?? 11_155_111);
+const CHAIN_ID = Number(process.env.CHAIN_ID ?? 1952);
 
 // keccak-derived and verified against the deployed ABI, not guessed.
 const SEL_SCORE_OF = "0x133af456"; //        scoreOf(address)

@@ -1,5 +1,7 @@
 "use client"
 
+import Link from "next/link"
+
 import { useState } from "react"
 import { Check, Copy, ExternalLink } from "lucide-react"
 
@@ -195,6 +197,24 @@ export default function DocsPage() {
             wallet's own nonce and balance never move. Confirm charges from the execution status,
             not from the relayer's transaction list.
           </p>
+        </div>
+      </Section>
+
+      <Section
+        title="More in Polaris"
+        blurb="The rest of the estate. Off the main nav because they are not part of paying or getting paid."
+      >
+        <div className="grid gap-px overflow-hidden rounded-2xl border border-primary/15 bg-primary/10 sm:grid-cols-3">
+          {[
+            { href: "/merchants", h: "Merchant directory", b: "Everyone registered to take Polaris credit." },
+            { href: "/faucet", h: "Testnet faucet", b: "Test stablecoin for settling on X Layer testnet." },
+            { href: "/stock/book", h: "The book & the price", b: "What the pool has lent and the print positions are valued against." },
+          ].map((c) => (
+            <Link key={c.href} href={c.href} className="bg-background p-5 transition hover:bg-primary/[0.04]">
+              <p className="text-sm font-medium text-foreground">{c.h}</p>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-foreground/55">{c.b}</p>
+            </Link>
+          ))}
         </div>
       </Section>
     </div>

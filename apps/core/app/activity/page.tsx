@@ -10,7 +10,12 @@ import { ConnectGate } from "@/components/connect-gate"
 import { ADDRESSES, ENGINE_ABI, ERC20_ABI, explainWriteError, txUrl, waitForAllowance } from "@/lib/polaris-client"
 
 /**
- * Every share you locked, what it is securing, and how much cover is left.
+ * Everything this wallet owes Polaris, in one place.
+ *
+ * Polaris extends credit two ways — against locked stock, and against a
+ * repayment record — and they used to be reviewed on two different pages under
+ * two different tabs. A borrower does not think in products; they think about
+ * what they owe and when. So both sit here, in the order they come due.
  *
  * Repay, refund and liquidate are all signed by the connected wallet. The
  * contract already decides who may do which — only the borrower repays, only
@@ -30,13 +35,13 @@ const TONE: Record<number, string> = {
 }
 const fetcher = (u: string) => fetch(u, { cache: "no-store" }).then((r) => r.json())
 
-export default function PositionsPage() {
+export default function ActivityPage() {
   return (
     <ConnectGate
-      title="Connect to see your positions"
+      title="Connect to see what you owe"
       reason="A position belongs to one wallet, and only that wallet can repay it."
-      previewLabel="Your positions"
-      previewNote="the shares you locked, what they secure, and how much cover is left"
+      previewLabel="Your activity"
+      previewNote="the shares you locked, what they secure, and what is still to settle"
     >
       <Positions />
     </ConnectGate>
@@ -56,6 +61,12 @@ function Positions() {
     address ? `/api/stock/state?address=${address}` : null,
     fetcher,
     { refreshInterval: 15000 },
+  )
+
+  // The credit line's side of the same question.
+  const { data: credit } = useSWR(
+    address ? `/api/credit/me?address=${address}` : null,
+    fetcher,
   )
 
   /*
@@ -152,12 +163,13 @@ function Positions() {
   const loans = state.loans ?? []
   return (
     <div className="py-10">
-      <p className="label">Polaris · stock credit</p>
+      <p className="label">Polaris</p>
       <h1 className="mt-3 text-[clamp(2rem,5vw,3.4rem)] font-medium leading-[0.98] tracking-[-0.035em] text-white">
-        Your positions
+        Activity
       </h1>
       <p className="mt-4 max-w-[62ch] text-white/60">
-        Every share you locked, what it is securing, and how much cover is left.
+        Everything outstanding against this wallet — the shares you locked, what they secure,
+        and anything still to settle on your credit line.
       </p>
 
       {error && (
@@ -178,9 +190,9 @@ function Positions() {
 
       {loans.length === 0 ? (
         <div className="surface mt-6 p-8" data-testid="empty">
-          <h2 className="text-lg font-medium text-white">Nothing locked yet</h2>
+          <h2 className="text-lg font-medium text-white">Nothing outstanding</h2>
           <p className="mt-2 text-white/60">
-            This wallet has no positions. When you pay a merchant with stock credit, the position
+            This wallet owes nothing. When you pay a merchant with stock credit, the position
             shows up here. <Link href="/" className="text-white underline underline-offset-4">Go to checkout</Link>.
           </p>
         </div>
@@ -231,6 +243,33 @@ function Positions() {
           </table>
         </div>
       )}
+
+      <section className="mt-10" aria-labelledby="line">
+        <h2 id="line" className="text-lg font-medium text-white">On your credit line</h2>
+        <p className="mt-1 text-[13px] text-white/50">
+          Unsecured, opened by a merchant at the till and priced off your repayment record.
+        </p>
+        {credit?.plans?.length ? (
+          <div className="surface mt-4 divide-y divide-white/10" data-testid="plans">
+            {credit.plans.map((p: any) => (
+              <div key={p.id} className="flex flex-wrap items-baseline justify-between gap-3 p-4">
+                <span className="font-mono text-sm text-white">Plan #{p.id}</span>
+                <span className="font-mono text-sm text-white/70">{p.merchant ?? ""}</span>
+                <span className="font-mono text-sm text-white">${p.outstandingDisplay ?? p.amountDisplay ?? "—"}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="surface mt-4 p-6" data-testid="plans-empty">
+            <p className="text-[13px] text-white/55">
+              Nothing drawn on the line. Score{" "}
+              <span className="font-mono text-white">{credit?.score ?? "—"}</span>, limit{" "}
+              <span className="font-mono text-white">${credit?.limitDisplay ?? "—"}</span>, of which{" "}
+              <span className="font-mono text-white">${credit?.availableDisplay ?? "—"}</span> is available.
+            </p>
+          </div>
+        )}
+      </section>
 
       <p className="mt-6 font-mono text-[11px] text-white/35">
         Block {state.blockNumber} · {state.viewer.address}

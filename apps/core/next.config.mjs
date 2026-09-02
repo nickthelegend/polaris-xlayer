@@ -37,6 +37,28 @@ const nextConfig = {
     ],
   },
 
+  /*
+   * Stock credit and the credit line merged into one product, so the paths
+   * they used to occupy fold into the merged surface.
+   *
+   * These are permanent HTTP redirects rather than pages that call redirect():
+   * a prerendered page answers 200 with a shim that only a browser running JS
+   * will follow, which leaves crawlers, link previews and curl believing the
+   * old URL is still a real page.
+   */
+  async redirects() {
+    return [
+      { source: "/credit", destination: "/activity", permanent: true },
+      { source: "/plans", destination: "/activity", permanent: true },
+      { source: "/stock/positions", destination: "/activity", permanent: true },
+      { source: "/stock/merchant", destination: "/merchant", permanent: true },
+      { source: "/limits", destination: "/", permanent: true },
+      // Merchant QR codes printed before the merge point here. Next carries the
+      // query string across a redirect, so the basket survives the hop.
+      { source: "/stock", destination: "/", permanent: true },
+    ]
+  },
+
   async headers() {
     return [
       {
