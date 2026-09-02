@@ -124,8 +124,27 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
     Loan[] private _loans;
     mapping(address => uint256[]) private _loansOf;
     mapping(address => uint256) public lockedOf; // stock => total shares held
-    /// keccak(merchant, orderRef) => loanId+1. Makes a retried checkout idempotent.
+    /// keccak(merchant, orderRef, borrower) => loanId+1. Retry idempotency.
     mapping(bytes32 => uint256) private _orderToLoan;
+
+    /**
+     * Shares owed to someone that could not be delivered.
+     *
+     * @dev Real tokenized equity carries an issuer blocklist — that is what
+     *      makes it a regulated instrument rather than a token. If the
+     *      borrower's address is blocked, pushing their collateral back
+     *      reverts, and with it the whole transaction: `repay` fails, and so
+     *      does `liquidate`, because it hands the remainder back in the same
+     *      call. The position sticks on Active forever, `outstanding` never
+     *      clears, and the collateral is bricked in this contract with no way
+     *      out.
+     *
+     *      So delivery is attempted, and if the token refuses the recipient
+     *      the shares are credited here instead. Settlement always completes;
+     *      only the delivery waits. The borrower pulls with `claim` once they
+     *      can receive again.
+     */
+    mapping(address => mapping(address => uint256)) public claimable;
 
     event StockAccepted(address indexed stock, bool accepted);
     event LoanOpened(
@@ -150,6 +169,8 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
         uint256 price
     );
     event ParamsChanged(string what, uint256 value);
+    event DeliveryDeferred(address indexed to, address indexed token, uint256 amount);
+    event Claimed(address indexed to, address indexed token, uint256 amount);
 
     error StockNotAccepted(address stock);
     error ZeroAmount();
@@ -160,6 +181,8 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
     error NotLiquidatable(uint256 loanId, uint256 healthFactorWad);
     error OrderAlreadyUsed(bytes32 key, uint256 loanId);
     error BadParam();
+    error CollateralShortfall(uint256 expected, uint256 received);
+    error MarketShut();
 
     constructor(IERC20 stable_, StockPriceOracle oracle_, LiquidityPool pool_, address owner_) Ownable(owner_) {
         stable = stable_;
@@ -273,8 +296,22 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
         printedAt; // the receipt carries it; unused here
         collateralValue = collateralValueOf(stock, shares, usdPerShare);
         ltvBps = effectiveLtvBps(marketOpen);
-        maxBorrow = (collateralValue * ltvBps) / BPS;
+        uint256 allowed = (collateralValue * ltvBps) / BPS;
+
+        // The ceiling covers principal *and* the prepaid fee, so the largest
+        // borrowable principal is not the ceiling itself — it is the ceiling
+        // net of the fee that borrowing it would incur. Solve
+        //     borrow + borrow * k / BPS <= allowed
+        // for borrow, where k is the fee in bps over this tenor.
+        uint256 k = originationFeeBps + (interestAprBps * tenor) / (365 days);
+        maxBorrow = (allowed * BPS) / (BPS + k);
         feeOnMax = feeFor(maxBorrow, tenor);
+        // Integer division can leave the pair a hair over; walk it back so the
+        // number quoted is always one the contract will actually accept.
+        while (maxBorrow > 0 && maxBorrow + feeOnMax > allowed) {
+            maxBorrow -= 1;
+            feeOnMax = feeFor(maxBorrow, tenor);
+        }
     }
 
     /// @notice Origination plus simple interest for the tenor, charged at open.
@@ -304,16 +341,21 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
         if (shares == 0 || borrowAmount == 0) revert ZeroAmount();
         if (tenor < minTenor || tenor > maxTenor) revert TenorOutOfRange(tenor);
 
-        bytes32 key = keccak256(abi.encodePacked(merchant, orderRef));
+        // Keyed on the borrower too. On (merchant, orderRef) alone, anyone
+        // could open a dust loan against a merchant's published reference and
+        // permanently burn it, so the real shopper's checkout reverts.
+        bytes32 key = keccak256(abi.encode(merchant, orderRef, msg.sender));
         uint256 existing = _orderToLoan[key];
         if (existing != 0) revert OrderAlreadyUsed(key, existing - 1);
 
         (uint256 usdPerShare,, bool marketOpen) = oracle.getPrice(stock);
         uint256 collateralValue = collateralValueOf(stock, shares, usdPerShare);
         uint256 allowed = (collateralValue * effectiveLtvBps(marketOpen)) / BPS;
-        if (borrowAmount > allowed) revert ExceedsMaxLtv(borrowAmount, allowed);
-
         uint256 fee = feeFor(borrowAmount, tenor);
+        // The fee is charged at open and is owed from the first block, so it
+        // is debt and belongs inside the ceiling. Checking only the principal
+        // let a "35%" loan open at 35.51% of collateral.
+        if (borrowAmount + fee > allowed) revert ExceedsMaxLtv(borrowAmount + fee, allowed);
 
         loanId = _loans.length;
         _loans.push(
@@ -337,7 +379,15 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
 
         // Collateral in before money out. If the shopper cannot deliver the
         // shares the merchant is never paid.
+        //
+        // Book what arrived, not what was asked for: a fee-on-transfer or
+        // rebasing token would otherwise have the engine lending against
+        // collateral it never received.
+        uint256 before = IERC20(stock).balanceOf(address(this));
         IERC20(stock).safeTransferFrom(msg.sender, address(this), shares);
+        uint256 received = IERC20(stock).balanceOf(address(this)) - before;
+        if (received != shares) revert CollateralShortfall(shares, received);
+
         pool.draw(merchant, borrowAmount);
 
         emit LoanOpened(
@@ -357,7 +407,7 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
 
         stable.safeTransferFrom(msg.sender, address(pool), owed);
         pool.onRepaid(l.principal, l.fee);
-        IERC20(l.stock).safeTransfer(l.borrower, l.shares);
+        _deliver(l.stock, l.borrower, l.shares);
 
         emit LoanRepaid(loanId, l.borrower, owed, l.shares);
     }
@@ -394,8 +444,10 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
         // Nor on a price we would not lend against. `liquidate` demands a
         // fresh print anyway; saying so here keeps the view honest instead of
         // promising a call that is going to revert.
-        (,,, bool fresh) = oracle.peek(l.stock);
+        (, uint64 printedAt, bool marketOpen, bool fresh) = oracle.peek(l.stock);
         if (!fresh) return false;
+        // Agree with liquidate(), which will not seize while the venue is shut.
+        if (!marketOpen || uint64(block.timestamp) - printedAt > oracle.maxAge()) return false;
         if (block.timestamp > l.dueAt) return true;
         return healthFactor(loanId) < 1e18;
     }
@@ -413,7 +465,14 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
         if (l.status != Status.Active) revert NotActive(loanId);
         if (!isLiquidatable(loanId)) revert NotLiquidatable(loanId, healthFactor(loanId));
 
-        (uint256 usdPerShare,,) = oracle.getPrice(l.stock);
+        (uint256 usdPerShare, uint64 printedAt, bool marketOpen) = oracle.getPrice(l.stock);
+        // Opening a position against a four-day-old closing print is fine —
+        // it is haircut for. Seizing someone's shares against one is not: the
+        // venue is shut, the collateral cannot actually be sold, and the
+        // price the seizure is computed at is days from the truth. Liquidation
+        // therefore demands a live print, and a position that falls due over a
+        // weekend waits for the open.
+        if (!marketOpen || uint64(block.timestamp) - printedAt > oracle.maxAge()) revert MarketShut();
         uint256 debt = l.principal + l.fee;
 
         // Shares whose value equals the debt plus the liquidator's bonus.
@@ -433,10 +492,38 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
 
         stable.safeTransferFrom(msg.sender, address(pool), debt);
         pool.onRepaid(l.principal, l.fee);
+        // The liquidator's leg may revert — they chose to be here, and a
+        // liquidator who cannot receive the collateral should not be paid.
         IERC20(l.stock).safeTransfer(msg.sender, seizeShares);
-        if (returnShares > 0) IERC20(l.stock).safeTransfer(l.borrower, returnShares);
+        // The borrower's leg may not: a blocked borrower must not be able to
+        // hold the whole position hostage.
+        _deliver(l.stock, l.borrower, returnShares);
 
         emit LoanLiquidated(loanId, msg.sender, debt, seizeShares, returnShares, usdPerShare);
+    }
+
+    /**
+     * @dev Try to hand `amount` of `token` to `to`; if the token refuses,
+     *      credit it instead of reverting. A low-level call rather than
+     *      SafeERC20 precisely because a revert here must not be fatal.
+     */
+    function _deliver(address token, address to, uint256 amount) private {
+        if (amount == 0) return;
+        (bool ok, bytes memory ret) = token.call(abi.encodeWithSelector(IERC20.transfer.selector, to, amount));
+        if (ok && (ret.length == 0 || abi.decode(ret, (bool)))) return;
+        claimable[to][token] += amount;
+        emit DeliveryDeferred(to, token, amount);
+    }
+
+    /// @notice Collect shares that could not be delivered at the time.
+    function claim(address token) external nonReentrant returns (uint256 amount) {
+        amount = claimable[msg.sender][token];
+        if (amount == 0) revert ZeroAmount();
+        claimable[msg.sender][token] = 0;
+        // This one may revert: if the holder still cannot receive, the balance
+        // should stay owed to them rather than vanish.
+        IERC20(token).safeTransfer(msg.sender, amount);
+        emit Claimed(msg.sender, token, amount);
     }
 
     // ── reads ───────────────────────────────────────────────────────────────
@@ -453,8 +540,12 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
         return _loansOf[user];
     }
 
-    function loanIdForOrder(address merchant, bytes32 orderRef) external view returns (bool found, uint256 loanId) {
-        uint256 v = _orderToLoan[keccak256(abi.encodePacked(merchant, orderRef))];
+    function loanIdForOrder(address merchant, bytes32 orderRef, address borrower)
+        external
+        view
+        returns (bool found, uint256 loanId)
+    {
+        uint256 v = _orderToLoan[keccak256(abi.encode(merchant, orderRef, borrower))];
         return v == 0 ? (false, 0) : (true, v - 1);
     }
 

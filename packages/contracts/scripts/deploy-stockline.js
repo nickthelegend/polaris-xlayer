@@ -100,10 +100,35 @@ async function main() {
   }
 
   // ── a first price, so the book has something to quote against ───────────
-  const price = usd(Number(process.env.OPEN_PRICE || 220));
-  const now = (await ethers.provider.getBlock("latest")).timestamp;
-  await (await oracle.postPrice(stock, price, now, true, process.env.PRICE_SOURCE || "manual open")).wait();
-  console.log(`posted price ${price} (1e8) for ${stock}`);
+  //
+  // Seeded from the real venue rather than stamped with the current block
+  // time. A price is a claim that a print happened at a moment; inventing
+  // that moment is the same lie the staleness check exists to catch, and the
+  // oracle now rejects a later real print as going backwards if you do.
+  let price, printedAt, marketOpen, source;
+  try {
+    const symbol = process.env.STOCK_SYMBOL || "AAPL";
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1m&range=1d`,
+      { headers: { "User-Agent": "Mozilla/5.0 stockline-deploy" } }
+    );
+    const m = (await res.json())?.chart?.result?.[0]?.meta;
+    const nowSec = Math.floor(Date.now() / 1000);
+    const reg = m.currentTradingPeriod?.regular;
+    price = BigInt(Math.round(m.regularMarketPrice * 1e8));
+    printedAt = Number(m.regularMarketTime);
+    marketOpen = !!reg && nowSec >= reg.start && nowSec < reg.end;
+    source = `${m.fullExchangeName || m.exchangeName} ${marketOpen ? "last" : "close"}`;
+    console.log(`seed price ${symbol} $${m.regularMarketPrice} (${marketOpen ? "open" : "closed"}) from ${source}`);
+  } catch (e) {
+    price = usd(Number(process.env.OPEN_PRICE || 220));
+    printedAt = (await ethers.provider.getBlock("latest")).timestamp;
+    marketOpen = true;
+    source = "manual seed — no venue reachable";
+    console.log(`WARNING: could not reach the venue (${e.message}); seeding a manual price`);
+  }
+  await (await oracle.postPrice(stock, price, printedAt, marketOpen, source)).wait();
+  console.log(`posted ${price} (1e8) printed ${printedAt} for ${stock}`);
 
   const out = {
     network: network.name,

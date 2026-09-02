@@ -76,6 +76,7 @@ contract StockPriceOracle is Ownable {
     error StalePrice(address stock, uint64 printedAt, uint64 age);
     error PriceInFuture(uint64 printedAt, uint64 now_);
     error ZeroPrice();
+    error PriceWentBackwards(uint64 stored, uint64 offered);
 
     constructor(address owner_) Ownable(owner_) {
         isRelayer[owner_] = true;
@@ -95,6 +96,8 @@ contract StockPriceOracle is Ownable {
     function setMaxAge(uint64 whileOpen, uint64 whileClosed) external onlyOwner {
         require(whileOpen >= 60, "maxAge too tight");
         require(whileClosed >= whileOpen, "closed bound must be the looser one");
+        // An unbounded closed window is the staleness guard switched off.
+        require(whileClosed <= 7 days, "closed bound too loose");
         maxAge = whileOpen;
         maxAgeWhenClosed = whileClosed;
         emit MaxAgeSet(whileOpen, whileClosed);
@@ -119,6 +122,13 @@ contract StockPriceOracle is Ownable {
     ) external onlyRelayer {
         if (usdPerShare == 0) revert ZeroPrice();
         if (printedAt > block.timestamp) revert PriceInFuture(printedAt, uint64(block.timestamp));
+        // Time only runs one way. Without this a relayer — or anyone who
+        // gained the role — could walk the stored print backwards to a
+        // convenient older one and re-open a stale window at will.
+        Price memory prev = _prices[stock];
+        if (prev.usdPerShare != 0 && printedAt < prev.printedAt) {
+            revert PriceWentBackwards(prev.printedAt, printedAt);
+        }
         _prices[stock] = Price(usdPerShare, printedAt, marketOpen);
         sourceOf[stock] = source;
         emit PricePosted(stock, usdPerShare, printedAt, marketOpen, source);

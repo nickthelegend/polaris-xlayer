@@ -72,8 +72,24 @@ describe("Stockline", () => {
     const q = await engine.quote(await stock.getAddress(), shares(10), TENOR);
     expect(q.collateralValue).to.equal(stable(2_200));
     expect(q.ltvBps).to.equal(3_500n);
-    expect(q.maxBorrow).to.equal((stable(2_200) * 3_500n) / BPS); // $770
     expect(q.marketOpen).to.equal(true);
+    // The ceiling is 35% of $2,200 = $770, and it has to cover the prepaid fee
+    // as well as the principal — so the borrowable principal is just under.
+    const ceiling = (stable(2_200) * 3_500n) / BPS;
+    expect(q.maxBorrow + q.feeOnMax).to.be.at.most(ceiling);
+    // 100bps origination + 7 days of 12% APR ~= 1.23%, so the principal lands
+    // a shade under the ceiling rather than on it.
+    expect(q.maxBorrow).to.be.greaterThan((ceiling * 98n) / 100n);
+    expect(q.maxBorrow).to.be.lessThan(ceiling);
+  });
+
+  it("quotes a maximum that is actually borrowable, to the last unit", async () => {
+    const q = await engine.quote(await stock.getAddress(), shares(10), TENOR);
+    await expect(
+      engine.connect(borrower).openLoan(
+        await stock.getAddress(), shares(10), merchant.address, ethers.id("max"), q.maxBorrow, TENOR
+      )
+    ).to.not.be.reverted;
   });
 
   it("haircuts the ceiling further when the venue was shut", async () => {
@@ -81,7 +97,9 @@ describe("Stockline", () => {
     const q = await engine.quote(await stock.getAddress(), shares(10), TENOR);
     // 35% * (1 - 10%) = 31.5%
     expect(q.ltvBps).to.equal(3_150n);
-    expect(q.maxBorrow).to.equal((stable(2_200) * 3_150n) / BPS);
+    const ceiling = (stable(2_200) * 3_150n) / BPS;
+    expect(q.maxBorrow + q.feeOnMax).to.be.at.most(ceiling);
+    expect(q.maxBorrow).to.be.greaterThan((ceiling * 98n) / 100n);
   });
 
   it("pays the merchant immediately, from the pool, and locks the shares", async () => {
@@ -441,5 +459,184 @@ describe("Stockline — the sequencer goes down", () => {
     await engine.setSequencerUptimeFeed(ethers.ZeroAddress, 3600);
     expect(await engine.sequencerOk()).to.equal(true);
     expect(await engine.isLiquidatable(0)).to.equal(true);
+  });
+});
+
+describe("Stockline — the hardening", () => {
+  let owner, borrower, attacker, merchant, liquidator, funder;
+  let stock, usdt, oracle, pool, engine;
+  const usd = (n) => BigInt(Math.round(n * 1e8));
+  const stable = (n) => BigInt(Math.round(n * 1e6));
+  const shares = (n) => BigInt(Math.round(n * 1e6)) * 10n ** 12n;
+  const TENOR = 7 * 24 * 60 * 60;
+
+  beforeEach(async () => {
+    [owner, borrower, attacker, merchant, liquidator, funder] = await ethers.getSigners();
+    stock = await (await ethers.getContractFactory("TestnetStock")).deploy("t", "tXAAPL", 18, owner.address);
+    usdt = await (await ethers.getContractFactory("MockUSDC")).deploy();
+    oracle = await (await ethers.getContractFactory("StockPriceOracle")).deploy(owner.address);
+    pool = await (await ethers.getContractFactory("LiquidityPool")).deploy(await usdt.getAddress(), owner.address);
+    engine = await (await ethers.getContractFactory("StocklineEngine")).deploy(
+      await usdt.getAddress(), await oracle.getAddress(), await pool.getAddress(), owner.address
+    );
+    await pool.setEngine(await engine.getAddress());
+    await engine.setAcceptedStock(await stock.getAddress(), true);
+    await oracle.postPrice(await stock.getAddress(), usd(220), await time.latest(), true, "live");
+    await usdt.mint(funder.address, stable(1_000_000));
+    await usdt.connect(funder).approve(await pool.getAddress(), stable(1_000_000));
+    await pool.connect(funder).fund(stable(1_000_000));
+    for (const who of [borrower, attacker]) {
+      await stock.mint(who.address, shares(100));
+      await stock.connect(who).approve(await engine.getAddress(), ethers.MaxUint256);
+    }
+    await usdt.mint(liquidator.address, stable(100_000));
+    await usdt.connect(liquidator).approve(await engine.getAddress(), ethers.MaxUint256);
+  });
+
+  it("will not let a stranger mint collateral", async () => {
+    await expect(stock.connect(attacker).mint(attacker.address, shares(1_000_000)))
+      .to.be.revertedWithCustomError(stock, "OwnableUnauthorizedAccount");
+  });
+
+  it("caps the faucet, so nobody prints their way into the pool", async () => {
+    await expect(stock.connect(attacker).faucet(shares(100))).to.not.be.reverted;
+    await expect(stock.connect(attacker).faucet(1n)).to.be.revertedWithCustomError(stock, "FaucetExhausted");
+  });
+
+  it("will not let an attacker burn a merchant's order reference", async () => {
+    const ref = ethers.id("merchant-invoice-9001");
+    // The attacker front-runs the real shopper with a dust loan on the same ref.
+    await engine.connect(attacker).openLoan(
+      await stock.getAddress(), shares(1), merchant.address, ref, stable(1), TENOR
+    );
+    // The shopper's own checkout still goes through.
+    await expect(
+      engine.connect(borrower).openLoan(
+        await stock.getAddress(), shares(10), merchant.address, ref, stable(700), TENOR
+      )
+    ).to.not.be.reverted;
+  });
+
+  it("still makes the same shopper's retry idempotent", async () => {
+    const ref = ethers.id("same-basket");
+    await engine.connect(borrower).openLoan(
+      await stock.getAddress(), shares(10), merchant.address, ref, stable(700), TENOR
+    );
+    await expect(
+      engine.connect(borrower).openLoan(
+        await stock.getAddress(), shares(10), merchant.address, ref, stable(700), TENOR
+      )
+    ).to.be.revertedWithCustomError(engine, "OrderAlreadyUsed");
+  });
+
+  it("counts the prepaid fee against the ceiling", async () => {
+    const q = await engine.quote(await stock.getAddress(), shares(10), TENOR);
+    const ceiling = (stable(2_200) * 3_500n) / BPS;
+    // Borrowing the raw ceiling would put principal+fee over it.
+    await expect(
+      engine.connect(borrower).openLoan(
+        await stock.getAddress(), shares(10), merchant.address, ethers.id("over"), ceiling, TENOR
+      )
+    ).to.be.revertedWithCustomError(engine, "ExceedsMaxLtv");
+    expect(q.maxBorrow).to.be.lessThan(ceiling);
+  });
+
+  it("will not seize shares while the venue is shut", async () => {
+    await engine.connect(borrower).openLoan(
+      await stock.getAddress(), shares(10), merchant.address, ethers.id("shut"), stable(700), TENOR
+    );
+    // Price collapses, but it collapsed at the close — the shares cannot
+    // actually be sold, so they cannot be taken either.
+    await oracle.postPrice(await stock.getAddress(), usd(130), await time.latest(), false, "close");
+    expect(await engine.isLiquidatable(0)).to.equal(false);
+    await expect(engine.connect(liquidator).liquidate(0)).to.be.revertedWithCustomError(engine, "NotLiquidatable");
+
+    // The moment the venue opens on the same price, it is liquidatable.
+    await oracle.postPrice(await stock.getAddress(), usd(130), await time.latest(), true, "live");
+    expect(await engine.isLiquidatable(0)).to.equal(true);
+    await expect(engine.connect(liquidator).liquidate(0)).to.not.be.reverted;
+  });
+
+  it("refuses a print that walks the clock backwards", async () => {
+    const t = await time.latest();
+    await oracle.postPrice(await stock.getAddress(), usd(220), t, true, "live");
+    await expect(oracle.postPrice(await stock.getAddress(), usd(100), t - 600, true, "older"))
+      .to.be.revertedWithCustomError(oracle, "PriceWentBackwards");
+  });
+
+  it("refuses an unbounded closed-market window", async () => {
+    await expect(oracle.setMaxAge(900, 30 * 86400)).to.be.revertedWith("closed bound too loose");
+  });
+});
+
+describe("Stockline — a blocked borrower cannot brick the position", () => {
+  let owner, borrower, merchant, liquidator, funder;
+  let stock, usdt, oracle, pool, engine;
+  const usd = (n) => BigInt(Math.round(n * 1e8));
+  const stable = (n) => BigInt(Math.round(n * 1e6));
+  const shares = (n) => BigInt(Math.round(n * 1e6)) * 10n ** 12n;
+  const TENOR = 7 * 24 * 60 * 60;
+
+  beforeEach(async () => {
+    [owner, borrower, merchant, liquidator, funder] = await ethers.getSigners();
+    // A share token whose issuer can refuse a holder — which is what makes a
+    // regulated instrument different from a plain ERC-20.
+    stock = await (await ethers.getContractFactory("BlockableStock")).deploy();
+    usdt = await (await ethers.getContractFactory("MockUSDC")).deploy();
+    oracle = await (await ethers.getContractFactory("StockPriceOracle")).deploy(owner.address);
+    pool = await (await ethers.getContractFactory("LiquidityPool")).deploy(await usdt.getAddress(), owner.address);
+    engine = await (await ethers.getContractFactory("StocklineEngine")).deploy(
+      await usdt.getAddress(), await oracle.getAddress(), await pool.getAddress(), owner.address
+    );
+    await pool.setEngine(await engine.getAddress());
+    await engine.setAcceptedStock(await stock.getAddress(), true);
+    await oracle.postPrice(await stock.getAddress(), usd(220), await time.latest(), true, "live");
+    await usdt.mint(funder.address, stable(1_000_000));
+    await usdt.connect(funder).approve(await pool.getAddress(), stable(1_000_000));
+    await pool.connect(funder).fund(stable(1_000_000));
+    await stock.mint(borrower.address, shares(100));
+    await stock.connect(borrower).approve(await engine.getAddress(), ethers.MaxUint256);
+    await usdt.mint(borrower.address, stable(10_000));
+    await usdt.connect(borrower).approve(await engine.getAddress(), ethers.MaxUint256);
+    await usdt.mint(liquidator.address, stable(100_000));
+    await usdt.connect(liquidator).approve(await engine.getAddress(), ethers.MaxUint256);
+    await engine.connect(borrower).openLoan(
+      await stock.getAddress(), shares(10), merchant.address, ethers.id("blk"), stable(700), TENOR
+    );
+  });
+
+  it("liquidation still completes when the issuer has blocked the borrower", async () => {
+    await stock.setBlocked(borrower.address, true);
+    await oracle.postPrice(await stock.getAddress(), usd(130), await time.latest(), true, "live");
+    expect(await engine.isLiquidatable(0)).to.equal(true);
+
+    await expect(engine.connect(liquidator).liquidate(0)).to.not.be.reverted;
+
+    // Settlement finished: the pool is square and the liquidator was paid.
+    expect((await engine.getLoan(0)).status).to.equal(3n);
+    expect(await pool.outstanding()).to.equal(0n);
+    expect(await stock.balanceOf(liquidator.address)).to.be.greaterThan(0n);
+
+    // The remainder is owed, not lost, and is collectable once unblocked.
+    const owed = await engine.claimable(borrower.address, await stock.getAddress());
+    expect(owed).to.be.greaterThan(0n);
+    await expect(engine.connect(borrower).claim(await stock.getAddress())).to.be.revertedWith("BLOCKED");
+    await stock.setBlocked(borrower.address, false);
+    await engine.connect(borrower).claim(await stock.getAddress());
+    expect(await stock.balanceOf(borrower.address)).to.equal(shares(90) + owed);
+  });
+
+  it("repayment still clears the debt when the borrower cannot receive shares", async () => {
+    await stock.setBlocked(borrower.address, true);
+    await expect(engine.connect(borrower).repay(0)).to.not.be.reverted;
+    expect((await engine.getLoan(0)).status).to.equal(2n);
+    expect(await pool.outstanding()).to.equal(0n);
+    expect(await engine.claimable(borrower.address, await stock.getAddress())).to.equal(shares(10));
+  });
+
+  it("delivers straight through when nobody is blocked", async () => {
+    await engine.connect(borrower).repay(0);
+    expect(await stock.balanceOf(borrower.address)).to.equal(shares(100));
+    expect(await engine.claimable(borrower.address, await stock.getAddress())).to.equal(0n);
   });
 });

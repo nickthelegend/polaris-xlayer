@@ -84,11 +84,10 @@ async function main() {
   const merchantAfter = await stable.balanceOf(merchant.address);
   console.log(`    merchant received     $${fmt6(merchantAfter - merchantBefore)}  (immediately, from the pool)`);
   console.log(`    shares locked         ${fmt18(await stock.balanceOf(dep.contracts.engine))}`);
+  const l = await engine.getLoan(id);
   // The upside is in the locked shares, not in a leftover balance: the whole
   // point is that the position was never closed.
-  console.log(`    position kept         ${fmt18(l0.shares)} shares still owned, still exposed`);
-  const l0 = await engine.getLoan(id);
-  const l = l0;
+  console.log(`    position kept         ${fmt18(l.shares)} shares still owned, still exposed`);
   console.log(`    owed                  $${fmt6(await engine.amountOwed(id))} by ${new Date(Number(l.dueAt) * 1000).toISOString().slice(0, 10)}`);
   console.log(`    health factor         ${(Number(await engine.healthFactor(id)) / 1e18).toFixed(2)}`);
 
@@ -113,7 +112,21 @@ async function main() {
   console.log(`    borrowed at the full ceiling, health ${(Number(await engine.healthFactor(id2)) / 1e18).toFixed(2)}`);
 
   const crashed = (live.price * 55n) / 100n; // -45%: through the 50% threshold
-  await rec("post crashed price", await oracle.postPrice(dep.contracts.stock, crashed, Math.floor(Date.now() / 1000), live.open, live.source + " (demo move)"));
+  // Liquidation demands a live print: while the venue is shut the collateral
+  // cannot actually be sold, so the engine will not let it be seized. To
+  // exercise the path out of hours the demo posts the moved price marked
+  // open, and says so rather than hiding it.
+  if (!live.open) {
+    console.log(`    NOTE: the venue is shut, so a real liquidation could not run right now.`);
+    console.log(`          Posting the moved price marked OPEN purely to exercise the path.`);
+  }
+  await rec(
+    "post crashed price",
+    await oracle.postPrice(
+      dep.contracts.stock, crashed, Math.floor(Date.now() / 1000), true,
+      live.source + (live.open ? " (demo move)" : " (demo move, venue marked open to exercise liquidation)")
+    )
+  );
   console.log(`    price now $${fmt8(crashed)}  health ${(Number(await engine.healthFactor(id2)) / 1e18).toFixed(2)}  liquidatable: ${await engine.isLiquidatable(id2)}`);
 
   const debt = await engine.amountOwed(id2);

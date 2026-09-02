@@ -149,6 +149,48 @@ To deploy against real assets instead of stand-ins:
 STOCK_TOKEN=0x... STABLE_TOKEN=0x... npx hardhat run scripts/deploy-stockline.js --network xlayer
 ```
 
+## What an adversarial audit changed
+
+Five independent attackers went at these contracts across accounting,
+decimals, access control, oracle manipulation and liveness; every claim was
+then handed to a separate agent whose job was to refute it. **24 attacks were
+claimed and 2 survived refutation.** Both are fixed, and the 22 that died are
+as useful as the 2 that lived — they are the reasons the code is already
+right.
+
+**An attacker could permanently burn a merchant's order reference.** The
+idempotency key was `keccak(merchant, orderRef)`, claimed first-come and never
+cleared. For one micro-unit of stablecoin and a dust position — reproduced
+line by line, with the attacker fully refunded on repay — anyone could squat a
+merchant's published reference and make every real checkout at that reference
+revert, forever. The key is now `keccak(merchant, orderRef, borrower)`, which
+still stops a shopper double-tapping into two loans but gives a stranger
+nothing to squat.
+
+**A blocked borrower could freeze their own position forever.** Real tokenized
+equity carries an issuer blocklist — that is what makes it a regulated
+instrument rather than a token. Both exits pushed shares back to the borrower,
+so if the issuer blocked that address, `repay` reverted *and* `liquidate`
+reverted with it: the loan stuck on Active, the pool's `outstanding` never
+cleared, and the collateral was bricked in the contract with no way out.
+Delivery is now attempted and, if the token refuses the recipient, credited to
+`claimable` for the borrower to pull later. Settlement always completes; only
+delivery waits. The liquidator's leg still reverts on failure, because a
+liquidator who cannot receive the collateral should not be paid.
+
+Hardened alongside, whether or not the refuters agreed they were exploitable:
+the testnet share token's mint is owner-only with a capped faucet (an
+unpermissioned mint on accepted collateral is an unpermissioned licence to
+borrow the pool); the prepaid fee now counts against the LTV ceiling, so a
+"35%" loan can no longer open at 35.51%; collateral is booked as the amount
+*received* rather than requested; and a price may not walk backwards in time.
+
+**Liquidation now requires a live print.** Opening against a four-day-old
+closing price is fine — it is haircut for. Seizing someone's shares against
+one is not: the venue is shut, the collateral cannot actually be sold, and the
+price is days from the truth. A position that falls due over a weekend waits
+for the open.
+
 ## Risks, said out loud
 
 Tokenized equity is price exposure — no dividend, no vote. Max LTV 35% with a

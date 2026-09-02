@@ -36,9 +36,34 @@ contract TestnetStock is ERC20, Ownable {
         return _decimals;
     }
 
-    /// @notice Open faucet. This token has no value; gating it would only
-    ///         make the demo harder to run.
-    function mint(address to, uint256 amount) external {
+    /**
+     * @notice Issue shares. Owner only.
+     * @dev This was an open mint, on the grounds that the token is worthless.
+     *      That was wrong: the engine accepts this token as collateral, so an
+     *      unpermissioned mint is an unpermissioned licence to print
+     *      collateral and borrow the entire pool against it. Worthless to a
+     *      market is not worthless to a lender that prices it.
+     */
+    function mint(address to, uint256 amount) external onlyOwner {
         _mint(to, amount);
+    }
+
+    /// How much one address may draw from the faucet, in total.
+    uint256 public constant FAUCET_LIMIT = 100e18;
+    mapping(address => uint256) public faucetDrawn;
+
+    error FaucetExhausted(uint256 drawn, uint256 limit);
+
+    /**
+     * @notice A capped faucet, so a demo can be run without the owner.
+     * @dev Capped per address and priced far below the pool's float, so the
+     *      worst case is someone borrowing against 100 shares rather than
+     *      against infinity.
+     */
+    function faucet(uint256 amount) external {
+        uint256 drawn = faucetDrawn[msg.sender] + amount;
+        if (drawn > FAUCET_LIMIT) revert FaucetExhausted(drawn, FAUCET_LIMIT);
+        faucetDrawn[msg.sender] = drawn;
+        _mint(msg.sender, amount);
     }
 }
