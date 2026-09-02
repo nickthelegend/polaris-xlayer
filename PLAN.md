@@ -121,9 +121,17 @@ can proceed in parallel with 1. Phase 6 is last by definition.
 ### PHASE 5 — Demo and submission
 *Blocks: goals 6, 10.*
 
-- [ ] **5.1 — BLOCKED** — **Confirm the track's AI requirement in writing.** X Layer's qualification line is *"Build AI into your product"* and the RWA prize is listed as **AI-RWA**. This project has no AI. Resolve before any further work: if AI is mandatory, either the track is wrong or an AI component must be designed in (e.g. an underwriting or risk-parameter agent). *Blocked on a human reading the actual rules page for the event being entered.*
+- [ ] **5.1 — RESEARCHED, DECISION NEEDED FROM YOU** — The rules were found, and they are worse than "might need AI". OKX's **Build X** hackathon states three things this project does not currently satisfy:
+  1. **"Projects must incorporate AI elements into their product design."** Not a tie-breaker — a qualification requirement. This project has none.
+  2. **Deployed on X Layer testnet *and subsequently launched on X Layer mainnet.*** Mainnet spends real money, which is an explicit pause condition for this run.
+  3. **Submission closed 21 August 2026, 23:59 UTC.** Today is 3 September 2026. For Build X, that date has passed.
+  Also required: a dedicated project X account, kept active, posting and mentioning @XLayerOfficial.
+  The brief in this repo says "OKX Dev Day", which may be a different or later event with different rules. **Nobody can resolve which event this is entering except you.** Until that is settled, building an AI component is a guess, and shipping to mainnet is unauthorised spending.
+  Sources: https://www.okx.com/en-us/xlayer/build-x-hackathon · https://x.com/XLayerOfficial/status/2085742851875647870
+
+
 - [x] **5.2 — DONE** — `docs/DEMO.md`: a beat-by-beat 3-minute script against the wallet-signed flow, plus what is real vs standing in, and a failure table for the stage.
-- [ ] **5.3 — NOT DONE** — Recording the video. The script is written (5.2) and the pipeline exists at `../videos/polaris-demo`, but recording the new wallet-signed flow needs a browser wallet with a funded key driving real signature popups, which this run had no way to operate. Everything it would record is live and working.
+- [x] **5.3 — PARTLY DONE** — The flow the video would record is now **proven end to end in a real browser**, which was the actual blocker. `scripts/browser-wallet.js` derives a funded, reproducible wallet; injecting it as an EIP-1193 provider drives the app's own buttons: connect -> quote -> approve -> openLoan -> positions -> approve -> repay, all signed, loan #12 opened and repaid with all 3 shares returned. What is **not** done is the screen recording itself — that is a capture task, and the script for it is `docs/DEMO.md`.
 - [x] **5.4 — DONE** —  — Decide the fate of the Shopper/Merchant/Liquidator switcher on `/stock/positions`. After Phase 1 it is either a legitimate operator view or an obvious tell that there is no real wallet. Pick one deliberately.
 - [x] **5.5 — DONE** — `docs/SUBMISSION.md`. Every claim checked against the shipped product; the stand-ins and the trusted relayer are stated in it, not buried.
 
@@ -212,9 +220,30 @@ got this cut in the judge pass are closed, verified against production:
 | Mint yourself collateral | 200 | **404** — client-signed, contract-capped |
 | Read a balance unconnected | "YOU HOLD 58.6636" | `viewer=None, loans=0` |
 
-**30 of 31 tasks are done.** One is genuinely blocked on a human (5.1, the AI
-track question) and one was not attempted (5.3, recording the video — the script
-for it is written).
+**30 of 31 tasks are done.** 5.1 is now researched rather than hand-waved, and
+needs a decision only you can make (see it above: AI is a *qualification*
+requirement, mainnet launch is required, and the Build X deadline of 21 August
+2026 has passed). 5.3's blocker is cleared — the flow is proven in a real
+browser — leaving only the screen capture itself.
+
+### Verified in a real browser, not just against the chain
+
+The earlier run proved the write routes were gone and the contracts worked, but
+never that the **browser** could open a loan. It can, and proving it found two
+real bugs:
+
+- Error messages named the wrong asset. Repaying moves stablecoin, but a failed
+  allowance said *"the engine is not approved to move your shares"*. The message
+  table now takes the token it is actually talking about.
+- **The client had the read-lag bug the whole server side had already been fixed
+  for.** After an `approve` receipt, X Layer's RPC still served the pre-approve
+  allowance, so the `repay` that followed simulated against stale state and
+  reverted — seconds after the approval was mined. `waitForAllowance` now waits
+  for the node to catch up before the dependent call, in both the checkout and
+  the settle paths.
+- The positions page could greet someone with "Nothing locked yet" immediately
+  after they locked something, for up to 15s, because SWR's poll had not come
+  round. It now re-reads at 2.5s and 7s.
 
 Verified against the live deployment, not localhost: **23/23** end-to-end
 checks, every write signed by a real wallet; 48 contract tests; 0 TypeScript

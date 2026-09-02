@@ -56,8 +56,11 @@ const MESSAGES: Record<string, string> = {
   NoPrice: "There is no price on chain for that token yet.",
   ZeroAmount: "That amount cannot be zero.",
   FaucetExhausted: "You have already drawn the maximum from the faucet.",
-  ERC20InsufficientBalance: "You do not hold enough of that token.",
-  ERC20InsufficientAllowance: "The engine is not approved to move your shares yet.",
+  // These two say nothing about *which* token, and the same code path moves
+  // shares when opening and stablecoin when repaying. Naming the wrong one is
+  // worse than naming none, so the caller supplies the noun.
+  ERC20InsufficientBalance: "You do not hold enough {token}.",
+  ERC20InsufficientAllowance: "The engine is not approved to move your {token} yet.",
 };
 
 function findData(e: any): string | null {
@@ -79,8 +82,12 @@ function findData(e: any): string | null {
   return m ? m[1] : null;
 }
 
-/** A sentence for a failed write, or the raw reason if we genuinely cannot name it. */
-export function explainWriteError(e: any): string {
+/**
+ * A sentence for a failed write, or the raw reason if we genuinely cannot name
+ * it. `token` names what the failing transfer was actually moving — shares
+ * when a position opens, stablecoin when one is settled.
+ */
+export function explainWriteError(e: any, token = "tokens"): string {
   const name = String(e?.name ?? "");
   const msg = String(e?.shortMessage ?? e?.message ?? "");
   // A user closing the wallet popup is not an error worth a red panel.
@@ -92,7 +99,7 @@ export function explainWriteError(e: any): string {
     for (const iface of IFACES) {
       try {
         const parsed = iface.parseError(data);
-        if (parsed && MESSAGES[parsed.name]) return MESSAGES[parsed.name];
+        if (parsed && MESSAGES[parsed.name]) return MESSAGES[parsed.name].replace("{token}", token);
         if (parsed) return `The contract rejected this: ${parsed.name}.`;
       } catch {
         /* not this interface */
@@ -104,3 +111,34 @@ export function explainWriteError(e: any): string {
 }
 
 export const txUrl = (hash: string) => `${EXPLORER}/tx/${hash}`;
+
+/**
+ * Wait until an approval is actually visible to the node we simulate against.
+ *
+ * X Layer's RPC serves pre-transaction state for a moment after a receipt. A
+ * receipt for an approve therefore does not mean the next call will see the
+ * allowance: the repay that follows simulates against the old state and
+ * reverts with InsufficientAllowance, seconds after the approve was mined.
+ * Every server-side script in this repo already settles between dependent
+ * calls; the browser has to do the same.
+ */
+export async function waitForAllowance(
+  publicClient: any,
+  token: `0x${string}`,
+  owner: `0x${string}`,
+  spender: `0x${string}`,
+  atLeast: bigint,
+  tries = 40,
+): Promise<boolean> {
+  for (let i = 0; i < tries; i++) {
+    const a = (await publicClient.readContract({
+      address: token,
+      abi: ERC20_ABI,
+      functionName: "allowance",
+      args: [owner, spender],
+    } as any)) as bigint;
+    if (a >= atLeast) return true;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return false;
+}

@@ -8,7 +8,7 @@ import { useAccount, usePublicClient, useWriteContract } from "wagmi"
 import { parseUnits, maxUint256 } from "viem"
 
 import { ConnectGate } from "@/components/connect-gate"
-import { ADDRESSES, ENGINE_ABI, ERC20_ABI, explainWriteError, txUrl } from "@/lib/polaris-client"
+import { ADDRESSES, ENGINE_ABI, ERC20_ABI, explainWriteError, txUrl, waitForAllowance } from "@/lib/polaris-client"
 
 /**
  * Spend the stock, don't sell the stock.
@@ -116,6 +116,16 @@ function StockCredit() {
           args: [ADDRESSES.engine as `0x${string}`, maxUint256],
         })
         await publicClient.waitForTransactionReceipt({ hash: approveHash })
+        // Same read-lag: openLoan would simulate against the pre-approve state.
+        const visible = await waitForAllowance(
+          publicClient, ADDRESSES.stock as `0x${string}`, address,
+          ADDRESSES.engine as `0x${string}`, wei,
+        )
+        if (!visible) {
+          setError("The approval is confirmed but the node has not caught up yet. Try again in a moment.")
+          setBusy(null)
+          return
+        }
         setBusy("pay")
       }
 
@@ -141,11 +151,11 @@ function StockCredit() {
       setOrderRef("basket-" + Math.random().toString(36).slice(2, 8))
       void mutate()
     } catch (e: any) {
-      setError(explainWriteError(e))
+      setError(explainWriteError(e, state?.tokens?.stockSymbol ?? "shares"))
     } finally {
       setBusy(null)
     }
-  }, [quote, address, merchant, publicClient, shares, orderRef, write, mutate])
+  }, [quote, address, merchant, publicClient, shares, orderRef, write, mutate, state])
 
   const faucet = useCallback(async () => {
     setError(null); setBusy("faucet")
@@ -159,11 +169,11 @@ function StockCredit() {
       await publicClient?.waitForTransactionReceipt({ hash })
       void mutate()
     } catch (e: any) {
-      setError(explainWriteError(e))
+      setError(explainWriteError(e, state?.tokens?.stockSymbol ?? "shares"))
     } finally {
       setBusy(null)
     }
-  }, [write, publicClient, mutate])
+  }, [write, publicClient, mutate, state])
 
   if (!state) return <div className="py-16 text-white/50">Reading X Layer…</div>
   if (state.error) {

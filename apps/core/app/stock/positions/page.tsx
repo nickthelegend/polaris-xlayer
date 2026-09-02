@@ -1,13 +1,13 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import useSWR from "swr"
 import { useAccount, usePublicClient, useWriteContract } from "wagmi"
 import { maxUint256 } from "viem"
 
 import { ConnectGate } from "@/components/connect-gate"
-import { ADDRESSES, ENGINE_ABI, ERC20_ABI, explainWriteError, txUrl } from "@/lib/polaris-client"
+import { ADDRESSES, ENGINE_ABI, ERC20_ABI, explainWriteError, txUrl, waitForAllowance } from "@/lib/polaris-client"
 
 /**
  * Every share you locked, what it is securing, and how much cover is left.
@@ -58,6 +58,21 @@ function Positions() {
     { refreshInterval: 15000 },
   )
 
+  /*
+   * Re-read shortly after arriving.
+   *
+   * X Layer's RPC serves pre-transaction state for a moment after a receipt,
+   * so someone who pays and then opens this page can land inside that window
+   * and be told they have nothing locked — seconds after locking something.
+   * The 15s poll corrects it eventually, which is far too late to be the first
+   * thing they read. Two quick re-reads close the window.
+   */
+  useEffect(() => {
+    if (!address) return
+    const t = [setTimeout(() => void mutate(), 2500), setTimeout(() => void mutate(), 7000)]
+    return () => t.forEach(clearTimeout)
+  }, [address, mutate])
+
   const [busy, setBusy] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ok, setOk] = useState<{ hash: string; action: string } | null>(null)
@@ -68,7 +83,23 @@ function Positions() {
       setError(null); setOk(null); setBusy(loanId)
       try {
         // Repaying, refunding and liquidating all move stablecoin from the
-        // caller into the pool, so the caller has to have approved it first.
+        // caller into the pool, so the caller needs both the balance and the
+        // approval. Checking the balance first turns "the engine is not
+        // approved" — which is true but unhelpful — into the actual problem.
+        const held = (await publicClient.readContract({
+          address: ADDRESSES.stable as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: "balanceOf",
+          args: [address],
+        } as any)) as bigint
+        if (held < BigInt(owed)) {
+          setError(
+            `Repaying this needs ${(Number(owed) / 1e6).toFixed(2)} ${state?.tokens?.stableSymbol ?? "stablecoin"}, ` +
+              `and this wallet holds ${(Number(held) / 1e6).toFixed(2)}.`
+          )
+          setBusy(null)
+          return
+        }
         {
           const allowance = (await publicClient.readContract({
             address: ADDRESSES.stable as `0x${string}`,
@@ -84,6 +115,17 @@ function Positions() {
               args: [ADDRESSES.engine as `0x${string}`, maxUint256],
             })
             await publicClient.waitForTransactionReceipt({ hash: approveHash })
+            // The receipt is not enough on this RPC — wait for the node to
+            // actually report the allowance before the settle call simulates.
+            const visible = await waitForAllowance(
+              publicClient, ADDRESSES.stable as `0x${string}`, address,
+              ADDRESSES.engine as `0x${string}`, BigInt(owed),
+            )
+            if (!visible) {
+              setError("The approval is confirmed but the node has not caught up yet. Try again in a moment.")
+              setBusy(null)
+              return
+            }
           }
         }
 
@@ -97,12 +139,12 @@ function Positions() {
         setOk({ hash, action })
         void mutate()
       } catch (e: any) {
-        setError(explainWriteError(e))
+        setError(explainWriteError(e, state?.tokens?.stableSymbol ?? "stablecoin"))
       } finally {
         setBusy(null)
       }
     },
-    [publicClient, address, write, mutate],
+    [publicClient, address, write, mutate, state],
   )
 
   if (!state) return <div className="py-16 text-white/50">Reading X Layer…</div>
