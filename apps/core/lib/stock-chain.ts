@@ -23,7 +23,7 @@ if (typeof window === "undefined") {
     break;
   }
 }
-import deployment from "../../../packages/contracts/deployments/polaris-xlayerTestnet.json";
+import deployment from "./polaris-deployment.json";
 
 /**
  * Polaris credit against tokenized equity, on X Layer.
@@ -45,24 +45,27 @@ export const RISK = deployment.risk;
 export const STAND_INS = deployment.standIns;
 
 /*
- * ABIs come from the compiled artifacts, not from hand-written signature
- * lists. A hand-written list omits the custom error definitions, and without
+ * ABIs come from a file generated off the compiled artifacts, not from
+ * hand-written signature lists. A hand-written list omits the custom error definitions, and without
  * those ethers cannot decode a revert: a healthy loan someone tried to
  * liquidate came back as "execution reverted (unknown custom error)" with a
  * 500, instead of the 409 explaining the position is fine. The artifact
  * carries every function and every error, so the reason always survives.
+ *
+ * It is committed rather than imported out of Hardhat's artifacts directory:
+ * artifacts are build output, they are gitignored, and reaching into them
+ * makes the app unbuildable anywhere the contracts have not just been
+ * compiled. Regenerate with `npx hardhat run scripts/export-abis.js` in
+ * packages/contracts.
  */
-import engineArtifact from "../../../packages/contracts/artifacts/contracts/polaris/PolarisEngine.sol/PolarisEngine.json";
-import oracleArtifact from "../../../packages/contracts/artifacts/contracts/polaris/StockPriceOracle.sol/StockPriceOracle.json";
-import poolArtifact from "../../../packages/contracts/artifacts/contracts/polaris/LiquidityPool.sol/LiquidityPool.json";
-import stockArtifact from "../../../packages/contracts/artifacts/contracts/polaris/TestnetStock.sol/TestnetStock.json";
-import stableArtifact from "../../../packages/contracts/artifacts/contracts/MockUSDC.sol/MockUSDC.json";
 
-export const ENGINE_ABI = engineArtifact.abi;
-export const ORACLE_ABI = oracleArtifact.abi;
-export const POOL_ABI = poolArtifact.abi;
+import abis from "./polaris-abis.json";
+
+export const ENGINE_ABI = abis.PolarisEngine;
+export const ORACLE_ABI = abis.StockPriceOracle;
+export const POOL_ABI = abis.LiquidityPool;
 /** The stand-in share token and the stand-in stablecoin share the ERC-20 surface. */
-export const ERC20_ABI = [...stockArtifact.abi, ...stableArtifact.abi.filter(
+export const ERC20_ABI = [...abis.TestnetStock, ...abis.MockUSDC.filter(
   (f: any) => f.type === "function" && f.name === "mint"
 )];
 

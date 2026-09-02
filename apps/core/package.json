@@ -1,5 +1,5 @@
 {
-  "name": "my-v0-project",
+  "name": "polaris-app",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -22,7 +22,7 @@
     "@metamask/connect-evm": "^0.9.0",
     "@minswap/aggregator-widget": "^1.0.13",
     "@morpho-org/blue-api-sdk": "^2.17.3",
-    "@polarispay/db": "workspace:*",
+    "@polarispay/db": "file:../../packages/db",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
     "@radix-ui/react-aspect-ratio": "1.1.1",

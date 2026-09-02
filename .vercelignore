@@ -1,0 +1,11 @@
+# Nothing here is needed to build the app, and some of it is very large.
+packages/contracts/artifacts
+packages/contracts/cache
+packages/contracts/node_modules
+target
+test-ledger
+mobile
+merchant-app
+programs
+videos
+_archive
