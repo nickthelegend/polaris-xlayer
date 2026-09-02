@@ -53,7 +53,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             </ErrorBoundary>
           </Providers>
         </Suspense>
-        <Analytics />
+        {/* Vercel Web Analytics serves its script only once the feature is
+            switched on for the project. Rendering the component regardless
+            puts a guaranteed 404 in every visitor's console. Turn it on in
+            the project settings, then set NEXT_PUBLIC_VERCEL_ANALYTICS=1. */}
+        {process.env.NEXT_PUBLIC_VERCEL_ANALYTICS === "1" && <Analytics />}
       </body>
     </html>
   )
