@@ -1,10 +1,10 @@
 {
-  "_comment": "Every address here was read off the chain with eth_call / eth_getCode, not copied from documentation. The official X Layer docs still say the testnet chain id is 195; the live RPC answers 1952. Verified 2026-08-30.",
+  "_comment": "Every address here was read off the chain with eth_call / eth_getCode, not copied from documentation. Two things the docs get wrong: the testnet chain id (they say 195; the live RPC answers 1952, and 195 is deprecated with an empty RPC list), and the stack — X Layer migrated from Polygon CDK to the OP Stack in December 2025. Verified 2026-08-30.",
   "mainnet": {
     "name": "X Layer",
     "chainId": 196,
     "rpc": "https://rpc.xlayer.tech",
-    "explorer": "https://www.oklink.com/xlayer",
+    "explorer": "https://www.oklink.com/x-layer",
     "gasToken": "OKB",
     "assets": {
       "USDT0": {
@@ -28,14 +28,15 @@
         "USDC/USD": "0xB8a08c178D96C315FbFB5661ABD208477391B"
       },
       "_equityNote": "There is no equity push feed on X Layer. All 26 X Layer push feeds are crypto. Equity prices exist only as Chainlink Data Streams, which is a paid subscription and whose on-chain StreamsLookup pattern is NOT supported on X Layer. That is why StockPriceOracle takes a relayed print with its source and timestamp recorded on chain, rather than pretending to read a feed that does not exist."
-    }
+    },
+    "explorerAlt": "https://web3.okx.com/explorer/x-layer"
   },
   "testnet": {
     "name": "X Layer Testnet",
     "chainId": 1952,
     "_chainIdNote": "Official docs say 195. The live RPC returns 0x7a0 = 1952. The old X1 testnet on 195 no longer answers.",
     "rpc": "https://testrpc.xlayer.tech",
-    "explorer": "https://www.oklink.com/xlayer-test",
+    "explorer": "https://www.oklink.com/x-layer-testnet",
     "gasToken": "OKB",
     "faucet": {
       "url": "https://web3.okx.com/xlayer/faucet/xlayerfaucet",
@@ -56,6 +57,26 @@
         "BTC/USD": "0x486b9BcBBC2607edB9353631b072B1148aF8f0F4",
         "OKB/USD": "0xF6195DE070F6bf0da411Fb6F1e109a424a6C8c0e"
       }
-    }
+    },
+    "explorerAlt": "https://web3.okx.com/explorer/x-layer-testnet"
+  },
+  "stack": {
+    "framework": "OP Stack",
+    "migratedFrom": "Polygon CDK, December 2025",
+    "proofSystem": "ZK validity proofs (OP Succinct / SP1), respectedGameType 42. Cannon FaultDisputeGame is not deployed.",
+    "settlesTo": {
+      "mainnet": "Ethereum mainnet",
+      "testnet": "Ethereum Sepolia"
+    },
+    "withdrawalDelaySeconds": {
+      "mainnet": 604800,
+      "testnet": 25200
+    },
+    "standardBridge": {
+      "enabled": false,
+      "mainnet": "0xAecF995ABf9E7eDE7ae0CE65E60622C9eD84823a",
+      "_note": "The OP standard bridge is deliberately disabled on X Layer: depositETH, bridgeETH, depositERC20 and a plain ETH transfer all revert with the string 'not allow bridge'. Do not design a flow that assumes users can bridge in through it."
+    },
+    "_lendingImplication": "Being an L2 with a single sequencer is the material fact for a lending protocol: if the sequencer stalls, borrowers cannot reach the chain to repay while prices keep moving, and every position becomes liquidatable the moment it resumes. StocklineEngine reads Chainlink's L2 Sequencer Uptime feed and refuses to liquidate during an outage and for a grace period after recovery."
   }
 }

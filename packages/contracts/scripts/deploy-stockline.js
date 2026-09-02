@@ -67,6 +67,19 @@ async function main() {
   console.log(`engine               ${await engine.getAddress()}\n`);
 
   await (await pool.setEngine(await engine.getAddress())).wait();
+
+  // X Layer is an OP Stack L2 with one sequencer. Chainlink publishes an
+  // uptime feed on mainnet; testnet has none, and address(0) correctly
+  // disables the check rather than pretending to one.
+  const SEQUENCER_FEED = {
+    196: "0x45c2b8C204568A03Dc7A2E32B71D67Fe97F908A9",
+  }[Number(network.config.chainId)];
+  if (SEQUENCER_FEED) {
+    await (await engine.setSequencerUptimeFeed(SEQUENCER_FEED, 3600)).wait();
+    console.log(`sequencer uptime feed ${SEQUENCER_FEED} (1h grace)`);
+  } else {
+    console.log("no sequencer uptime feed on this network — liquidation guard disabled");
+  }
   await (await engine.setAcceptedStock(stock, true)).wait();
   console.log("wired: pool -> engine, engine accepts the stock");
 
@@ -117,6 +130,7 @@ async function main() {
     // Recorded rather than glossed over: anyone reading this deployment can
     // see exactly which pieces are real and which are standing in.
     standIns,
+    sequencerUptimeFeed: SEQUENCER_FEED || null,
   };
   const dir = path.join(__dirname, "..", "deployments");
   fs.mkdirSync(dir, { recursive: true });

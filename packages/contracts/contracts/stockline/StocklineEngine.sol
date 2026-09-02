@@ -10,6 +10,14 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {StockPriceOracle} from "./StockPriceOracle.sol";
 import {LiquidityPool} from "./LiquidityPool.sol";
 
+/// Chainlink's L2 Sequencer Uptime feed. answer: 0 = up, 1 = down.
+interface IL2SequencerUptime {
+    function latestRoundData()
+        external
+        view
+        returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound);
+}
+
 /**
  * @title StocklineEngine
  * @notice Spend the stock. Don't sell the stock.
@@ -90,6 +98,28 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
 
     uint64 public minTenor = 7 days;
     uint64 public maxTenor = 14 days;
+
+    /**
+     * Chainlink's L2 Sequencer Uptime feed, and how long after it comes back
+     * before liquidation is allowed again.
+     *
+     * @dev X Layer is an OP Stack L2 with a single sequencer. If it stalls, a
+     *      borrower physically cannot get a repayment transaction on chain
+     *      while the price keeps moving underneath them — and the moment it
+     *      resumes, every position that drifted is liquidatable at once,
+     *      through no fault of the borrower. Blocking liquidation during the
+     *      outage and for a grace period after it is what gives them their
+     *      window back.
+     *
+     *      Repayment is deliberately NOT gated on this. A borrower who can
+     *      reach the chain should always be able to get out.
+     *
+     *      Unset (address(0)) disables the check, which is the correct state
+     *      on a network that publishes no such feed — X Layer testnet has
+     *      none. Mainnet's lives at 0x45c2b8C204568A03Dc7A2E32B71D67Fe97F908A9.
+     */
+    IL2SequencerUptime public sequencerUptimeFeed;
+    uint64 public sequencerGracePeriod = 1 hours;
 
     Loan[] private _loans;
     mapping(address => uint256[]) private _loansOf;
@@ -173,6 +203,28 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
 
     function setOracle(StockPriceOracle oracle_) external onlyOwner {
         oracle = oracle_;
+    }
+
+    function setSequencerUptimeFeed(IL2SequencerUptime feed, uint64 grace) external onlyOwner {
+        if (grace > 12 hours) revert BadParam();
+        sequencerUptimeFeed = feed;
+        sequencerGracePeriod = grace;
+        emit ParamsChanged("sequencer", grace);
+    }
+
+    /**
+     * @notice Is the chain healthy enough to liquidate against?
+     * @dev False while the sequencer is down and for `sequencerGracePeriod`
+     *      after it returns. True when no feed is configured, because a
+     *      network with no uptime feed gives us nothing to check.
+     */
+    function sequencerOk() public view returns (bool) {
+        if (address(sequencerUptimeFeed) == address(0)) return true;
+        (, int256 answer, uint256 startedAt,,) = sequencerUptimeFeed.latestRoundData();
+        if (answer != 0) return false; // down right now
+        // startedAt is when the *current* status began. If it only just came
+        // back up, borrowers have not had their window yet.
+        return block.timestamp - startedAt > sequencerGracePeriod;
     }
 
     // ── pricing ─────────────────────────────────────────────────────────────
@@ -314,11 +366,19 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
      * @notice How much cover is left. 1e18 == exactly at the threshold.
      * @dev Below 1e18 the position is liquidatable. Past the due date it is
      *      liquidatable regardless — see `isLiquidatable`.
+     *
+     *      This does not revert on a missing or stale price; it reports the
+     *      position as unassessable by returning max. An earlier version
+     *      called `oracle.getPrice` and reverted, which made both this and
+     *      `isLiquidatable` untotal views — and the state where that bites is
+     *      exactly the one after a sequencer outage, when the price is always
+     *      stale and a keeper most needs a straight answer.
      */
     function healthFactor(uint256 loanId) public view returns (uint256) {
         Loan memory l = _loans[loanId];
         if (l.status != Status.Active) return type(uint256).max;
-        (uint256 usdPerShare,,) = oracle.getPrice(l.stock);
+        (uint256 usdPerShare,,, bool fresh) = oracle.peek(l.stock);
+        if (!fresh) return type(uint256).max;
         uint256 value = collateralValueOf(l.stock, l.shares, usdPerShare);
         uint256 debt = l.principal + l.fee;
         if (debt == 0) return type(uint256).max;
@@ -328,6 +388,14 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
     function isLiquidatable(uint256 loanId) public view returns (bool) {
         Loan memory l = _loans[loanId];
         if (l.status != Status.Active) return false;
+        // Nothing is liquidatable while the borrower could not have reached
+        // the chain to prevent it.
+        if (!sequencerOk()) return false;
+        // Nor on a price we would not lend against. `liquidate` demands a
+        // fresh print anyway; saying so here keeps the view honest instead of
+        // promising a call that is going to revert.
+        (,,, bool fresh) = oracle.peek(l.stock);
+        if (!fresh) return false;
         if (block.timestamp > l.dueAt) return true;
         return healthFactor(loanId) < 1e18;
     }

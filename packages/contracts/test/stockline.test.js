@@ -355,3 +355,91 @@ describe("Stockline — staleness across a market close", () => {
     await expect(oracle.setMaxAge(900, 4 * 86400)).to.not.be.reverted;
   });
 });
+
+describe("Stockline — the sequencer goes down", () => {
+  let owner, borrower, merchant, liquidator, funder;
+  let stock, usdt, oracle, pool, engine, feed;
+  const usd = (n) => BigInt(Math.round(n * 1e8));
+  const stable = (n) => BigInt(Math.round(n * 1e6));
+  const shares = (n) => BigInt(Math.round(n * 1e6)) * 10n ** 12n;
+  const TENOR = 7 * 24 * 60 * 60;
+
+  beforeEach(async () => {
+    [owner, borrower, merchant, liquidator, funder] = await ethers.getSigners();
+    stock = await (await ethers.getContractFactory("TestnetStock")).deploy("t", "tXAAPL", 18, owner.address);
+    usdt = await (await ethers.getContractFactory("MockUSDC")).deploy();
+    oracle = await (await ethers.getContractFactory("StockPriceOracle")).deploy(owner.address);
+    pool = await (await ethers.getContractFactory("LiquidityPool")).deploy(await usdt.getAddress(), owner.address);
+    engine = await (await ethers.getContractFactory("StocklineEngine")).deploy(
+      await usdt.getAddress(), await oracle.getAddress(), await pool.getAddress(), owner.address
+    );
+    feed = await (await ethers.getContractFactory("SequencerFeedStub")).deploy();
+    await pool.setEngine(await engine.getAddress());
+    await engine.setAcceptedStock(await stock.getAddress(), true);
+    await engine.setSequencerUptimeFeed(await feed.getAddress(), 3600);
+    await oracle.postPrice(await stock.getAddress(), usd(220), await time.latest(), true, "live");
+
+    await usdt.mint(funder.address, stable(1_000_000));
+    await usdt.connect(funder).approve(await pool.getAddress(), stable(1_000_000));
+    await pool.connect(funder).fund(stable(1_000_000));
+    await stock.mint(borrower.address, shares(100));
+    await stock.connect(borrower).approve(await engine.getAddress(), ethers.MaxUint256);
+    await usdt.mint(borrower.address, stable(10_000));
+    await usdt.connect(borrower).approve(await engine.getAddress(), ethers.MaxUint256);
+    await usdt.mint(liquidator.address, stable(100_000));
+    await usdt.connect(liquidator).approve(await engine.getAddress(), ethers.MaxUint256);
+
+    // A position that a price crash will put underwater.
+    await feed.set(0, (await time.latest()) - 86400); // up, and has been for a day
+    await engine.connect(borrower).openLoan(
+      await stock.getAddress(), shares(10), merchant.address, ethers.id("seq"), stable(700), TENOR
+    );
+    await oracle.postPrice(await stock.getAddress(), usd(130), await time.latest(), true, "live");
+  });
+
+  it("is liquidatable while the sequencer is healthy", async () => {
+    expect(await engine.sequencerOk()).to.equal(true);
+    expect(await engine.isLiquidatable(0)).to.equal(true);
+  });
+
+  it("is NOT liquidatable while the sequencer is down", async () => {
+    await feed.set(1, await time.latest()); // down
+    expect(await engine.sequencerOk()).to.equal(false);
+    expect(await engine.isLiquidatable(0)).to.equal(false);
+    await expect(engine.connect(liquidator).liquidate(0)).to.be.revertedWithCustomError(engine, "NotLiquidatable");
+  });
+
+  it("stays protected through the grace period after it comes back", async () => {
+    await feed.set(0, await time.latest()); // just came back up
+    expect(await engine.isLiquidatable(0)).to.equal(false);
+    await time.increase(1800); // half an hour in — still inside the window
+    expect(await engine.isLiquidatable(0)).to.equal(false);
+    await time.increase(1900); // past the hour
+    // The price went stale while we waited — which is exactly the state after
+    // a real outage. A stale print is not a licence to liquidate.
+    expect(await engine.isLiquidatable(0)).to.equal(false);
+    await oracle.postPrice(await stock.getAddress(), usd(130), await time.latest(), true, "live");
+    expect(await engine.isLiquidatable(0)).to.equal(true);
+  });
+
+  it("will not liquidate on a stale price even when the sequencer is fine", async () => {
+    await time.increase(20 * 60);
+    expect(await engine.sequencerOk()).to.equal(true);
+    expect(await engine.isLiquidatable(0)).to.equal(false);
+    expect(await engine.healthFactor(0)).to.equal(ethers.MaxUint256);
+    await expect(engine.connect(liquidator).liquidate(0)).to.be.revertedWithCustomError(engine, "NotLiquidatable");
+  });
+
+  it("lets the borrower repay even while the sequencer feed says down", async () => {
+    // If they can get a transaction through at all, they can always get out.
+    await feed.set(1, await time.latest());
+    await expect(engine.connect(borrower).repay(0)).to.not.be.reverted;
+    expect(await stock.balanceOf(borrower.address)).to.equal(shares(100));
+  });
+
+  it("skips the check entirely where no feed exists, as on X Layer testnet", async () => {
+    await engine.setSequencerUptimeFeed(ethers.ZeroAddress, 3600);
+    expect(await engine.sequencerOk()).to.equal(true);
+    expect(await engine.isLiquidatable(0)).to.equal(true);
+  });
+});
