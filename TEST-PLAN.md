@@ -106,3 +106,59 @@ never quietly marked PASS:
 - Real xStocks / real USDT0 (not issued on X Layer testnet; stand-ins are used and labelled)
 - Chainlink L2 sequencer uptime feed (does not exist on X Layer testnet; the guard is off there and is covered by unit tests instead)
 - OKX Pay merchant QR (no public developer API exists)
+
+
+---
+
+# Results
+
+Executed against the live X Layer testnet deployment, through the running app
+in a real browser and through the contracts on chain. Re-run top to bottom
+after every fix: **31/31 scripted items and 12/12 browser-only items pass.**
+
+## Everything that failed, and what it was
+
+**B12 · a healthy position could not say so.** Liquidating a healthy loan
+returned `500 execution reverted (unknown custom error)` instead of the 409
+the plan specifies. The ABIs were hand-written signature lists, which carry no
+custom-error definitions, so ethers could not decode `NotLiquidatable` — and
+`e.revert` is left `null` when the revert comes from `estimateGas`, so reading
+it was never going to work either. Fixed at source: ABIs now come from the
+compiled artifacts, and `decodeRevert` parses the raw return data itself.
+Sixteen contract errors now map to sentences a person can act on.
+
+**B1 · the state endpoint died under its own page load.** `/api/state` returned
+`500 missing response for request`. ethers batches JSON-RPC calls by default
+and X Layer's public endpoint does not reliably return every response in a
+batch; one page render was enough to drop some. Batching is off. Six
+consecutive calls now return 200.
+
+**D1 · the invariant checker could not read its own history.** X Layer refuses
+a log query spanning more than 100 blocks. The checker walks back from head in
+windows.
+
+**F2 · the pool was left drained by its own test.** The empty-pool case
+withdrew the float, and the refund reverted because it approved and funded in
+the same breath — the RPC still served a zero allowance. The float was
+restored on the spot and the script now settles between dependent calls, the
+same fix already applied to the e2e and the app.
+
+Two more, found before the browser phase but from the same live-network cause:
+the e2e script believed a stale read and reported a loan that had genuinely
+opened as not having opened; and with one key every actor was the same address,
+so a liquidation reported "seized 10 and returned 10 of 10 locked". Three real
+funded actors now exist on chain.
+
+## Untested, and why
+
+- **Mainnet** — spends real money. Out of scope by instruction.
+- **Real xStocks / real USDT0** — not issued on X Layer testnet. Verified
+  absent with `eth_getCode`. Stand-ins are deployed, named so they cannot be
+  mistaken (`tXAAPL`, "Testnet Apple (NOT A SECURITY)"), and listed in every
+  deployment record under `standIns`.
+- **Chainlink L2 sequencer uptime guard** — no such feed exists on X Layer
+  testnet, so the guard is correctly disabled there. Covered by five unit tests
+  against a settable feed instead.
+- **OKX Pay merchant QR** — no public developer API exists.
+
+No item was marked PASS without the specific result the plan named.
