@@ -1,0 +1,96 @@
+{
+  "network": "xlayerTestnet",
+  "chainId": 1952,
+  "ranAt": "2026-09-02T13:39:41.159Z",
+  "openingPrint": {
+    "symbol": "AAPL",
+    "usd": 324.2,
+    "printedAt": 1788356317,
+    "source": "NasdaqGS last",
+    "marketOpen": true
+  },
+  "loans": {
+    "repaid": 3,
+    "liquidated": 4
+  },
+  "transactions": [
+    {
+      "label": "post price",
+      "hash": "0x56d3b5f95a89434fe99c6e35ae75b114fcec01c71a89e20244543d0c51828c51",
+      "block": 39897494,
+      "gasUsed": "44234"
+    },
+    {
+      "label": "mint shares to shopper",
+      "hash": "0x3eafbfa6b2ed2e6f90402b79075e210165c47276dbc0e584c6e3138ae52d24d3",
+      "block": 39897498,
+      "gasUsed": "53248"
+    },
+    {
+      "label": "approve engine",
+      "hash": "0x11baebc8497e2bafb4820a89804ef70ac758bc3005a61c4e85cdfe18cebc22a5",
+      "block": 39897501,
+      "gasUsed": "46288"
+    },
+    {
+      "label": "openLoan",
+      "hash": "0xb9305fd942d21b64b79fdb1fefc45a7b12400ed2f46c5ba5afd4ab43c90b1f20",
+      "block": 39897505,
+      "gasUsed": "400150"
+    },
+    {
+      "label": "mint repayment to shopper",
+      "hash": "0x459979de442244c4826c4300143efedc264296e1d7ec0c90384c9f28a021d842",
+      "block": 39897510,
+      "gasUsed": "51017"
+    },
+    {
+      "label": "approve",
+      "hash": "0x965cd07f151917b4aaa03e54995a12b227bede0f920df675ff1eabeea859ba2a",
+      "block": 39897514,
+      "gasUsed": "46282"
+    },
+    {
+      "label": "repay",
+      "hash": "0x1a86c7d439d7dcc87ab2ae96e08dded1ec3dce2b5bace050f50aa7143353607b",
+      "block": 39897518,
+      "gasUsed": "115582"
+    },
+    {
+      "label": "approve again",
+      "hash": "0xd26d3730728c7293afab5e4e21f86bc721bd2746bb19c4ece87d896efeb007fe",
+      "block": 39897522,
+      "gasUsed": "26388"
+    },
+    {
+      "label": "openLoan #2",
+      "hash": "0x86436fc6f49f39aa535dbc389e49773c081acabd14f686683b8a6f2c4a3e0baa",
+      "block": 39897526,
+      "gasUsed": "365962"
+    },
+    {
+      "label": "post crashed price",
+      "hash": "0xfe9027f07b46ab22352796d0dc8ecabf1ea34bcc66740ae32ea3a9dc0132e51c",
+      "block": 39897531,
+      "gasUsed": "44390"
+    },
+    {
+      "label": "fund liquidator",
+      "hash": "0x511688cea819b60c54dadac5bfe1e2bc62cffa96f6837c516da8a65ebf835d66",
+      "block": 39897535,
+      "gasUsed": "51017"
+    },
+    {
+      "label": "liquidator approves",
+      "hash": "0xd6dbed1272fd383bd3f8ab288abcf254ab72e2531d83864ce2307a26330a3f04",
+      "block": 39897538,
+      "gasUsed": "46282"
+    },
+    {
+      "label": "liquidate",
+      "hash": "0xc73850a5d1bbcb8fd6117ade289d04a19f4e92a2e4dde853b4cbbe771b0fd52e",
+      "block": 39897542,
+      "gasUsed": "179140"
+    }
+  ]
+}

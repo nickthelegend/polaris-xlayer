@@ -51,8 +51,22 @@ async function main() {
   const stock = await ethers.getContractAt("TestnetStock", dep.contracts.stock);
   const stable = await ethers.getContractAt("MockUSDC", dep.contracts.stable);
   const receipts = [];
+  /**
+   * Send, confirm, and then wait for the node we read from to have caught up.
+   *
+   * A local chain answers reads from the state the transaction just wrote.
+   * A public RPC does not: X Layer's testnet endpoint served pre-transaction
+   * state straight after `wait()` returned, so an openLoan that had genuinely
+   * landed read back as loanCount 0, merchant paid nothing, no shares locked.
+   * The transaction was fine; the read was behind. Wait for the node to reach
+   * the block the receipt is in before believing anything it says.
+   */
   const rec = async (label, tx) => {
     const r = await tx.wait();
+    for (let i = 0; i < 40; i++) {
+      if ((await ethers.provider.getBlockNumber()) >= r.blockNumber) break;
+      await new Promise((res) => setTimeout(res, 500));
+    }
     receipts.push({ label, hash: r.hash, block: r.blockNumber, gasUsed: r.gasUsed.toString() });
     console.log(`    ${label}  ${r.hash}`);
     return r;

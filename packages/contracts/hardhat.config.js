@@ -3,6 +3,13 @@ require("dotenv").config({ path: "../../.env" });
 
 const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY;
 
+// The demo has three people in it. On a public network they have to be three
+// actual accounts, or every balance assertion double-counts.
+const ACTORS = ["ACTOR_SHOPPER_KEY", "ACTOR_MERCHANT_KEY", "ACTOR_LIQUIDATOR_KEY"]
+  .map((k) => process.env[k])
+  .filter(Boolean);
+const ALL_KEYS = DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY, ...ACTORS] : [];
+
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
@@ -37,12 +44,12 @@ module.exports = {
     xlayerTestnet: {
       url: process.env.XLAYER_TESTNET_RPC_URL || "https://testrpc.xlayer.tech",
       chainId: 1952,
-      accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : [],
+      accounts: ALL_KEYS,
     },
     xlayer: {
       url: process.env.XLAYER_MAINNET_RPC_URL || "https://rpc.xlayer.tech",
       chainId: 196,
-      accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : [],
+      accounts: ALL_KEYS,
     },
   },
   etherscan: {

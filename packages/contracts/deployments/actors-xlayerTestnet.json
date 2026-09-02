@@ -1,0 +1,17 @@
+{
+  "network": "xlayerTestnet",
+  "actors": [
+    {
+      "role": "shopper",
+      "address": "0xf2B99773b24c8593E071FDD4a7dFB1F925a209d0"
+    },
+    {
+      "role": "merchant",
+      "address": "0x095Ba9281e2ee960d0a553858AB76FaA830BEbbF"
+    },
+    {
+      "role": "liquidator",
+      "address": "0xc6f7274E64A7B520063ed06855ACa4A42f72fCF8"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "network": "xlayerTestnet",
+  "chainId": 1952,
+  "deployedAt": "2026-09-02T13:35:45.770Z",
+  "deployer": "0xb51756B8Ee57Cc622669E3B3EF67FA305821Bf56",
+  "contracts": {
+    "stock": "0x957a46693F66B4676FF08DAF25323eb9124Eb278",
+    "stable": "0x35cbD9F7432065309DF6FAEF0e4313e2093F1958",
+    "oracle": "0x51B91e1733e53F39E528C32823fe97FD3A96bf75",
+    "pool": "0xAd4992d13682C31c374719A0a4520636cb5deD4d",
+    "engine": "0x81fABc31c455F88d6FAA733Dd695bebFE2083C7D"
+  },
+  "risk": {
+    "maxLtvBps": 3500,
+    "closedMarketHaircutBps": 1000,
+    "liquidationThresholdBps": 5000,
+    "liquidationBonusBps": 500,
+    "originationFeeBps": 100,
+    "interestAprBps": 1200,
+    "minTenorDays": 7,
+    "maxTenorDays": 14
+  },
+  "standIns": [
+    {
+      "what": "stablecoin",
+      "address": "0x35cbD9F7432065309DF6FAEF0e4313e2093F1958",
+      "why": "USDT0 is not deployed on this network"
+    },
+    {
+      "what": "tokenized share",
+      "address": "0x957a46693F66B4676FF08DAF25323eb9124Eb278",
+      "why": "xStocks are not issued on this network"
+    }
+  ],
+  "sequencerUptimeFeed": null
+}
