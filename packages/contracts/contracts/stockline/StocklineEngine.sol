@@ -55,7 +55,8 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
         None,
         Active,
         Repaid,
-        Liquidated
+        Liquidated,
+        Refunded
     }
 
     struct Loan {
@@ -82,6 +83,18 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
 
     /// Stock tokens accepted as collateral. Nothing else can be locked.
     mapping(address => bool) public isAcceptedStock;
+
+    /**
+     * Merchants the pool will pay.
+     *
+     * @dev Off by default so a demo can run without an onboarding step. On,
+     *      it is what makes this a checkout rail rather than a general lending
+     *      facility: without it `openLoan` will pay any address the caller
+     *      names, and the product becomes "borrow against your stock to
+     *      yourself", which is a different business with a different licence.
+     */
+    bool public requireRegisteredMerchant;
+    mapping(address => bool) public isRegisteredMerchant;
 
     /// Ceiling on what can be borrowed against a share, before haircuts. 35%.
     uint256 public maxLtvBps = 3_500;
@@ -147,6 +160,9 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
     mapping(address => mapping(address => uint256)) public claimable;
 
     event StockAccepted(address indexed stock, bool accepted);
+    event MerchantRegistered(address indexed merchant, bool registered);
+    event MerchantGateSet(bool required);
+    event LoanRefunded(uint256 indexed loanId, address indexed merchant, uint256 returned, uint256 sharesReturned);
     event LoanOpened(
         uint256 indexed loanId,
         address indexed borrower,
@@ -183,6 +199,8 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
     error BadParam();
     error CollateralShortfall(uint256 expected, uint256 received);
     error MarketShut();
+    error MerchantNotRegistered(address merchant);
+    error NotMerchant();
 
     constructor(IERC20 stable_, StockPriceOracle oracle_, LiquidityPool pool_, address owner_) Ownable(owner_) {
         stable = stable_;
@@ -196,6 +214,16 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
     function setAcceptedStock(address stock, bool accepted) external onlyOwner {
         isAcceptedStock[stock] = accepted;
         emit StockAccepted(stock, accepted);
+    }
+
+    function setMerchant(address merchant, bool registered) external onlyOwner {
+        isRegisteredMerchant[merchant] = registered;
+        emit MerchantRegistered(merchant, registered);
+    }
+
+    function setMerchantGate(bool required) external onlyOwner {
+        requireRegisteredMerchant = required;
+        emit MerchantGateSet(required);
     }
 
     function setRiskParams(
@@ -338,6 +366,7 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
         uint64 tenor
     ) external nonReentrant returns (uint256 loanId) {
         if (!isAcceptedStock[stock]) revert StockNotAccepted(stock);
+        if (requireRegisteredMerchant && !isRegisteredMerchant[merchant]) revert MerchantNotRegistered(merchant);
         if (shares == 0 || borrowAmount == 0) revert ZeroAmount();
         if (tenor < minTenor || tenor > maxTenor) revert TenorOutOfRange(tenor);
 
@@ -410,6 +439,36 @@ contract StocklineEngine is Ownable, ReentrancyGuard {
         _deliver(l.stock, l.borrower, l.shares);
 
         emit LoanRepaid(loanId, l.borrower, owed, l.shares);
+    }
+
+    /**
+     * @notice The merchant reverses the sale and unwinds the loan with it.
+     *
+     * @dev Without this a refund leaves the shopper still owing for goods
+     *      they returned, which is not a defensible checkout rail. The
+     *      merchant returns principal *and* fee: the financing cost was
+     *      incurred because of their sale, and a shopper who gets their money
+     *      back should not be paying interest on it. The pool is made whole
+     *      either way.
+     *
+     *      Anyone may pay on the merchant's behalf, but the merchant must be
+     *      the one to authorise it — refunding is their decision, not a
+     *      stranger's.
+     */
+    function refund(uint256 loanId) external nonReentrant {
+        Loan storage l = _loans[loanId];
+        if (l.status != Status.Active) revert NotActive(loanId);
+        if (msg.sender != l.merchant) revert NotMerchant();
+
+        uint256 owed = l.principal + l.fee;
+        l.status = Status.Refunded;
+        lockedOf[l.stock] -= l.shares;
+
+        stable.safeTransferFrom(msg.sender, address(pool), owed);
+        pool.onRepaid(l.principal, l.fee);
+        _deliver(l.stock, l.borrower, l.shares);
+
+        emit LoanRefunded(loanId, msg.sender, owed, l.shares);
     }
 
     /**

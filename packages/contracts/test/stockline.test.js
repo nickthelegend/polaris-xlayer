@@ -640,3 +640,87 @@ describe("Stockline — a blocked borrower cannot brick the position", () => {
     expect(await engine.claimable(borrower.address, await stock.getAddress())).to.equal(0n);
   });
 });
+
+describe("Stockline — merchants and refunds", () => {
+  let owner, borrower, merchant, stranger, funder;
+  let stock, usdt, oracle, pool, engine;
+  const usd = (n) => BigInt(Math.round(n * 1e8));
+  const stable = (n) => BigInt(Math.round(n * 1e6));
+  const shares = (n) => BigInt(Math.round(n * 1e6)) * 10n ** 12n;
+  const TENOR = 7 * 24 * 60 * 60;
+
+  beforeEach(async () => {
+    [owner, borrower, merchant, stranger, funder] = await ethers.getSigners();
+    stock = await (await ethers.getContractFactory("TestnetStock")).deploy("t", "tXAAPL", 18, owner.address);
+    usdt = await (await ethers.getContractFactory("MockUSDC")).deploy();
+    oracle = await (await ethers.getContractFactory("StockPriceOracle")).deploy(owner.address);
+    pool = await (await ethers.getContractFactory("LiquidityPool")).deploy(await usdt.getAddress(), owner.address);
+    engine = await (await ethers.getContractFactory("StocklineEngine")).deploy(
+      await usdt.getAddress(), await oracle.getAddress(), await pool.getAddress(), owner.address
+    );
+    await pool.setEngine(await engine.getAddress());
+    await engine.setAcceptedStock(await stock.getAddress(), true);
+    await oracle.postPrice(await stock.getAddress(), usd(220), await time.latest(), true, "live");
+    await usdt.mint(funder.address, stable(1_000_000));
+    await usdt.connect(funder).approve(await pool.getAddress(), stable(1_000_000));
+    await pool.connect(funder).fund(stable(1_000_000));
+    await stock.mint(borrower.address, shares(100));
+    await stock.connect(borrower).approve(await engine.getAddress(), ethers.MaxUint256);
+    await usdt.mint(merchant.address, stable(10_000));
+    await usdt.connect(merchant).approve(await engine.getAddress(), ethers.MaxUint256);
+  });
+
+  const open = async (ref = "o") =>
+    engine.connect(borrower).openLoan(
+      await stock.getAddress(), shares(10), merchant.address, ethers.id(ref), stable(700), TENOR
+    );
+
+  it("pays anyone while the gate is open, which is why the gate exists", async () => {
+    expect(await engine.requireRegisteredMerchant()).to.equal(false);
+    await expect(
+      engine.connect(borrower).openLoan(
+        await stock.getAddress(), shares(10), stranger.address, ethers.id("x"), stable(700), TENOR
+      )
+    ).to.not.be.reverted;
+  });
+
+  it("pays only registered merchants once the gate is on", async () => {
+    await engine.setMerchantGate(true);
+    await expect(
+      engine.connect(borrower).openLoan(
+        await stock.getAddress(), shares(10), stranger.address, ethers.id("y"), stable(700), TENOR
+      )
+    ).to.be.revertedWithCustomError(engine, "MerchantNotRegistered");
+
+    await engine.setMerchant(merchant.address, true);
+    await expect(open("z")).to.not.be.rejected;
+  });
+
+  it("lets the merchant reverse the sale and unwind the loan", async () => {
+    await open("refundable");
+    const owed = await engine.amountOwed(0);
+    const before = await usdt.balanceOf(merchant.address);
+
+    await engine.connect(merchant).refund(0);
+
+    // The shopper owes nothing and has every share back.
+    expect((await engine.getLoan(0)).status).to.equal(4n); // Refunded
+    expect(await stock.balanceOf(borrower.address)).to.equal(shares(100));
+    expect(await engine.amountOwed(0)).to.equal(0n);
+    // The merchant returned principal and the financing cost they caused.
+    expect(before - (await usdt.balanceOf(merchant.address))).to.equal(owed);
+    expect(await pool.outstanding()).to.equal(0n);
+  });
+
+  it("will not let a stranger refund someone else's sale", async () => {
+    await open("mine");
+    await expect(engine.connect(stranger).refund(0)).to.be.revertedWithCustomError(engine, "NotMerchant");
+    await expect(engine.connect(borrower).refund(0)).to.be.revertedWithCustomError(engine, "NotMerchant");
+  });
+
+  it("cannot refund a loan that is already closed", async () => {
+    await open("once");
+    await engine.connect(merchant).refund(0);
+    await expect(engine.connect(merchant).refund(0)).to.be.revertedWithCustomError(engine, "NotActive");
+  });
+});
