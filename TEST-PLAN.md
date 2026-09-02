@@ -311,3 +311,35 @@ is stated here as the plan states everything else: what "correct" means.
 | J5 | The no-gas failure is a Polaris sentence | Not viem's "The total cost (gas * gas fee + value)…". A human sentence naming OKB and what to do. |
 | J6 | The credit profile does not read as hardcoded | The 600/500 default is labelled as a starting position every address begins from, so a reviewer probing two addresses sees an explanation rather than a smell. |
 | J7 | Status badges tell the truth | A card reading $0.00 does not also say READY. |
+
+## Third-run results — 7/7 PASS
+
+| # | Status | Evidence |
+|---|---|---|
+| J1 | **PASS** *(fixed)* | `raw.githubusercontent.com/.../README.md` now opens "Spend the stock. Don't sell the stock — on X Layer". `services/price-relayer/index.js`, `app/activity`, `app/merchant` all 200 on the public repo; the old split product returns 404. |
+| J2 | **PASS** *(fixed)* | `/` with no wallet shows the pitch, the four-step flow and the three design decisions before asking for anything. |
+| J3 | **PASS** *(fixed)* | The chain is named and the X Layer faucet linked, reachable without connecting. |
+| J4 | **PASS** *(fixed)* | Holding 0 and asking for 10: *"This wallet holds 0.0000 tXAAPL, and locking 10 would need more than that. Use 'Get 25 test shares' below to fund it on testnet."* No quote, no pay button. |
+| J5 | **PASS** *(fixed)* | *"This wallet has no OKB to pay for gas on X Layer testnet. Claim some from the X Layer faucet at https://www.okx.com/xlayer/faucet, then try again."* |
+| J6 | **PASS** *(fixed)* | The starting position is labelled: the score is read from `ScoreManager` on chain and moves with what you repay. |
+| J7 | **PASS** *(fixed)* | The card reads **NO SHARES YET** over $0.00; READY only once there is capacity. |
+
+### Fixes
+
+| Defect | Root cause | Fix |
+|---|---|---|
+| The public repo was a different product and said Solana | 19 files never committed | Committed and pushed; README rewritten for X Layer, Solana original preserved at `docs/SOLANA-README.md` |
+| The whole argument sat behind the wallet gate | `ConnectGate` had no way to show anything but the gate | `ConnectGate` takes a `pitch`; `/` passes the product explanation, the four steps, the three decisions and the faucet |
+| Quoted and offered to pay against shares not held | The quote asked what a share count is worth — a question about the market, not about you | Balance pre-check before quoting, naming both numbers |
+| The no-gas error was raw viem text | The guard matched `/insufficient funds/`; viem actually says *"exceeds the balance of the account"* | Match what is really thrown, and name the faucet |
+| A card read READY over $0.00 | The badge was unconditional | Badge follows capacity |
+| 600/500 read as hardcoded | Real `ScoreManager` default, unexplained | Labelled as the starting position everyone begins from |
+
+### Regression after the fixes
+
+Funded wallet, full path re-run: quote $204.72 − $2.49 = $202.24, paid, tx
+`0xeb882e69…` — 2.0 tXAAPL locked and **202.237008 pUSDC to the merchant**,
+matching the quote exactly. API 19/19. All redirects 308, all pages 200.
+`pnpm test` 356 passing / 0 failing. `pnpm build` and `pnpm typecheck` exit 0.
+`pnpm verify:live` — all invariants hold. Seven pages on a fresh tab: zero
+console output, **zero requests ≥ 400**.
