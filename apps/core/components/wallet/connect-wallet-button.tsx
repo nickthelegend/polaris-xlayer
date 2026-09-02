@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const SEPOLIA_CHAIN_ID = 11155111;
+import { ACTIVE_CHAIN, ADD_CHAIN_PARAMS } from "@/lib/chains";
 
 /**
  * Connect, and everything that follows from being connected.
@@ -35,7 +35,7 @@ export function ConnectWalletButton() {
   if (!mounted) return null;
 
   const injected = connectors[0];
-  const isSepolia = chain?.id === SEPOLIA_CHAIN_ID;
+  const onRightChain = chain?.id === ACTIVE_CHAIN.id;
 
   const copyAddress = () => {
     if (!address) return;
@@ -43,26 +43,19 @@ export function ConnectWalletButton() {
     toast.success("Address copied");
   };
 
-  const switchToSepolia = () => {
+  const switchToActiveChain = () => {
     switchChain(
-      { chainId: SEPOLIA_CHAIN_ID },
+      { chainId: ACTIVE_CHAIN.id },
       {
         onError: () => {
-          // The wallet has never seen Sepolia. Adding it is the fix.
+          // The wallet has never seen X Layer, so switching returns 4902.
+          // Adding it is the fix.
           void (window as { ethereum?: { request: (a: unknown) => Promise<unknown> } }).ethereum
             ?.request({
               method: "wallet_addEthereumChain",
-              params: [
-                {
-                  chainId: "0xAA36A7",
-                  chainName: "Sepolia",
-                  nativeCurrency: { name: "Sepolia Ether", symbol: "ETH", decimals: 18 },
-                  rpcUrls: ["https://ethereum-sepolia-rpc.publicnode.com"],
-                  blockExplorerUrls: ["https://sepolia.etherscan.io"],
-                },
-              ],
+              params: [ADD_CHAIN_PARAMS],
             })
-            .catch(() => toast.error("Could not add Sepolia to your wallet"));
+            .catch(() => toast.error(`Could not add ${ACTIVE_CHAIN.name} to your wallet`));
         },
       }
     );
@@ -111,7 +104,7 @@ export function ConnectWalletButton() {
             <span className="size-1.5 bg-primary-foreground rounded-full animate-pulse" />
             {address!.slice(0, 8)}...{address!.slice(-6)}
           </span>
-          {!isSepolia && (
+          {!onRightChain && (
             <span className="text-[7px] text-amber-400 font-bold uppercase tracking-widest animate-pulse flex items-center gap-1">
               <ShieldAlert className="size-2" />
               WRONG_NETWORK
@@ -142,20 +135,20 @@ export function ConnectWalletButton() {
           <div className="bg-white/5 p-2 rounded-sm border border-white/5 flex justify-between items-center">
             <span className="text-[11px] text-white/65 uppercase">Network</span>
             <span
-              className={`text-[11px] font-black ${isSepolia ? "text-primary" : "text-amber-400"}`}
+              className={`text-[11px] font-black ${onRightChain ? "text-primary" : "text-amber-400"}`}
             >
               {chain?.name ?? "Unknown"}
             </span>
           </div>
 
           {/* Only offered when it is the fix for something. */}
-          {!isSepolia && (
+          {!onRightChain && (
             <DropdownMenuItem
-              onClick={switchToSepolia}
+              onClick={switchToActiveChain}
               className="flex items-center justify-center gap-2 py-3 px-3 cursor-pointer border text-[10px] uppercase font-black tracking-widest transition-all text-primary hover:text-black hover:bg-primary border-primary/30"
             >
               <ShieldAlert className="size-3" />
-              SWITCH_TO_SEPOLIA
+              SWITCH_TO_X_LAYER
             </DropdownMenuItem>
           )}
 
@@ -170,7 +163,7 @@ export function ConnectWalletButton() {
 
         <div className="bg-white/5 px-4 py-2 border-t border-white/10">
           <span className="text-[11px] text-white/70 uppercase tracking-widest">
-            PolarisPay // Sepolia
+            PolarisPay // {ACTIVE_CHAIN.name}
           </span>
         </div>
       </DropdownMenuContent>

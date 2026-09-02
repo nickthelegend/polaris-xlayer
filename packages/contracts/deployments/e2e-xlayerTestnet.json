@@ -1,0 +1,39 @@
+{
+  "network": "xlayerTestnet",
+  "chainId": 11155111,
+  "loanId": "2",
+  "borrower": "0xb51756B8Ee57Cc622669E3B3EF67FA305821Bf56",
+  "merchant": "0x000000000000000000000000000000000000dEaD",
+  "principalRaw": "200000000",
+  "totalOwedRaw": "200009132",
+  "totalRepaidRaw": "50002283",
+  "installmentCount": 4,
+  "installmentsPaid": 1,
+  "intervalSeconds": 60,
+  "startedAt": 1788372594,
+  "scoreBefore": 612,
+  "scoreAfter": 624,
+  "steps": [
+    {
+      "label": "Checkout approval",
+      "detail": "10000.00 pUSDC to LoanEngine",
+      "hash": "0x6a04bb284c9f733f12f1e29c57c33bd74ee4c9676562995ae660e2d5c4635109"
+    },
+    {
+      "label": "Plan opened",
+      "detail": "loan #2, 200.00 principal, 4 installments",
+      "hash": "0x27140a2c9bbf28955ae0debadae900341f5ce63c05bbf3aff32c05bccf8c70ee"
+    },
+    {
+      "label": "Installment 1 collected",
+      "detail": "50.00 pUSDC pulled by a third party",
+      "hash": "0xdbbd56e572608a217db0ebb759c9f594cc371fb43c09a2c063ab3df529d84c6e"
+    }
+  ],
+  "contracts": {
+    "MockUSDC": "0xF0d9aFcB83771563dcE8dE65941bcABdBA270da8",
+    "ScoreManager": "0x8b484257281EF42a9468f9271872Bd76fE399133",
+    "MerchantRegistry": "0xeD5D615D2F289835240e3F0cb9Bf15abA317a82e",
+    "PolarisLoanEngine": "0x06Ca46f78DB8712b5c698375B0fFf897165e67d2"
+  }
+}

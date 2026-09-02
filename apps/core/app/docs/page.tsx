@@ -153,7 +153,7 @@ export default function DocsPage() {
         </dl>
       </Section>
 
-      <Section title="Deployed on Sepolia">
+      <Section title="Deployed on X Layer">
         <dl className="divide-y divide-primary/10 rounded-2xl border border-primary/15 overflow-hidden">
           {CONTRACTS.map(([name, address]) => (
             <div
@@ -163,7 +163,7 @@ export default function DocsPage() {
               <dt className="text-sm sm:w-48 shrink-0">{name}</dt>
               <dd className="min-w-0">
                 <a
-                  href={`https://sepolia.etherscan.io/address/${address}`}
+                  href={`https://www.oklink.com/x-layer-testnet/address/${address}`}
                   target="_blank"
                   rel="noreferrer"
                   className="font-mono text-xs text-foreground/55 hover:text-primary transition-colors inline-flex items-center gap-1 break-all"

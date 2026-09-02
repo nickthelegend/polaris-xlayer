@@ -31,7 +31,7 @@ export default function FaucetPage() {
   return (
     <ConnectGate
       title="Connect to get test tokens"
-      reason="The faucet sends Sepolia test tokens to an address, so it needs one to send them to."
+      reason="The faucet sends X Layer test tokens to an address, so it needs one to send them to."
       previewLabel="Your balances"
       previewNote="your test token balances and what the faucet can send"
     >
@@ -105,7 +105,7 @@ function Faucet() {
       <header className="space-y-2">
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Test tokens</h1>
         <p className="text-sm text-foreground/55">
-          {symbol} on Sepolia, for trying the product. You will also need a little Sepolia ETH for
+          {symbol} on X Layer, for trying the product. You will also need a little OKB for
           gas, which the public faucets have.
         </p>
       </header>
@@ -143,7 +143,7 @@ function Faucet() {
             {note.text}
             {note.hash && (
               <a
-                href={`https://sepolia.etherscan.io/tx/${note.hash}`}
+                href={`https://www.oklink.com/x-layer-testnet/tx/${note.hash}`}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 underline underline-offset-2"
@@ -158,7 +158,7 @@ function Faucet() {
       <p className="text-xs text-foreground/65">
         Token{" "}
         <a
-          href={`https://sepolia.etherscan.io/address/${TOKEN}`}
+          href={`https://www.oklink.com/x-layer-testnet/address/${TOKEN}`}
           target="_blank"
           rel="noreferrer"
           className="font-mono underline underline-offset-2 hover:text-foreground/60"

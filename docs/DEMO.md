@@ -1,123 +1,103 @@
-# Recording the demo
+# The 3-minute demo
 
-Five minutes against a real validator. Nothing here is mocked or replayed:
-every figure on screen is read from a program account, and every transaction
-has a signature you can open in the explorer afterwards.
+Every step is signed by a real wallet against X Layer testnet (chain 1952).
+Nothing on this page is simulated, and there is no server key behind any of it.
 
-The EVM recording script — the original build, on Sepolia — is in
-[`DEMO-EVM.md`](DEMO-EVM.md). This is the Solana one.
+**Before you start**
+- A browser wallet on X Layer testnet. The app offers to add the network if the
+  wallet has never seen it.
+- A little OKB for gas: https://web3.okx.com/xlayer/faucet/xlayerfaucet
+- Check `https://polaris-xlayer.vercel.app/api/stock/health` — it reports the
+  RPC, the price age and the pool's liquidity separately, so a red light on
+  stage points at the cause.
 
-## Before you press record
+---
 
-One command stands the whole thing up: a fresh validator with the program
-deployed, five merchants, a borrower with history, three loans in different
-states and three subscription plans.
+**0:00 — the problem, in one line.**
+Open `polaris-xlayer.vercel.app`. Do not connect yet.
 
-```bash
-./scripts/reset-local.sh
-```
+> "People already hold tokenized stock. Merchants take stablecoin. Today your
+> only option is to sell — which closes a position you wanted to keep."
 
-Then two services, in two terminals:
+The page is honest before you connect: it shows no balance, because it does not
+know who you are. Nothing is signed on anybody's behalf.
 
-```bash
-pnpm --filter @polaris/gateway start
-```
+**0:20 — connect.**
+Connect the wallet. The tiles fill in: the live NasdaqGS print for tXAAPL, your
+share balance, the pool's available stablecoin, and the LTV in force. If the
+venue is shut the LTV drops from 35% to 31.5% on its own — say that out loud,
+it is the after-hours haircut doing its job.
 
-```bash
-pnpm --filter polaris-mobile start
-```
+**0:40 — the merchant's side.**
+Open **Take a payment**. Enter an amount and a reference, and a QR appears. It
+carries the checkout, not a payment: merchant address, order reference, share
+count. Point out that the price is still quoted at scan time, so a code left on
+a counter cannot lock in yesterday's number.
 
-The gateway is the underwriter and the Solana Pay endpoint. The app is the
-customer. Check the gateway agrees with the cluster before you start:
+**1:00 — scan and pay.**
+Scan it, or open the link. The checkout is pre-filled. Press **Get a quote**:
+collateral value, the ceiling at the current LTV, the fee, and what the merchant
+receives. Press pay, and **the wallet asks you to sign** — approve, then the
+loan.
 
-```bash
-curl -s localhost:4100/health
-```
+**1:30 — what just happened.**
+The merchant has stablecoin. You still own the shares; they are locked, not
+sold. Open **Positions**: the loan, what is owed, the health factor, the due
+date. Open the explorer link and show the transaction was signed by the address
+in the wallet, not by the site.
 
-## The five minutes
+**2:00 — the part nobody demos.**
+Open **Book & price**, paste the operator key, and move the price −45%. Watch
+the health factor cross 1.00 on the positions page and the **Liquidate** button
+appear.
 
-**1. A wallet nobody has ever underwritten.** Open the app on a fresh install.
-It generates a signer on the device, and the credit screen fills in from
-nothing: score 520, a 200 USDC line, and four lines saying why —
+Liquidate it. The liquidator takes what covers the debt plus a bonus — and the
+remainder goes straight back to the borrower in the same transaction.
 
-```
-Wallet is less than a month old · +0
-0 transactions signed · +0
-No tokens held · +0
-0.00 USDC on hand · +0
-```
+> "This is the whole point. A 45% move does not cost you the position. It costs
+> you what the debt needed and not one share more."
 
-That is the whole argument on one screen. The limit was read off the chain, and
-because every input is public, the reasons can be shown. Nobody filled in a
-form.
+**2:30 — why it holds up.**
+Relay the live print again to clear the demo move. Then, briefly:
 
-To show the other end of it, underwrite a wallet that has actually been used.
-`--read` scores it without opening anything:
+- Liquidation demands a *live* print — a position falling due over a weekend
+  waits for the open, because the collateral cannot actually be sold while the
+  venue is shut.
+- Two staleness bounds, because when the market closes the newest price *is*
+  the closing price and only gets older.
+- The engine reads Chainlink's L2 sequencer uptime feed and refuses to
+  liquidate during an outage and for an hour after — but never gates repayment.
+- Five adversarial reviewers, 24 attacks claimed, 2 survived, both fixed.
 
-```bash
-pnpm --filter @polaris/gateway underwrite <address> --read
-```
+**2:50 — close.**
+> "Tokenized stocks on X Layer are a portfolio. This makes them a payment
+> method, without ever making you close the trade."
 
-**2. Fund the wallet.** The app shows its address; give it something to spend.
+---
 
-```bash
-pnpm exec tsx scripts/fund.ts <address>
-```
+## What is real, and what is standing in
 
-**3. Check out.** Pick a merchant, split into four. One transaction carries the
-SPL approval and the origination together, the merchant is paid in full
-immediately out of protocol liquidity, and the plan appears on the Plans tab
-with all four dates.
+Say this before anyone asks:
 
-**4. Or check out by QR.** The merchant's side of the same thing:
+- Real: the contracts, the chain, every transaction, the price (live NasdaqGS
+  print, relayed on chain with its source and timestamp), the merchant payment,
+  the liquidation.
+- Standing in: the share token and the stablecoin. **xStocks and USDT0 are not
+  deployed on X Layer testnet** — verified with `eth_getCode`. The stand-ins are
+  named so nobody can mistake them (`tXAAPL`, "Testnet Apple (NOT A SECURITY)")
+  and the page lists them. On mainnet, USDT0 is
+  `0x779Ded0c9e1022225f8E0630b35a9b54bE713736` and swapping it in is a change of
+  address in the deployment record.
+- Not built: the oracle relayer is trusted. Chainlink has no equity feed on X
+  Layer — all 26 of its push feeds there are crypto, and equity prices exist
+  only as Data Streams, which is a paid subscription whose on-chain
+  `StreamsLookup` X Layer does not support.
 
-```
-http://localhost:4100/checkout?merchant=<merchant PDA>&amount=180000000
-```
+## If something breaks on stage
 
-A Solana Pay transaction request. Any Solana Pay wallet scans it and is handed
-one transaction to approve — and if that wallet has never borrowed, a line is
-underwritten from its own history first, mid-checkout.
-
-The line to point at is **Network fee — paid by Polaris**. The gateway is the
-fee payer *and* the rent payer, so the customer opens a credit plan holding no
-SOL at all. On EVM that was a product we bought; here it is a field on the
-transaction.
-
-Merchant PDAs are in `deployments/localnet-seed.json`.
-
-**5. And the app reads the code.** Tap the scanner in the middle of the tab
-bar and point it at the checkout page on another screen. It decodes the code,
-fetches the transaction and shows the merchant's terms before anything is
-signed. Without a second screen, hand the request straight to the app the way
-a phone's OS would when the *Open in a wallet* link is tapped:
-
-```bash
-open "http://localhost:8085/scan?request=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote('solana:'+urllib.parse.quote(sys.argv[1],safe=''),safe=''))" "http://localhost:4100/pay/demo?merchant=<merchant PDA>&amount=40000000")"
-```
-
-**6. The keeper collects.** Loan #2 in the seed runs on a 60-second interval
-precisely so a collection can happen inside a recording.
-
-```bash
-pnpm --filter @polaris/keeper-solana start
-```
-
-It reads what is due with one `getProgramAccounts` call — there is no database
-behind it — simulates, then sends. The Activity tab updates, and the borrower
-never signed anything.
-
-**7. Default and liquidation.** The full arc, unattended, in about five
-minutes: origination, four collections, then a second borrower who revokes
-their delegation and is liquidated.
-
-```bash
-POLARIS_CLUSTER=localnet pnpm exec tsx scripts/lifecycle.ts
-```
-
-## What to say about failures
-
-Leave them in. A liquidation that recovers nothing is not a bug — it is the
-protocol booking bad debt against itself, which is what an undercollateralized
-book does when it is wrong. `scripts/inspect.ts` prints that ledger, and a run
-that only ever shows green is a marketing asset rather than a demo.
+| Symptom | Cause | Fix |
+|---|---|---|
+| Quote returns "price is stale" | Nobody has relayed in 15 minutes | Book & price → Relay the live print |
+| "Pool has no stablecoin" | Float drained | `pool.fund()` from the deployer |
+| Wallet says wrong network | Not on 1952 | The connect button offers the switch, and adds the chain if unknown |
+| Liquidate button missing | Position is healthy, or the venue is shut | Move the price further, or relay a print marked open |

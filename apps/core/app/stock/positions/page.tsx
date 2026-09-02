@@ -3,8 +3,20 @@
 import { useCallback, useState } from "react"
 import Link from "next/link"
 import useSWR from "swr"
+import { useAccount, usePublicClient, useWriteContract } from "wagmi"
+import { maxUint256 } from "viem"
 
-/** Every share locked, what it is securing, and how much cover is left. */
+import { ConnectGate } from "@/components/connect-gate"
+import { ADDRESSES, ENGINE_ABI, ERC20_ABI, explainWriteError, txUrl } from "@/lib/polaris-client"
+
+/**
+ * Every share you locked, what it is securing, and how much cover is left.
+ *
+ * Repay, refund and liquidate are all signed by the connected wallet. The
+ * contract already decides who may do which — only the borrower repays, only
+ * the merchant refunds — so the UI's job is to offer the action and let the
+ * chain refuse it, not to pretend it can act as somebody else.
+ */
 
 const usd = (v: string, d = 6) =>
   (Number(v) / 10 ** d).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -18,24 +30,80 @@ const TONE: Record<number, string> = {
 }
 const fetcher = (u: string) => fetch(u, { cache: "no-store" }).then((r) => r.json())
 
-export default function Positions() {
-  const [as, setAs] = useState("shopper")
-  const { data: state, mutate } = useSWR(`/api/stock/state?as=${as}`, fetcher, { refreshInterval: 15000 })
+export default function PositionsPage() {
+  return (
+    <ConnectGate
+      title="Connect to see your positions"
+      reason="A position belongs to one wallet, and only that wallet can repay it."
+      previewLabel="Your positions"
+      previewNote="the shares you locked, what they secure, and how much cover is left"
+    >
+      <Positions />
+    </ConnectGate>
+  )
+}
+
+function Positions() {
+  const { address } = useAccount()
+  const publicClient = usePublicClient()
+  const { writeContractAsync } = useWriteContract()
+  const write = useCallback(
+    (args: Record<string, unknown>) => writeContractAsync(args as never),
+    [writeContractAsync],
+  )
+
+  const { data: state, mutate } = useSWR(
+    address ? `/api/stock/state?address=${address}` : null,
+    fetcher,
+    { refreshInterval: 15000 },
+  )
+
   const [busy, setBusy] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [ok, setOk] = useState<any>(null)
+  const [ok, setOk] = useState<{ hash: string; action: string } | null>(null)
 
-  const act = useCallback(async (loanId: number, action: string) => {
-    setError(null); setOk(null); setBusy(loanId)
-    const r = await fetch("/api/stock/repay", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ loanId, action }),
-    })
-    const j = await r.json()
-    setBusy(null)
-    if (!r.ok) { setError(j.error); return }
-    setOk(j); mutate()
-  }, [mutate])
+  const act = useCallback(
+    async (loanId: number, action: "repay" | "refund" | "liquidate", owed: string) => {
+      if (!publicClient || !address) return
+      setError(null); setOk(null); setBusy(loanId)
+      try {
+        // Repaying, refunding and liquidating all move stablecoin from the
+        // caller into the pool, so the caller has to have approved it first.
+        {
+          const allowance = (await publicClient.readContract({
+            address: ADDRESSES.stable as `0x${string}`,
+            abi: ERC20_ABI,
+            functionName: "allowance",
+            args: [address, ADDRESSES.engine],
+          } as any)) as bigint
+          if (allowance < BigInt(owed)) {
+            const approveHash = await write({
+              address: ADDRESSES.stable as `0x${string}`,
+              abi: ERC20_ABI,
+              functionName: "approve",
+              args: [ADDRESSES.engine as `0x${string}`, maxUint256],
+            })
+            await publicClient.waitForTransactionReceipt({ hash: approveHash })
+          }
+        }
+
+        const hash = await write({
+          address: ADDRESSES.engine as `0x${string}`,
+          abi: ENGINE_ABI,
+          functionName: action,
+          args: [BigInt(loanId)],
+        })
+        await publicClient.waitForTransactionReceipt({ hash })
+        setOk({ hash, action })
+        void mutate()
+      } catch (e: any) {
+        setError(explainWriteError(e))
+      } finally {
+        setBusy(null)
+      }
+    },
+    [publicClient, address, write, mutate],
+  )
 
   if (!state) return <div className="py-16 text-white/50">Reading X Layer…</div>
 
@@ -50,17 +118,6 @@ export default function Positions() {
         Every share you locked, what it is securing, and how much cover is left.
       </p>
 
-      <div className="mt-6 flex gap-2" data-testid="actor-switch">
-        {["shopper", "merchant", "liquidator"].map((r) => (
-          <button key={r} onClick={() => setAs(r)} data-testid={`as-${r}`}
-            className={`rounded-md px-4 py-2 text-sm capitalize transition ${
-              as === r ? "bg-white text-black" : "border border-white/15 text-white/70 hover:border-white/30"
-            }`}>
-            {r}
-          </button>
-        ))}
-      </div>
-
       {error && (
         <div className="mt-6 rounded-lg border border-rose-400/25 bg-rose-400/[0.06] p-4" data-testid="error">
           <p className="text-sm text-rose-200">{error}</p>
@@ -69,8 +126,10 @@ export default function Positions() {
       {ok && (
         <div className="mt-6 rounded-lg border border-emerald-300/30 bg-emerald-300/[0.06] p-4" data-testid="action-done">
           <p className="text-sm text-emerald-200">
-            {ok.action} confirmed.{" "}
-            <a href={ok.explorer} target="_blank" rel="noreferrer" className="underline underline-offset-4">View the transaction</a>
+            {ok.action} signed and confirmed.{" "}
+            <a href={txUrl(ok.hash)} target="_blank" rel="noreferrer" className="underline underline-offset-4">
+              View the transaction
+            </a>
           </p>
         </div>
       )}
@@ -79,8 +138,8 @@ export default function Positions() {
         <div className="surface mt-6 p-8" data-testid="empty">
           <h2 className="text-lg font-medium text-white">Nothing locked yet</h2>
           <p className="mt-2 text-white/60">
-            This account has no positions. When you pay a merchant with stock credit, the position
-            shows up here. <Link href="/stock" className="text-white underline underline-offset-4">Go to checkout</Link>.
+            This wallet has no positions. When you pay a merchant with stock credit, the position
+            shows up here. <Link href="/" className="text-white underline underline-offset-4">Go to checkout</Link>.
           </p>
         </div>
       ) : (
@@ -111,16 +170,12 @@ export default function Positions() {
                   <td className="px-4 py-4">
                     {l.status === 1 && (
                       <div className="flex flex-wrap justify-end gap-2">
-                        <button onClick={() => act(l.id, "repay")} disabled={busy !== null} data-testid={`repay-${l.id}`}
+                        <button onClick={() => act(l.id, "repay", l.owed)} disabled={busy !== null} data-testid={`repay-${l.id}`}
                           className="rounded-md bg-white px-3 py-1.5 text-xs font-medium text-black transition hover:opacity-85 disabled:opacity-40">
-                          {busy === l.id ? "…" : "Repay"}
-                        </button>
-                        <button onClick={() => act(l.id, "refund")} disabled={busy !== null} data-testid={`refund-${l.id}`}
-                          className="rounded-md border border-white/15 px-3 py-1.5 text-xs text-white transition hover:border-white/30 disabled:opacity-40">
-                          Refund
+                          {busy === l.id ? "Signing…" : "Repay"}
                         </button>
                         {l.liquidatable && (
-                          <button onClick={() => act(l.id, "liquidate")} disabled={busy !== null} data-testid={`liquidate-${l.id}`}
+                          <button onClick={() => act(l.id, "liquidate", l.owed)} disabled={busy !== null} data-testid={`liquidate-${l.id}`}
                             className="rounded-md border border-rose-400/40 px-3 py-1.5 text-xs text-rose-200 transition hover:border-rose-400/70 disabled:opacity-40">
                             Liquidate
                           </button>
@@ -136,7 +191,11 @@ export default function Positions() {
       )}
 
       <p className="mt-6 font-mono text-[11px] text-white/35">
-        Block {state.blockNumber} · {state.viewer.role} {state.viewer.address}
+        Block {state.blockNumber} · {state.viewer.address}
+      </p>
+      <p className="mt-2 text-[11px] text-white/35">
+        A merchant refunds a sale from their own wallet, on their own dashboard — this page only
+        offers what this wallet is allowed to do.
       </p>
     </div>
   )

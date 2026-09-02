@@ -104,7 +104,7 @@ export default function MerchantsPage() {
         </div>
         <div className="stat border-t border-foreground/[0.08] sm:border-l sm:border-t-0">
           <dt className="label">Network</dt>
-          <dd className="stat-value">Sepolia</dd>
+          <dd className="stat-value">X Layer</dd>
           <dd className="stat-note">Real contracts, testnet funds</dd>
         </div>
         <div className="stat border-t border-foreground/[0.08] sm:border-l sm:border-t-0">
@@ -177,7 +177,7 @@ export default function MerchantsPage() {
               <div className="mt-auto">
                 <p className="label">Settles to</p>
                 <a
-                  href={`https://sepolia.etherscan.io/address/${m.payoutAddress}`}
+                  href={`https://www.oklink.com/x-layer-testnet/address/${m.payoutAddress}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="figure mt-1 inline-flex items-center gap-1 text-xs text-foreground/60 underline-offset-4 transition-colors hover:text-primary hover:underline"

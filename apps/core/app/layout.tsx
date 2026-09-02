@@ -16,12 +16,13 @@ export const viewport = {
 }
 
 export const metadata: Metadata = {
-  title: "PolarisPay | Buy now, pay later on-chain",
-  description: "Split any checkout into four. Your limit is underwritten from your own chain history, and instalments collect themselves.",
+  title: "Polaris | Spend the stock, don't sell the stock — on X Layer",
+  description:
+    "Pay a merchant in stablecoin against tokenized equity you keep. The shares lock, the merchant is paid now, and you still own the position. Collateralized checkout on X Layer.",
   // Fhenix/FHE/Confidential Lending described a different project; nothing here
   // is encrypted or confidential, and claiming it in metadata is a false claim
   // to anyone who finds the page by searching for it.
-  keywords: "Sepolia, BNPL, buy now pay later, on-chain credit, Ethereum, DeFi",
+  keywords: "X Layer, OKX, RWA, tokenized stocks, xStocks, collateralized checkout, USDT0, on-chain credit, BNPL",
   authors: [{ name: "Polaris Team" }],
   creator: "Polaris",
   publisher: "Polaris",

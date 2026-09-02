@@ -1,7 +1,7 @@
 /**
  * End-to-end lifecycle against the live deployment.
  *
- *   npx hardhat run scripts/e2e.js --network sepolia
+ *   npx hardhat run scripts/e2e.js --network xlayerTestnet
  *
  * Drives a real BNPL plan through every stage that matters and asserts chain
  * state at each step: register a merchant, fund a borrower, open a plan, watch
@@ -20,9 +20,27 @@ const hre = require("hardhat");
 const USDC = (n) => BigInt(Math.round(n * 1e6));
 const fmt = (v) => (Number(v) / 1e6).toFixed(2);
 
+/**
+ * X Layer's RPC serves pre-transaction state straight after a receipt, so a
+ * call that depends on the one before it must wait for the node to catch up.
+ * createLoan reverted on a zero allowance here until this existed, moments
+ * after the approve had already been mined.
+ */
+const settled = async (tx) => {
+  const r = await tx.wait();
+  for (let i = 0; i < 40; i++) {
+    if ((await hre.ethers.provider.getBlockNumber()) >= r.blockNumber) return r;
+    await new Promise((s) => setTimeout(s, 500));
+  }
+  return r;
+};
+
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
-  const d = require("../deployments/sepolia.json").contracts;
+  // Read the deployment for the network this run is pointed at. This said
+  // "sepolia.json" long after the contracts moved to X Layer, so the script
+  // silently exercised addresses that are not on the chain it connects to.
+  const d = require(`../deployments/${hre.network.name}.json`).contracts;
 
   const usdc = await hre.ethers.getContractAt("MockUSDC", d.MockUSDC);
   const scores = await hre.ethers.getContractAt("ScoreManager", d.ScoreManager);
@@ -72,16 +90,18 @@ async function main() {
   // 3. The single checkout-time approval that funds every installment
   const principal = USDC(200);
   const approveTx = await usdc.approve(d.PolarisLoanEngine, USDC(10_000));
-  await approveTx.wait();
+  await settled(approveTx);
   log("Checkout approval", "10000.00 pUSDC to LoanEngine", approveTx.hash);
 
-  // 4. Open the plan. 4 installments, 60s apart so the schedule is observable
-  //    inside one run instead of over eight weeks.
+  // 4. Open the plan. The engine rejects any interval under an hour — an
+  //    unvalidated one let a caller pass 0 and make every installment due at
+  //    once — so this uses the floor rather than the 60s it used to pass,
+  //    which reverted with InvalidInterval on every run.
   const merchantBefore = await usdc.balanceOf(merchant);
   const scoreBefore = await scores.scoreOf(borrower.address);
 
-  const createTx = await engine.createLoan(borrower.address, merchant, principal, 4, 60);
-  const createRc = await createTx.wait();
+  const createTx = await engine.createLoan(borrower.address, merchant, principal, 4, 3600);
+  const createRc = await settled(createTx);
   const loanId = await engine.loanCount();
   log("Plan opened", `loan #${loanId}, 200.00 principal, 4 installments`, createTx.hash);
 
@@ -104,7 +124,7 @@ async function main() {
   const borrowerBefore = await usdc.balanceOf(borrower.address);
 
   const repayTx = await engine.repay(loanId, due);
-  await repayTx.wait();
+  await settled(repayTx);
   log("Installment 1 collected", `${fmt(due)} pUSDC pulled by a third party`, repayTx.hash);
 
   const borrowerAfter = await usdc.balanceOf(borrower.address);
@@ -131,7 +151,7 @@ async function main() {
   log("checkLiquidatable (after pay)", "false — still healthy");
 
   const out = {
-    network: "sepolia",
+    network: hre.network.name,
     chainId: 11155111,
     loanId: loanId.toString(),
     borrower: borrower.address,
@@ -149,13 +169,13 @@ async function main() {
     contracts: d,
   };
 
-  const outPath = join(__dirname, "..", "deployments", "e2e-sepolia.json");
+  const outPath = join(__dirname, "..", "deployments", `e2e-${hre.network.name}.json`);
   writeFileSync(outPath, `${JSON.stringify(out, null, 2)}\n`);
 
   console.log(`\nAll assertions passed. Wrote ${outPath}`);
   console.log("\nTransactions:");
   for (const s of out.steps) {
-    console.log(`  https://sepolia.etherscan.io/tx/${s.hash}`);
+    console.log(`  https://www.oklink.com/x-layer-testnet/tx/${s.hash}`);
   }
 }
 

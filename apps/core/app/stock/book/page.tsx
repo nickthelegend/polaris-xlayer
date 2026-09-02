@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import useSWR from "swr"
 
 /** What the pool has lent, what it has earned, and the print behind every position. */
@@ -12,6 +12,22 @@ const fetcher = (u: string) => fetch(u, { cache: "no-store" }).then((r) => r.jso
 export default function Book() {
   const { data: state, mutate } = useSWR("/api/stock/state", fetcher, { refreshInterval: 15000 })
   const [busy, setBusy] = useState<string | null>(null)
+  /*
+   * The relayer key, held only for this tab.
+   *
+   * Posting a price is an operator action — it moves the mark every open
+   * position is valued against — so the route requires a secret. Keeping it in
+   * sessionStorage means the operator pastes it once during a demo and it is
+   * gone when the tab closes; it is never in the bundle and never in a cookie.
+   */
+  const [key, setKey] = useState("")
+  useEffect(() => {
+    setKey(sessionStorage.getItem("polaris.relayerKey") ?? "")
+  }, [])
+  const rememberKey = (v: string) => {
+    setKey(v)
+    sessionStorage.setItem("polaris.relayerKey", v)
+  }
   const [error, setError] = useState<string | null>(null)
   const [ok, setOk] = useState<any>(null)
 
@@ -83,16 +99,27 @@ export default function Book() {
           ))}
         </div>
 
+        <label className="label mt-6 block" htmlFor="relayerKey">Relayer key</label>
+        <input
+          id="relayerKey" type="password" value={key} placeholder="operator only"
+          onChange={(e) => rememberKey(e.target.value)} data-testid="relayer-key"
+          className="mt-2 w-full rounded-md border border-white/10 bg-white/[0.03] px-4 py-3 font-mono text-sm text-white outline-none focus:border-white/25"
+        />
+        <p className="mt-2 text-[11px] text-white/40">
+          Posting a price moves the mark every open position is valued against, so it needs the
+          operator key. Held for this tab only.
+        </p>
+
         <div className="mt-6 flex flex-wrap gap-3">
-          <button onClick={() => post("relay")} disabled={!!busy} data-testid="relay-btn"
+          <button onClick={() => post("relay")} disabled={!!busy || !key} data-testid="relay-btn"
             className="rounded-md bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-85 disabled:opacity-40">
             {busy === "relay" ? "Fetching…" : "Relay the live print"}
           </button>
-          <button onClick={() => post("move", -45)} disabled={!!busy} data-testid="crash-btn"
+          <button onClick={() => post("move", -45)} disabled={!!busy || !key} data-testid="crash-btn"
             className="rounded-md border border-white/15 px-5 py-3 text-sm text-white transition hover:border-white/30 disabled:opacity-40">
             Move the price −45%
           </button>
-          <button onClick={() => post("move", 20)} disabled={!!busy} data-testid="rally-btn"
+          <button onClick={() => post("move", 20)} disabled={!!busy || !key} data-testid="rally-btn"
             className="rounded-md border border-white/15 px-5 py-3 text-sm text-white transition hover:border-white/30 disabled:opacity-40">
             Move the price +20%
           </button>

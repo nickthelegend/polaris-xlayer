@@ -13,9 +13,37 @@ export const maxDuration = 120;
  * can be shown on demand, and labels itself as a demo move on chain so nobody
  * mistakes it for a real quote later.
  */
+/**
+ * The relayer's key, shared with whoever operates it.
+ *
+ * This route is the one remaining place a server key signs, and it must stay
+ * that way: the price relayer is an operator role, not a user action. But it
+ * was open to the internet, and this endpoint moves the mark that every open
+ * position is valued against — anyone could have marked the whole book down
+ * and liquidated it. It now needs the secret.
+ */
+function authorised(req: Request): boolean {
+  const expected = process.env.RELAYER_KEY;
+  if (!expected) return false; // no key configured means no operator access
+  const given = req.headers.get("x-relayer-key");
+  return typeof given === "string" && given.length > 0 && given === expected;
+}
+
 export async function POST(req: Request) {
   try {
-    const { mode, pct } = await req.json();
+    if (!authorised(req)) {
+      return NextResponse.json(
+        { error: "The price relayer is an operator endpoint and needs its key." },
+        { status: 401 }
+      );
+    }
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "That request body is not valid JSON." }, { status: 400 });
+    }
+    const { mode, pct } = body ?? {};
     const oracle = new ethers.Contract(ADDRESSES.oracle, ORACLE_ABI, signer("deployer"));
 
     let price: bigint, printedAt: number, marketOpen: boolean, source: string;

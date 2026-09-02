@@ -2,7 +2,7 @@
 
 import { PropsWithChildren } from "react";
 import { createConfig, http, WagmiProvider } from "wagmi";
-import { sepolia } from "wagmi/chains";
+import { ACTIVE_CHAIN } from "@/lib/chains";
 // Imported from its own subpath, not the `wagmi/connectors` barrel.
 //
 // The barrel re-exports every connector wagmi ships — Safe, WalletConnect,
@@ -34,14 +34,16 @@ import { Toaster } from "sonner";
 const queryClient = new QueryClient();
 
 const wagmiConfig = createConfig({
-  // Sepolia only: it is where the contracts are deployed, and offering other
-  // networks on a demo just produces dead ends.
-  chains: [sepolia],
+  // X Layer only: it is where the contracts are deployed, and offering other
+  // networks on a demo just produces dead ends. This said `sepolia` long after
+  // the contracts moved, so a connected wallet was on a chain the app could
+  // not read and every write would have gone to the wrong network.
+  chains: [ACTIVE_CHAIN],
   connectors: [injected()],
   ssr: true,
   transports: {
-    [sepolia.id]: http(
-      process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com"
+    [ACTIVE_CHAIN.id]: http(
+      process.env.NEXT_PUBLIC_XLAYER_RPC || ACTIVE_CHAIN.rpcUrls.default.http[0]
     ),
   },
 });

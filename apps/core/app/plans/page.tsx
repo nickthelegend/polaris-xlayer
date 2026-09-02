@@ -13,7 +13,7 @@ import { useAccount } from "wagmi"
  * what leaves my wallet next, and is anything wrong. The page is ordered that
  * way and nothing competes with it.
  *
- * This is the BNPL surface backed by the Sepolia LoanEngine and the Mongo loan
+ * This is the BNPL surface backed by the X Layer LoanEngine and the Mongo loan
  * book. The FHE credit view at /credit is a separate product surface and is
  * left alone.
  */
@@ -57,7 +57,7 @@ const fetcher = (url: string) =>
 
 /**
  * Demo borrower shown when no wallet is connected. This is the address that
- * actually holds plans on Sepolia, so the page is viewable - and recordable -
+ * actually holds plans on X Layer, so the page is viewable - and recordable -
  * without a wallet. Read-only either way: nothing here is actionable.
  */
 const DEMO_BORROWER =
@@ -336,7 +336,7 @@ function PlanRow({
               </span>
               {i.transactionHash && (
                 <a
-                  href={`https://sepolia.etherscan.io/tx/${i.transactionHash}`}
+                  href={`https://www.oklink.com/x-layer-testnet/tx/${i.transactionHash}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-white/65 underline-offset-4 hover:text-white/70 hover:underline"

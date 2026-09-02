@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ethers } from "ethers";
 import {
-  ADDRESSES, ENGINE_ABI, ORACLE_ABI, ERC20_ABI, POOL_ABI, RISK, STAND_INS, provider, signer,
+  ADDRESSES, ENGINE_ABI, ORACLE_ABI, ERC20_ABI, POOL_ABI, RISK, STAND_INS, provider,
 } from "@/lib/stock-chain";
 
 export const dynamic = "force-dynamic";
@@ -9,12 +9,20 @@ export const dynamic = "force-dynamic";
 /** Everything the UI shows, read straight off X Layer. Nothing cached. */
 export async function GET(req: Request) {
   try {
-    // The demo has three people in it and each sees a different book. The
-    // merchant holds no positions, which is also the only honest way to see
-    // the empty state without inventing one.
-    const asRole = new URL(req.url).searchParams.get("as") ?? "shopper";
-    if (!["shopper", "merchant", "liquidator"].includes(asRole)) {
-      return NextResponse.json({ error: `Unknown actor "${asRole}".` }, { status: 400 });
+    /*
+     * Whose book is this?
+     *
+     * The connected wallet's, given as ?address=. This used to resolve the
+     * viewer from a server-held key, which meant the page said "you hold"
+     * about an address the visitor had never seen and could not sign for.
+     *
+     * There is no operator impersonation any more: the actor keys are gone
+     * from the deployment, so there is nothing to impersonate with.
+     */
+    const url = new URL(req.url);
+    const address = url.searchParams.get("address");
+    if (address && !ethers.isAddress(address)) {
+      return NextResponse.json({ error: `"${address}" is not an address.` }, { status: 400 });
     }
     const p = provider();
     const engine = new ethers.Contract(ADDRESSES.engine, ENGINE_ABI, p);
@@ -23,9 +31,18 @@ export async function GET(req: Request) {
     const stable = new ethers.Contract(ADDRESSES.stable, ERC20_ABI, p);
     const pool = new ethers.Contract(ADDRESSES.pool, POOL_ABI, p);
 
-    const viewer = signer(asRole as any).address;
-    const shopper = signer("shopper").address;
-    const merchant = signer("merchant").address;
+    // A connected address wins. Falling back to an operator key keeps the
+    // merchant/liquidator demo views working; with neither, there is no book
+    // to show and the UI says so rather than showing someone else's.
+    /*
+     * The merchant is an address, not a key.
+     *
+     * Reading it from a private key meant this route needed one just to
+     * render a heading. Nothing here signs any more, so the only server key
+     * left in the app is the oracle relayer's, behind its own secret.
+     */
+    const merchant = process.env.POLARIS_MERCHANT_ADDRESS ?? null;
+    const viewer = address;
 
     const [price, source, sSym, stSym, poolAvail, poolOut, poolEarned, blockNumber] = await Promise.all([
       oracle.peek(ADDRESSES.stock),
@@ -38,7 +55,7 @@ export async function GET(req: Request) {
       p.getBlockNumber(),
     ]);
 
-    const ids: bigint[] = await engine.loansOf(viewer);
+    const ids: bigint[] = viewer ? await engine.loansOf(viewer) : [];
     const loans = await Promise.all(
       ids.map(async (id) => {
         const l = await engine.getLoan(id);
@@ -77,12 +94,11 @@ export async function GET(req: Request) {
       },
       tokens: { stockSymbol: sSym, stableSymbol: stSym },
       pool: { available: poolAvail.toString(), outstanding: poolOut.toString(), earned: poolEarned.toString() },
-      viewer: { role: asRole, address: viewer },
-      actors: { shopper, merchant, liquidator: signer("liquidator").address },
+      viewer: { role: address ? "connected" : null, address: viewer },
+      merchant,
       balances: {
-        shopperShares: (await stock.balanceOf(shopper)).toString(),
-        shopperStable: (await stable.balanceOf(shopper)).toString(),
-        viewerShares: (await stock.balanceOf(viewer)).toString(),
+        viewerShares: viewer ? (await stock.balanceOf(viewer)).toString() : "0",
+        viewerStable: viewer ? (await stable.balanceOf(viewer)).toString() : "0",
         merchantStable: (await stable.balanceOf(merchant)).toString(),
         engineShares: (await stock.balanceOf(ADDRESSES.engine)).toString(),
       },

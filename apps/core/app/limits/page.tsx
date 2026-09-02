@@ -217,7 +217,7 @@ function Limits() {
             {note.text}
             {note.hash && (
               <a
-                href={`https://sepolia.etherscan.io/tx/${note.hash}`}
+                href={`https://www.oklink.com/x-layer-testnet/tx/${note.hash}`}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 underline underline-offset-2"
