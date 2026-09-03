@@ -156,3 +156,44 @@ recorded demo.
   pitch.
 - **Ideas 84–98** are real but pull focus. A judge remembers one sentence; a
   governance page and a referral mechanic dilute it.
+
+---
+
+## What was actually built, and verified
+
+Each of these was run against the deployed contracts on X Layer testnet and
+confirmed working before moving on. Nothing below is "it compiles".
+
+| # | Idea | Evidence |
+|---|---|---|
+| 1 | Storefront pays the engine directly | Purchase `0xe97b7a11…` — a $12.00 basket locked 0.118673 tXAAPL and paid the merchant **exactly 12.000000 pUSDC** |
+| 2 | Cart total → shares required | $12.00 → 0.1186 tXAAPL at the live mark. 10 unit tests hold the arithmetic, including that a basket rounds up rather than leaving the merchant a millionth short |
+| 3 | Order confirmation that proves it | Tx link, shares locked, merchant paid, settle link |
+| 4 | Orders page with repay | Settle `0x1da1c49c…` — repaid $12.147616 and **the same 0.118673 tXAAPL came back**, to the wei |
+| 5 | "You keep the upside" | `Since_Checkout` column on each order: what the locked shares are worth now against checkout |
+| 6 | Insufficient shares, priced in goods | "This basket needs X, this wallet holds Y — Z short", with a way to fix it |
+| 7 | One-click funding from checkout | `Get_25_Test_Shares`, signed by the shopper |
+| 8 | Live price ticker | `tXAAPL $324.96` in the shop header, with the venue dot and a tick that fires only on a real change |
+| 9 | Health-aware checkout | Refuses on a stale price or a short pool, with the reason |
+| 11 | Liquidation preview | "Safe until $204.72, 37.0% below today", with a bar that goes amber then red. 2 tests |
+| 24 | APR breakdown | Origination $0.12 + interest $0.02 reconciling against a $0.14 fee |
+| 26 | Embeddable checkout (partial) | CORS on the public reads, so any storefront on any domain can price a basket |
+| 61 | Empty states | Empty cart and empty orders, each with a way out |
+| 65 | Idempotent order refs | Derived from the basket, so a double-tap on Pay is a no-op rather than a second loan |
+
+## Deliberately not built, with reasons
+
+- **#12 repay-early savings** — *wrong about the product.* `amountOwed` is
+  `principal + fee` for the life of the loan: the fee is prepaid and fixed, so
+  settling early frees the shares sooner but costs exactly the same. A savings
+  panel would be inventing a discount the contract does not give. The checkout
+  now says so plainly instead.
+- **AI (#0.2 in PLAN.md)** — no credential exists anywhere, and the only
+  training data is 27 loans from 3 of this repo's own test wallets.
+- **Mainnet-dependent items (#31, #42's live half)** — spends real money.
+- **#84–#98** — real ideas, but they pull focus. A judge remembers one
+  sentence; a governance page and a referral mechanic dilute it.
+- **#99–#100** — the printer module is already built and proven; re-demoing it
+  does not strengthen *this* pitch.
+- **Everything else in tiers 3–6** — not reached. Ranked below what was built,
+  and the honest status is "not started", not "skipped".
