@@ -152,3 +152,29 @@ export function headroomBps(currentPrice: bigint, liqPrice: bigint): bigint {
   if (currentPrice === 0n || liqPrice >= currentPrice) return 0n;
   return ((currentPrice - liqPrice) * 10000n) / currentPrice;
 }
+
+/**
+ * The fee, split into the two things it actually is.
+ *
+ * A single "Fee, 7 days" line invites the reader to assume it is interest, or
+ * to assume it is a flat charge. It is both: origination at
+ * `originationFeeBps`, plus simple interest at `interestAprBps` for the tenor.
+ * Showing the split is the difference between a number a shopper accepts and
+ * one they understand.
+ *
+ * Worth stating plainly wherever this is shown: the fee is prepaid and fixed
+ * at open. Settling early returns the shares sooner but costs the same, because
+ * `amountOwed` is `principal + fee` for the life of the loan.
+ */
+export function feeBreakdown(principal: bigint, p: Pricing) {
+  const origination = (principal * p.originationFeeBps) / BPS;
+  const interest = (principal * p.interestAprBps * p.tenor) / (BPS * YEAR);
+  return {
+    origination,
+    interest,
+    total: origination + interest,
+    /** Annualised rate of the whole charge, in basis points, for comparison. */
+    effectiveAprBps:
+      principal === 0n ? 0n : ((origination + interest) * BPS * YEAR) / (principal * p.tenor),
+  };
+}

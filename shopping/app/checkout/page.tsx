@@ -9,7 +9,7 @@ import {
 import { useCart } from "@/lib/cart-context"
 import { useWallet } from "@/lib/use-wallet"
 import { useStockCheckout } from "@/lib/use-stock-checkout"
-import { formatShares, formatUsd } from "@/lib/stock-pricing"
+import { feeBreakdown, formatShares, formatUsd } from "@/lib/stock-pricing"
 import { EXPLORER } from "@/lib/polaris-client"
 
 /**
@@ -215,6 +215,19 @@ export default function CheckoutPage() {
                     <Row label="Shares_To_Lock" value={formatShares(quote.shares)} accent />
                     <Row label="Collateral_Value" value={`$${formatUsd(quote.collateralValue)}`} />
                     <Row label="Fee_7_Days" value={`−$${formatUsd(quote.fee)}`} />
+                    {/* A single fee line invites the reader to assume it is
+                        interest, or to assume it is flat. It is both, and the
+                        split is the difference between a number a shopper
+                        accepts and one they understand. */}
+                    {(() => {
+                      const b = feeBreakdown(quote.merchantReceives, quote.pricing)
+                      return (
+                        <div className="pl-3 border-l border-white/10 space-y-1.5 py-0.5">
+                          <Row label="Origination" value={`$${formatUsd(b.origination)}`} note="1% once" />
+                          <Row label="Interest" value={`$${formatUsd(b.interest)}`} note="12% APR, 7 days" />
+                        </div>
+                      )
+                    })()}
                     <Row label="Merchant_Receives" value={`$${formatUsd(quote.merchantReceives)}`} accent />
                   </div>
 
@@ -250,7 +263,8 @@ export default function CheckoutPage() {
 
                   <p className="mt-4 text-[10px] leading-relaxed text-white/30">
                     Wallet {short}. The shares lock as collateral and return when you settle — they are
-                    not sold.
+                    not sold. The fee is fixed at checkout, so settling early frees the shares sooner
+                    but costs the same.
                   </p>
                 </>
               )}

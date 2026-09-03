@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   usdToUnits, sharesForTotal, quoteForShares, feeFor, formatUsd, formatShares,
-  liquidationPrice, headroomBps,
+  liquidationPrice, headroomBps, feeBreakdown,
 } from "../lib/stock-pricing.ts";
 
 // The live numbers at the time of writing: $325.62 a share, 31.5% LTV after
@@ -100,4 +100,18 @@ test("headroom is the distance to that price", () => {
   assert.equal(headroomBps(325_00000000n, 200_00000000n), 3846n);
   // Already under water reports no room rather than a negative.
   assert.equal(headroomBps(150_00000000n, 200_00000000n), 0n);
+});
+
+test("the fee splits into origination and interest, and they sum to what is charged", () => {
+  const principal = 1000_000000n;
+  const b = feeBreakdown(principal, P);
+  assert.equal(b.origination + b.interest, b.total);
+  assert.equal(b.total, feeFor(principal, P));
+  // 1% origination on a thousand dollars.
+  assert.equal(b.origination, 10_000000n);
+  // 12% APR over seven days is a touch under a quarter percent.
+  assert.ok(b.interest > 0n && b.interest < 3_000000n);
+  // Annualised, the whole charge is far more than the headline 12%, because
+  // origination is paid once over a short tenor. Saying so is the point.
+  assert.ok(b.effectiveAprBps > 1200n);
 });
