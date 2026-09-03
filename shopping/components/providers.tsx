@@ -26,7 +26,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       chains: [ACTIVE_CHAIN],
       connectors: [injected()],
       transports: { [ACTIVE_CHAIN.id]: http() },
-      ssr: true,
+      // No `ssr: true`: that wants an initialState carried from the server on
+      // a cookie, and this storefront resolves its wallet entirely on the
+      // client. Turning it on without the cookie only adds a hydration pass.
     }),
   )
 

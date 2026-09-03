@@ -124,3 +124,31 @@ export function formatShares(units: bigint, dp = 4): string {
   const frac = (units % 10n ** SHARE_DECIMALS).toString().padStart(Number(SHARE_DECIMALS), "0").slice(0, dp);
   return `${whole}.${frac}`;
 }
+
+/**
+ * The price at which a position becomes liquidatable.
+ *
+ * A borrower's real question is not "what is my health factor" — it is "how far
+ * can this fall before somebody sells my shares". The engine liquidates when
+ * the collateral's value drops under `owed × 10000 / liquidationThresholdBps`,
+ * so the price that happens at is that value spread back over the shares held.
+ *
+ * Returned at the oracle's 1e8 scale, like every other price here.
+ */
+export function liquidationPrice(
+  shares: bigint,
+  owedUnits: bigint,
+  liquidationThresholdBps: bigint,
+): bigint | null {
+  if (shares === 0n || liquidationThresholdBps === 0n) return null;
+  // collateralValue = shares × price / 1e20, and liquidation bites when
+  // collateralValue × threshold / 10000 <= owed.
+  const requiredValue = (owedUnits * 10000n) / liquidationThresholdBps;
+  return (requiredValue * 10n ** (SHARE_DECIMALS + PRICE_DECIMALS - STABLE_DECIMALS)) / shares;
+}
+
+/** How far the price can fall before that happens, in basis points. */
+export function headroomBps(currentPrice: bigint, liqPrice: bigint): bigint {
+  if (currentPrice === 0n || liqPrice >= currentPrice) return 0n;
+  return ((currentPrice - liqPrice) * 10000n) / currentPrice;
+}

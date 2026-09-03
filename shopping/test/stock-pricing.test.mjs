@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   usdToUnits, sharesForTotal, quoteForShares, feeFor, formatUsd, formatShares,
+  liquidationPrice, headroomBps,
 } from "../lib/stock-pricing.ts";
 
 // The live numbers at the time of writing: $325.62 a share, 31.5% LTV after
@@ -79,4 +80,24 @@ test("formatting round-trips", () => {
   assert.equal(formatUsd(1234_567890n), "1,234.56");
   assert.equal(formatShares(10n ** 18n), "1.0000");
   assert.equal(formatShares(1500000000000000000n), "1.5000");
+});
+
+test("the liquidation price is where the threshold actually bites", () => {
+  // 1 share, $100 owed, liquidation at 50% — the position is under water once
+  // the collateral is worth less than $200, i.e. below $200 a share.
+  const liq = liquidationPrice(10n ** 18n, 100_000000n, 5000n);
+  assert.equal(liq, 200_00000000n);
+
+  // Twice the shares, half the price.
+  assert.equal(liquidationPrice(2n * 10n ** 18n, 100_000000n, 5000n), 100_00000000n);
+
+  // Nothing locked cannot be liquidated.
+  assert.equal(liquidationPrice(0n, 100_000000n, 5000n), null);
+});
+
+test("headroom is the distance to that price", () => {
+  // $325 now, liquidation at $200 — about 38% of room.
+  assert.equal(headroomBps(325_00000000n, 200_00000000n), 3846n);
+  // Already under water reports no room rather than a negative.
+  assert.equal(headroomBps(150_00000000n, 200_00000000n), 0n);
 });

@@ -8,7 +8,7 @@ import { ArrowLeft, CheckCircle, ExternalLink, Loader2, TrendingDown, TrendingUp
 
 import { useWallet } from "@/lib/use-wallet"
 import { ADDRESSES, ENGINE_ABI, ERC20_ABI, EXPLORER, explainWriteError, waitForAllowance } from "@/lib/polaris-client"
-import { formatShares, formatUsd } from "@/lib/stock-pricing"
+import { formatShares, formatUsd, headroomBps, liquidationPrice } from "@/lib/stock-pricing"
 
 /**
  * What you owe the shop, and getting your shares back.
@@ -40,6 +40,7 @@ type Loan = {
 
 type State = {
   loans: Loan[]
+  risk: { liquidationThresholdBps: number }
   price: { usdPerShare: string; marketOpen: boolean }
   tokens: { stockSymbol: string; stableSymbol: string }
   balances: { viewerStable: string }
@@ -229,6 +230,10 @@ export default function OrdersPage() {
                 const worthNow = (shares * price) / 10n ** 20n
                 const owed = BigInt(l.owed)
                 const upside = worthNow - BigInt(l.principal)
+                // The question a borrower actually has: how far can this fall
+                // before somebody sells my shares.
+                const liq = liquidationPrice(shares, owed, BigInt(state.risk.liquidationThresholdBps))
+                const room = liq ? headroomBps(price, liq) : 0n
                 return (
                   <div key={l.id} className="border border-white/10 rounded-xl p-6 bg-white/[0.02]">
                     <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -250,6 +255,38 @@ export default function OrdersPage() {
                         tone={upside >= 0n ? "up" : "down"}
                       />
                     </div>
+
+                    {liq && (
+                      <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3">
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <span className="text-[10px] uppercase font-bold text-white/35 tracking-widest">
+                            Safe_Until
+                          </span>
+                          <span className="font-mono text-sm font-black text-white/80">
+                            ${formatUsd(liq / 100n)}{" "}
+                            <span className="ml-1 text-[11px] font-normal text-white/35">
+                              {(Number(room) / 100).toFixed(1)}% below today
+                            </span>
+                          </span>
+                        </div>
+                        {/* A bar is easier to read than a percentage, and this
+                            one is the only number on the page that can cost
+                            somebody their shares. */}
+                        <div className="mt-2.5 h-1 rounded-full bg-white/10 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              room > 2000n ? "bg-green-500" : room > 800n ? "bg-amber-400" : "bg-red-500"
+                            }`}
+                            style={{ width: `${Math.min(100, Number(room) / 100)}%` }}
+                          />
+                        </div>
+                        <p className="mt-2.5 text-[11px] leading-relaxed text-white/35">
+                          {chainSymbol(state)} would have to fall to ${formatUsd(liq / 100n)} before this
+                          position could be liquidated — and even then only enough is sold to cover
+                          what is owed.
+                        </p>
+                      </div>
+                    )}
 
                     <p className="mt-4 text-[11px] leading-relaxed text-white/35">
                       Settle by {new Date(l.dueAt * 1000).toISOString().slice(0, 10)} and every share
@@ -322,4 +359,9 @@ function Cell({ label, value, accent, tone }: { label: string; value: string; ac
       </span>
     </div>
   )
+}
+
+/** The collateral's ticker, for prose that should name it rather than say "the stock". */
+function chainSymbol(state: State): string {
+  return state.tokens.stockSymbol
 }

@@ -5,6 +5,7 @@ import { useCart } from "@/lib/cart-context";
 import { ShoppingCart, Zap, Box, ArrowRight, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useWallet } from "@/lib/use-wallet";
+import { PriceTicker } from "@/components/price-ticker";
 
 export default function Home() {
   const { addToCart, items } = useCart();
@@ -21,6 +22,7 @@ export default function Home() {
         </div>
 
         <div className="flex items-center gap-6">
+          <PriceTicker />
           {!authenticated ? (
             <button
               onClick={login}
