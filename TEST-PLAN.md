@@ -184,3 +184,48 @@ happened to contain "You hold", grabbing a product price instead of the ticker,
 expecting a button label the shop words differently, and reading a note instead
 of a value. They are recorded here because a test that cries wolf costs as much
 trust as one that misses a bug.
+
+---
+
+# Addendum — H block (7)
+
+Six features shipped after the 65-item plan was written, plus a hydration
+check. Written before testing, same rules: an item passes only when the real
+product produces exactly the stated result, with a clean console on a **freshly
+opened tab** and no failed network request.
+
+| # | Item | Correct means |
+|---|---|---|
+| H1 | **Gas gate** — wallet with `0x0` OKB | Checkout names the missing gas, offers no Pay button, and links the X Layer faucet. Verified against a wallet whose `eth_getBalance` is literally `0x0`. |
+| H2 | **Wrong network** — wallet on chain 1 | Checkout says the wallet is on a different network, offers no quote or Pay button, and a switch button issues `wallet_switchEthereumChain`; on 4902 it falls back to `wallet_addEthereumChain` carrying `0x7A0`. |
+| H3 | **Add tokens** — on the receipt | Two buttons issue `wallet_watchAsset` with the deployed addresses and correct decimals (tXAAPL 18, pUSDC 6), then read as added. |
+| H4 | **Oracle provenance** | Panel names the source, venue state, the venue's own `printedAt`, the print's age and the oracle address — the source string matching `/api/stock/state` exactly. |
+| H5 | **404** | An unknown path renders the shop's own 404 on the dark ground with links to `/` and `/orders`, not Next's white default. |
+| H6 | **Hydration** | Every storefront route loads on a fresh tab with **zero** console errors — specifically no "Hydration failed" and no "Maximum update depth". |
+| H7 | **Storefront resources** | Every route reports zero resource responses ≥ 400 from the browser's own timings. |
+
+## H block results — 7/7 PASS
+
+| # | Result | Evidence |
+|---|---|---|
+| H1 | **PASS** | Wallet `0xA59aD531…` with `eth_getBalance` literally `0x0`: names the missing gas, no Pay button, faucet linked. |
+| H2 | **PASS** | Wallet on chain `0x1`: warns, offers no quote and no Pay button, requests a switch to `0x7a0`, and the 4902 fallback adds X Layer. |
+| H3 | **PASS** | Both `wallet_watchAsset` calls fired — tXAAPL 18 decimals, pUSDC 6 — buttons then read as added. Purchase `0x4003e827…` locked 0.118673 tXAAPL and paid 12.000000 pUSDC. |
+| H4 | **PASS** | Source `NasdaqGS close` matching the chain, venue closed, printed `2026-09-02 20:00:01Z`, age `33627s` within bound, oracle `0x926cDFa6…`. |
+| H5 | **PASS** | Own 404 on the dark ground with links to `/` and `/orders`; not Next's white default. |
+| H6 | **PASS** | Six storefront routes on a fresh tab: no "Hydration failed", no "Maximum update depth", no errors at all. |
+| H7 | **PASS** | Zero resource responses ≥ 400 on every route, from the browser's own timings. |
+
+**No failures in this block** — the six features were built with the previous
+run's lessons already applied (the hydration guard, the re-entrancy lock and
+the display-rounding rule all date from that pass).
+
+### Phase 4 — full re-run, 72/72
+
+The original 65 re-run from the top after the H block landed: B 22/22, E 5/5
+(7 invariant assertions, including the four liquidations the exhaustive search
+now reaches), F 4/4, G 6/6, and the A, C and D blocks unchanged. Contracts
+5/5 `exact_match` on Sourcify. `pnpm test` 212 passing, storefront pricing
+10/10, smoke 35/35, Playwright 4/4, typechecks and builds exit 0.
+
+**Nothing that passed before regressed.**
