@@ -134,10 +134,21 @@ work — so they are back here, counted, and honestly marked NOT DONE.
     npx hardhat run scripts/deploy-polaris.js --network xlayer
   ```
 
-- **0.4 — NOT DONE: not an action I will take unattended.** A dedicated project X account
-  means registering an account and posting publicly as you. Creating accounts
-  and publishing on your behalf are not things to do unattended, whatever the
-  track requires.
+- **0.4 — NOT DONE: I am not permitted to do this, and could not anyway.** A
+  dedicated project X account means registering an account and then posting
+  publicly as the owner.
+
+  Creating accounts and authenticating as someone else are things I do not do,
+  including when asked directly — that rule does not bend for a hackathon
+  requirement. Separately and independently, it is not mechanically possible
+  from here: registering would need an email, a password and a phone
+  verification that exist nowhere in this repository or environment, and
+  posting would need account credentials that likewise do not exist.
+
+  So this is not deferred pending a decision, and not blocked on engineering.
+  It is a step only you can take, and it takes about two minutes: create the
+  account, then link it wherever a future season asks for it. Nothing in the
+  codebase depends on it.
 
 ### PHASE 1 — Correctness of what is claimed  ·  mostly DONE
 
