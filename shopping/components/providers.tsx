@@ -1,85 +1,41 @@
 "use client"
 
 import type React from "react"
-import { PrivyProvider } from "@privy-io/react-auth"
+import { useState } from "react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { WagmiProvider, createConfig, http } from "wagmi"
+import { injected } from "wagmi/connectors"
 import { ToastContainer } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
 
+import { ACTIVE_CHAIN } from "@/lib/chains"
+
+/**
+ * The storefront's wallet.
+ *
+ * This used to sign in through Privy and then hand checkout off to a separate
+ * merchant service on localhost with a client id and secret — three moving
+ * parts, none of which a visitor has. The shop pays the Polaris engine
+ * directly now, with the shopper's own wallet, so the only thing it needs is a
+ * connector.
+ */
 export function Providers({ children }: { children: React.ReactNode }) {
-    return (
-        <PrivyProvider
-            appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || "cmkr3rc4i00iujs0cgnug0qzj"}
-            config={{
-                appearance: {
-                    theme: "dark",
-                    accentColor: "#FFFFFF",
-                },
-                embeddedWallets: {
-                    ethereum: {
-                        createOnLogin: "users-without-wallets",
-                    }
-                },
-                // Polaris runs on X Layer. This said X Layer, which is a chain the
-                // contracts this storefront settles against are not deployed on.
-                defaultChain: {
-                    id: 1952,
-                    name: "X Layer Testnet",
-                    network: "xlayer-testnet",
-                    nativeCurrency: {
-                        name: "OKB",
-                        symbol: "OKB",
-                        decimals: 18,
-                    },
-                    rpcUrls: {
-                        default: {
-                            http: ["https://testrpc.xlayer.tech"],
-                        },
-                        public: {
-                            http: ["https://testrpc.xlayer.tech"],
-                        },
-                    },
-                    blockExplorers: {
-                        default: { name: "OKLink", url: "https://www.oklink.com/x-layer-testnet" },
-                    },
-                },
-                supportedChains: [
-                    {
-                    id: 1952,
-                    name: "X Layer Testnet",
-                    network: "xlayer-testnet",
-                    nativeCurrency: {
-                        name: "OKB",
-                        symbol: "OKB",
-                        decimals: 18,
-                    },
-                    rpcUrls: {
-                        default: {
-                            http: ["https://testrpc.xlayer.tech"],
-                        },
-                        public: {
-                            http: ["https://testrpc.xlayer.tech"],
-                        },
-                    },
-                    blockExplorers: {
-                        default: { name: "OKLink", url: "https://www.oklink.com/x-layer-testnet" },
-                    },
-                },
-                ]
-            }}
-        >
-            {children}
-            <ToastContainer
-                position="top-right"
-                autoClose={5000}
-                hideProgressBar={false}
-                newestOnTop={false}
-                closeOnClick
-                rtl={false}
-                pauseOnFocusLoss
-                draggable
-                pauseOnHover
-                theme="dark"
-            />
-        </PrivyProvider>
-    )
+  const [queryClient] = useState(() => new QueryClient())
+  const [config] = useState(() =>
+    createConfig({
+      chains: [ACTIVE_CHAIN],
+      connectors: [injected()],
+      transports: { [ACTIVE_CHAIN.id]: http() },
+      ssr: true,
+    }),
+  )
+
+  return (
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        {children}
+        <ToastContainer position="bottom-right" theme="dark" />
+      </QueryClientProvider>
+    </WagmiProvider>
+  )
 }

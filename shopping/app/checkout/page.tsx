@@ -1,260 +1,296 @@
 "use client"
 
-import { useState, useEffect } from "react";
-import { useCart } from "@/lib/cart-context";
-import { initiatePolarisPayment } from "@/app/actions/payment";
-import { CreditCard, ShieldCheck, Zap, Loader2, User, Mail, MapPin, ArrowLeft, Wallet, CheckCircle, XCircle } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { usePrivy } from "@privy-io/react-auth";
-import { toast } from "react-toastify";
+import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
+import {
+  ArrowLeft, CheckCircle, ExternalLink, Loader2, Lock, ShieldCheck, TrendingUp, Wallet, XCircle,
+} from "lucide-react"
 
-interface PaymentResult {
-    type: "POLARIS_PAYMENT_RESULT";
-    success: boolean;
-    loanId?: number;
-    amount?: number;
-    paymentMode: "bnpl" | "split3";
-    txHash?: string;
-    error?: string;
-}
+import { useCart } from "@/lib/cart-context"
+import { useWallet } from "@/lib/use-wallet"
+import { useStockCheckout } from "@/lib/use-stock-checkout"
+import { formatShares, formatUsd } from "@/lib/stock-pricing"
+import { EXPLORER } from "@/lib/polaris-client"
+
+/**
+ * Checkout, paid with stock.
+ *
+ * This page used to POST the basket to a merchant service on localhost with a
+ * client id and secret, then open a hosted page in a popup and wait for a
+ * postMessage back. Three moving parts, none of which a visitor has, and the
+ * popup is blocked by default in most browsers anyway.
+ *
+ * Now the shopper's own wallet pays the engine: the basket is priced in shares
+ * at the live mark, the shares lock, and the merchant is paid from the pool in
+ * the same transaction. Nothing here is simulated — the numbers come off chain
+ * and the button signs.
+ */
+
+const POLARIS = process.env.NEXT_PUBLIC_POLARIS_URL ?? "https://polaris-xlayer.vercel.app"
 
 export default function CheckoutPage() {
-    const { total, items, clearCart } = useCart();
-    const router = useRouter();
-    const { login, authenticated, user } = usePrivy();
-    const [loading, setLoading] = useState(false);
-    const [formData, setFormData] = useState({
-        name: "Avery Sterling",
-        email: "avery@syndicate.net",
-        address: "7th Sector Node, Neo-Tokyo 2045"
-    });
-    const [orderStatus, setOrderStatus] = useState<null | "success" | "error">(null);
-    const [paymentDetails, setPaymentDetails] = useState<PaymentResult | null>(null);
+  const { total, items, clearCart } = useCart()
+  const router = useRouter()
+  const { login, connected, connecting, short } = useWallet()
 
-    useEffect(() => {
-        const handler = (event: MessageEvent) => {
-            const data = event.data;
-            if (data?.type !== "POLARIS_PAYMENT_RESULT") return;
+  // The order reference is derived from the basket, not random: the engine
+  // keys idempotency on it, so a double-tap on Pay must hash to the same thing.
+  const orderRef = useMemo(() => {
+    const line = items.map((i) => `${i.id}x${i.quantity}`).join("|")
+    return `shop-${line}-${total.toFixed(2)}`
+  }, [items, total])
 
-            const result = data as PaymentResult;
-            setPaymentDetails(result);
+  const { chain, quote, state, loadError, pay, fundShares, reset } = useStockCheckout(total)
+  const [form, setForm] = useState({
+    name: "Avery Sterling",
+    email: "avery@syndicate.net",
+    address: "7th Sector Node, Neo-Tokyo 2045",
+  })
 
-            if (result.success) {
-                setOrderStatus("success");
-                clearCart();
-                toast.success(
-                    `Payment confirmed via ${result.paymentMode === "bnpl" ? "BNPL" : "Split-in-3"}!`,
-                    { theme: "dark" }
-                );
-            } else {
-                setOrderStatus("error");
-                toast.error(
-                    result.error || "Payment failed. Please try again.",
-                    { theme: "dark" }
-                );
-            }
-        };
+  // Empty the basket once the chain has confirmed, not before.
+  useEffect(() => {
+    if (state.step === "done") clearCart()
+  }, [state.step, clearCart])
 
-        window.addEventListener("message", handler);
-        return () => window.removeEventListener("message", handler);
-    }, [clearCart]);
+  const busy = state.step === "approving" || state.step === "paying"
 
-    const handlePolarisPay = async () => {
-        setLoading(true);
-        const result = await initiatePolarisPayment(total, `Order for ${items.length} Modules`);
-
-        if (result.error) {
-            // A native alert() blocks the page thread, which froze the tab hard
-            // enough to stall navigation and devtools alike. The app already
-            // renders toasts; a failed payment is not a reason to lock the UI.
-            toast.error(result.error, { theme: "dark" });
-            setOrderStatus("error");
-            setLoading(false);
-        } else if (result.checkoutUrl) {
-            // Open the Polaris Checkout Hub in a new popup window
-            const width = 500;
-            const height = 700;
-            const left = window.screenX + (window.outerWidth - width) / 2;
-            const top = window.screenY + (window.outerHeight - height) / 2;
-
-            window.open(
-                result.checkoutUrl,
-                "Polaris_Secure_Settlement",
-                `width=${width},height=${height},left=${left},top=${top},status=no,menubar=no,toolbar=no`
-            );
-
-            setLoading(false);
-        }
-    };
-
+  if (items.length === 0 && state.step !== "done") {
     return (
-        <div className="max-w-6xl mx-auto px-6 py-12">
-            {orderStatus === "success" && paymentDetails && (
-                <div className="mb-12 p-8 rounded-xl border-2 border-green-500/30 bg-green-500/5">
-                    <div className="flex items-center gap-4 mb-6">
-                        <CheckCircle className="w-8 h-8 text-green-500" />
-                        <h2 className="text-2xl font-black uppercase tracking-tighter text-green-400">Settlement_Confirmed</h2>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="flex flex-col gap-1">
-                            <span className="text-[10px] uppercase font-bold text-white/40 tracking-widest">Payment_Mode</span>
-                            <span className="text-sm font-black uppercase">{paymentDetails.paymentMode === "bnpl" ? "BNPL" : "Split-in-3"}</span>
-                        </div>
-                        {paymentDetails.amount != null && (
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[10px] uppercase font-bold text-white/40 tracking-widest">Amount</span>
-                                <span className="text-sm font-black">${paymentDetails.amount.toFixed(2)}</span>
-                            </div>
-                        )}
-                        {paymentDetails.loanId != null && (
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[10px] uppercase font-bold text-white/40 tracking-widest">Loan_ID</span>
-                                <span className="text-sm font-black font-mono">#{paymentDetails.loanId}</span>
-                            </div>
-                        )}
-                        {paymentDetails.txHash && (
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[10px] uppercase font-bold text-white/40 tracking-widest">Tx_Hash</span>
-                                <span className="text-sm font-black font-mono truncate">{paymentDetails.txHash}</span>
-                            </div>
-                        )}
-                    </div>
-                    <button
-                        onClick={() => router.push("/")}
-                        className="mt-6 bg-green-500/20 border border-green-500/30 text-green-400 px-6 py-2 rounded text-[10px] font-black uppercase tracking-widest hover:bg-green-500/30 transition-all"
-                    >
-                        Continue_Shopping
-                    </button>
-                </div>
-            )}
+      <div className="max-w-6xl mx-auto px-6 py-24 text-center">
+        <h1 className="text-2xl font-black uppercase tracking-tighter">Cart_Empty</h1>
+        <p className="mt-3 text-sm text-white/40">Nothing to settle. Pick something first.</p>
+        <button
+          onClick={() => router.push("/")}
+          className="mt-8 bg-white text-black px-6 py-3 rounded text-[10px] font-black uppercase tracking-widest hover:opacity-80 transition-all"
+        >
+          Browse_Modules
+        </button>
+      </div>
+    )
+  }
 
-            {orderStatus === "error" && (
-                <div className="mb-12 p-8 rounded-xl border-2 border-red-500/30 bg-red-500/5">
-                    <div className="flex items-center gap-4 mb-4">
-                        <XCircle className="w-8 h-8 text-red-500" />
-                        <h2 className="text-2xl font-black uppercase tracking-tighter text-red-400">Settlement_Failed</h2>
-                    </div>
-                    <p className="text-sm text-white/60 mb-4">
-                        {paymentDetails?.error || "An unexpected error occurred during payment processing."}
-                    </p>
-                    <button
-                        onClick={() => { setOrderStatus(null); setPaymentDetails(null); }}
-                        className="bg-red-500/20 border border-red-500/30 text-red-400 px-6 py-2 rounded text-[10px] font-black uppercase tracking-widest hover:bg-red-500/30 transition-all"
-                    >
-                        Try_Again
-                    </button>
-                </div>
-            )}
-
-            <button onClick={() => router.back()} className="flex items-center gap-2 text-white/40 hover:text-white mb-12 transition-all uppercase text-[10px] font-bold tracking-widest group">
-                <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" /> Return_To_Inventory
+  return (
+    <div className="max-w-6xl mx-auto px-6 py-12">
+      {state.step === "done" && (
+        <div className="mb-12 p-8 rounded-xl border-2 border-green-500/30 bg-green-500/5">
+          <div className="flex items-center gap-4 mb-6">
+            <CheckCircle className="w-8 h-8 text-green-500" />
+            <h2 className="text-2xl font-black uppercase tracking-tighter text-green-400">
+              Settlement_Confirmed
+            </h2>
+          </div>
+          <p className="text-sm text-white/60 mb-6 max-w-2xl">
+            The merchant has been paid in stablecoin. Your shares are locked as collateral — you
+            still own them, and every one comes back when you settle.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Figure label="Merchant_Paid" value={`$${formatUsd(state.paid)}`} accent />
+            <Figure label="Shares_Locked" value={`${formatShares(state.shares)} ${chain?.tokens.stockSymbol ?? ""}`} />
+            <Figure label="Settle_Within" value="7_Days" />
+          </div>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <a
+              href={`${EXPLORER}/tx/${state.hash}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 bg-green-500/20 border border-green-500/30 text-green-400 px-6 py-2 rounded text-[10px] font-black uppercase tracking-widest hover:bg-green-500/30 transition-all"
+            >
+              View_Transaction <ExternalLink className="w-3 h-3" />
+            </a>
+            <a
+              href={`${POLARIS}/activity`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 border border-white/15 px-6 py-2 rounded text-[10px] font-black uppercase tracking-widest hover:border-white/40 transition-all"
+            >
+              Settle_Position <ExternalLink className="w-3 h-3" />
+            </a>
+            <button
+              onClick={() => { reset(); router.push("/") }}
+              className="px-6 py-2 rounded text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-white transition-all"
+            >
+              Continue_Shopping
             </button>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
-                {/* Settlement Info */}
-                <div className="flex flex-col gap-10">
-                    <div>
-                        <h1 className="text-3xl font-black uppercase tracking-tighter mb-4">Finalize_Settlement</h1>
-                        <p className="text-white/40 text-[10px] uppercase tracking-widest font-bold">Verify your deployment details and select a protocol.</p>
-                    </div>
-
-                    <div className="flex flex-col gap-6">
-                        <div className="flex flex-col gap-4">
-                            <label className="text-[10px] uppercase font-bold text-white/40 tracking-widest italic">Recipient_Data</label>
-                            <div className="grid grid-cols-1 gap-3">
-                                <div className="bg-white/5 border border-white/10 p-3 rounded flex items-center gap-3">
-                                    <User className="w-4 h-4 text-white/20" />
-                                    <input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="bg-transparent border-none outline-none text-xs font-bold w-full" />
-                                </div>
-                                <div className="bg-white/5 border border-white/10 p-3 rounded flex items-center gap-3">
-                                    <Mail className="w-4 h-4 text-white/20" />
-                                    <input value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="bg-transparent border-none outline-none text-xs font-bold w-full" />
-                                </div>
-                                <div className="bg-white/5 border border-white/10 p-3 rounded flex items-center gap-3">
-                                    <MapPin className="w-4 h-4 text-white/20" />
-                                    <input value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="bg-transparent border-none outline-none text-xs font-bold w-full" />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col gap-4 mt-4">
-                            <label className="text-[10px] uppercase font-bold text-white/40 tracking-widest italic">Protocol_Selection</label>
-
-                            <button
-                                onClick={handlePolarisPay}
-                                disabled={loading}
-                                className="group relative overflow-hidden bg-primary p-6 rounded-lg border-2 border-white/10 hover:border-white/40 transition-all flex flex-col gap-4 text-left"
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 bg-black rounded flex items-center justify-center">
-                                            <Zap className="w-4 h-4 text-white" />
-                                        </div>
-                                        <span className="font-black text-sm text-white uppercase tracking-tighter">
-                                            Pay_Via_Polaris
-                                        </span>
-                                    </div>
-                                    <span className="bg-green-500/10 border border-green-500/20 text-green-400 text-[10px] font-black px-2 py-0.5 rounded uppercase">0%_APR</span>
-                                </div>
-                                <p className="text-[11px] text-white/60 leading-relaxed font-medium">
-                                    Buy now, pay later with your Polaris Credit Limit. Zero-collateral settlement on X Layer.
-                                </p>
-                                {loading && (
-                                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm">
-                                        <Loader2 className="w-6 h-6 animate-spin text-white" />
-                                    </div>
-                                )}
-                            </button>
-
-                            <div className="p-4 rounded border border-white/5 opacity-50 cursor-not-allowed">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-bold uppercase text-white/40">Standard Credit Card</span>
-                                    <span className="text-[10px] font-black text-white/20">UNAVAILABLE</span>
-                                </div>
-                                <div className="h-1 bg-white/5 rounded-full" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Order Summary */}
-                <div className="flex flex-col gap-8 bg-white/[0.02] border border-white/10 p-8 rounded-xl h-fit sticky top-12">
-                    <h3 className="text-xl font-bold uppercase tracking-tighter">Inventory_Summary</h3>
-                    <div className="divide-y divide-white/10">
-                        {items.map(item => (
-                            <div key={item.id} className="py-4 flex justify-between items-center">
-                                <div className="flex flex-col">
-                                    <span className="text-xs font-bold uppercase">{item.name}</span>
-                                    <span className="text-[10px] text-white/40 uppercase">x{item.quantity} units</span>
-                                </div>
-                                <span className="text-sm font-black">${(item.price * item.quantity).toFixed(2)}</span>
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="flex flex-col gap-4 pt-6 border-t border-white/20">
-                        <div className="flex justify-between items-center text-white/40 text-[10px] font-bold uppercase tracking-widest">
-                            <span>Subtotal</span>
-                            <span>${total.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-white/40 text-[10px] font-bold uppercase tracking-widest">
-                            <span>Protocol Fee</span>
-                            <span className="text-green-500">Free</span>
-                        </div>
-                        <div className="flex justify-between items-center pt-4 border-t border-white/10 mt-2">
-                            <span className="text-lg font-black uppercase italic">Total Settlement</span>
-                            <span className="text-2xl font-black">${total.toFixed(2)}</span>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 p-4 bg-white/5 rounded border border-white/10">
-                        <ShieldCheck className="w-5 h-5 text-green-500" />
-                        <span className="text-[10px] font-bold text-white/60 leading-tight uppercase tracking-wider">
-                            Secured by X Layer settlement &amp; the Polaris escrow contracts
-                        </span>
-                    </div>
-                </div>
-            </div>
+          </div>
         </div>
-    );
+      )}
+
+      {state.step === "error" && (
+        <div className="mb-12 p-8 rounded-xl border-2 border-red-500/30 bg-red-500/5">
+          <div className="flex items-center gap-4 mb-4">
+            <XCircle className="w-8 h-8 text-red-500" />
+            <h2 className="text-2xl font-black uppercase tracking-tighter text-red-400">
+              Settlement_Failed
+            </h2>
+          </div>
+          <p className="text-sm text-white/60 mb-4">{state.message}</p>
+          <button
+            onClick={reset}
+            className="border border-red-500/30 text-red-400 px-6 py-2 rounded text-[10px] font-black uppercase tracking-widest hover:bg-red-500/10 transition-all"
+          >
+            Try_Again
+          </button>
+        </div>
+      )}
+
+      <button
+        onClick={() => router.back()}
+        className="flex items-center gap-2 text-white/40 hover:text-white mb-12 transition-all uppercase text-[10px] font-bold tracking-widest group"
+      >
+        <ArrowLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" />
+        Back
+      </button>
+
+      {state.step !== "done" && (
+        <div className="grid lg:grid-cols-[1fr_420px] gap-12">
+          <div>
+            <h1 className="text-3xl font-black uppercase tracking-tighter mb-8">Delivery</h1>
+            <div className="space-y-4">
+              {([
+                ["name", "Recipient"],
+                ["email", "Contact"],
+                ["address", "Drop_Point"],
+              ] as const).map(([key, label]) => (
+                <label key={key} className="block">
+                  <span className="text-[10px] uppercase font-bold text-white/40 tracking-widest">{label}</span>
+                  <input
+                    value={form[key]}
+                    onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                    className="mt-2 w-full bg-white/[0.03] border border-white/10 rounded px-4 py-3 text-sm outline-none focus:border-white/30 transition-colors"
+                  />
+                </label>
+              ))}
+            </div>
+
+            <div className="mt-10 grid sm:grid-cols-3 gap-px bg-white/10 rounded-lg overflow-hidden border border-white/10">
+              <Reassurance icon={Lock} title="Shares_Locked" body="Held by the engine, not sold. You keep the position." />
+              <Reassurance icon={TrendingUp} title="Upside_Kept" body="If the stock climbs while locked, the gain is still yours." />
+              <Reassurance icon={ShieldCheck} title="Only_What_It_Needs" body="A shortfall sells only enough to cover it. The rest returns." />
+            </div>
+          </div>
+
+          <aside className="lg:sticky lg:top-8 h-fit">
+            <div className="border border-white/10 rounded-xl p-6 bg-white/[0.02]">
+              <h2 className="text-[10px] uppercase font-bold text-white/40 tracking-widest">Order</h2>
+
+              <div className="mt-4 space-y-3">
+                {items.map((i) => (
+                  <div key={i.id} className="flex justify-between text-sm">
+                    <span className="text-white/60">
+                      {i.name} <span className="text-white/25">×{i.quantity}</span>
+                    </span>
+                    <span className="font-mono">${(i.price * i.quantity).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-baseline">
+                <span className="text-[10px] uppercase font-bold text-white/40 tracking-widest">Total</span>
+                <span className="text-2xl font-black font-mono">${total.toFixed(2)}</span>
+              </div>
+
+              {loadError && (
+                <p className="mt-6 text-[11px] leading-relaxed text-amber-300/80">{loadError}</p>
+              )}
+
+              {!connected ? (
+                <button
+                  onClick={login}
+                  disabled={connecting}
+                  className="mt-6 w-full bg-white text-black py-4 rounded text-[10px] font-black uppercase tracking-widest hover:opacity-80 transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                >
+                  <Wallet className="w-3.5 h-3.5" />
+                  {connecting ? "Connecting" : "Connect_Wallet_To_Pay"}
+                </button>
+              ) : !quote ? (
+                <p className="mt-6 text-[11px] text-white/40">Pricing the basket against the market…</p>
+              ) : (
+                <>
+                  <div className="mt-6 pt-6 border-t border-white/10 space-y-2.5">
+                    <Row
+                      label={`${chain?.tokens.stockSymbol ?? "Share"}_Price`}
+                      value={`$${formatUsd(quote.pricing.usdPerShare / 100n)}`}
+                      note={quote.marketOpen ? "market open" : "after-hours"}
+                    />
+                    <Row label="Shares_To_Lock" value={formatShares(quote.shares)} accent />
+                    <Row label="Collateral_Value" value={`$${formatUsd(quote.collateralValue)}`} />
+                    <Row label="Fee_7_Days" value={`−$${formatUsd(quote.fee)}`} />
+                    <Row label="Merchant_Receives" value={`$${formatUsd(quote.merchantReceives)}`} accent />
+                  </div>
+
+                  {!quote.affordable ? (
+                    <div className="mt-6">
+                      <p className="text-[11px] leading-relaxed text-amber-300/90">
+                        This basket needs {formatShares(quote.shares)} {chain?.tokens.stockSymbol}, and
+                        this wallet holds {formatShares(quote.held)} — {formatShares(quote.shortfall)} short.
+                      </p>
+                      <button
+                        onClick={fundShares}
+                        disabled={busy}
+                        className="mt-3 w-full border border-white/15 py-3 rounded text-[10px] font-black uppercase tracking-widest hover:border-white/40 transition-all disabled:opacity-40"
+                      >
+                        {busy ? "Signing" : "Get_25_Test_Shares"}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => pay(orderRef)}
+                      disabled={busy}
+                      className="mt-6 w-full bg-green-500 text-black py-4 rounded text-[10px] font-black uppercase tracking-widest hover:opacity-85 transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                    >
+                      {state.step === "approving" ? (
+                        <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Approve_Shares_In_Wallet</>
+                      ) : state.step === "paying" ? (
+                        <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Confirm_In_Wallet</>
+                      ) : (
+                        <>Pay_${total.toFixed(2)}_With_Stock</>
+                      )}
+                    </button>
+                  )}
+
+                  <p className="mt-4 text-[10px] leading-relaxed text-white/30">
+                    Wallet {short}. The shares lock as collateral and return when you settle — they are
+                    not sold.
+                  </p>
+                </>
+              )}
+            </div>
+          </aside>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Row({ label, value, note, accent }: { label: string; value: string; note?: string; accent?: boolean }) {
+  return (
+    <div className="flex justify-between items-baseline">
+      <span className="text-[10px] uppercase font-bold text-white/40 tracking-widest">
+        {label}
+        {note && <span className="ml-2 text-white/25 normal-case tracking-normal font-normal">{note}</span>}
+      </span>
+      <span className={`font-mono text-sm ${accent ? "text-green-400 font-black" : "text-white/80"}`}>{value}</span>
+    </div>
+  )
+}
+
+function Figure({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[10px] uppercase font-bold text-white/40 tracking-widest">{label}</span>
+      <span className={`text-sm font-black font-mono ${accent ? "text-green-400" : ""}`}>{value}</span>
+    </div>
+  )
+}
+
+function Reassurance({
+  icon: Icon, title, body,
+}: { icon: typeof Lock; title: string; body: string }) {
+  return (
+    <div className="bg-black p-5">
+      <Icon className="w-4 h-4 text-green-500 mb-3" />
+      <p className="text-[11px] font-black uppercase tracking-widest">{title}</p>
+      <p className="mt-1.5 text-[11px] leading-relaxed text-white/40">{body}</p>
+    </div>
+  )
 }

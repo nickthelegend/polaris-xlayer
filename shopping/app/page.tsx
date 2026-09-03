@@ -4,11 +4,11 @@ import { PRODUCTS } from "@/lib/products";
 import { useCart } from "@/lib/cart-context";
 import { ShoppingCart, Zap, Box, ArrowRight, Wallet } from "lucide-react";
 import Link from "next/link";
-import { usePrivy } from "@privy-io/react-auth";
+import { useWallet } from "@/lib/use-wallet";
 
 export default function Home() {
   const { addToCart, items } = useCart();
-  const { login, authenticated, user, logout } = usePrivy();
+  const { login, logout, connected: authenticated, address, short } = useWallet();
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
@@ -29,15 +29,23 @@ export default function Home() {
               <Wallet className="w-3.5 h-3.5" /> Connect_Identity
             </button>
           ) : (
+            <div className="flex items-center">
+            <a
+              href="/orders"
+              className="mr-6 text-[10px] font-black uppercase tracking-tighter text-white/40 hover:text-white transition-colors"
+            >
+              Orders
+            </a>
             <button
               onClick={logout}
               className="group flex flex-col items-end"
             >
               <span className="text-[10px] font-black uppercase tracking-tighter group-hover:text-red-500 transition-colors">
-                {user?.wallet?.address.slice(0, 6)}...{user?.wallet?.address.slice(-4)}
+                {short}
               </span>
               <span className="text-[8px] text-white/20 uppercase font-bold tracking-widest">Active_Session</span>
             </button>
+            </div>
           )}
 
           <Link href="/cart" className="relative p-2 hover:bg-white/5 rounded transition-all">

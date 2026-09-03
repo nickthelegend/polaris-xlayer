@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+import { corsJson, corsPreflight } from "@/lib/cors";
 import { ethers } from "ethers";
 import {
   ADDRESSES, ENGINE_ABI, ORACLE_ABI, ERC20_ABI, POOL_ABI, RISK, STAND_INS, provider,
@@ -22,7 +24,7 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const address = url.searchParams.get("address");
     if (address && !ethers.isAddress(address)) {
-      return NextResponse.json({ error: `"${address}" is not an address.` }, { status: 400 });
+      return corsJson({ error: `"${address}" is not an address.` }, { status: 400 });
     }
     const p = provider();
     const engine = new ethers.Contract(ADDRESSES.engine, ENGINE_ABI, p);
@@ -79,7 +81,7 @@ export async function GET(req: Request) {
       })
     );
 
-    return NextResponse.json({
+    return corsJson({
       blockNumber,
       addresses: ADDRESSES,
       risk: RISK,
@@ -105,6 +107,14 @@ export async function GET(req: Request) {
       loans,
     });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.shortMessage || e?.message || "read failed" }, { status: 500 });
+    return corsJson({ error: e?.shortMessage || e?.message || "read failed" }, { status: 500 });
   }
+}
+
+/**
+ * A browser sends this before any cross-origin POST carrying JSON, and before
+ * a GET with a custom header. Without it the real request is never made.
+ */
+export async function OPTIONS() {
+  return corsPreflight();
 }

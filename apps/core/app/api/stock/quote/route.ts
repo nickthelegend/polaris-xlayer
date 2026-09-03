@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+import { corsJson, corsPreflight } from "@/lib/cors";
 import { throttled } from "@/lib/throttle";
 import { ethers } from "ethers";
 import { ADDRESSES, ENGINE_ABI, POOL_ABI, explain, provider } from "@/lib/stock-chain";
@@ -13,7 +15,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   try {
     if (throttled(req)) {
-      return NextResponse.json({ error: "Too many quotes. Wait a moment." }, { status: 429 });
+      return corsJson({ error: "Too many quotes. Wait a moment." }, { status: 429 });
     }
     /*
      * Parse before trusting.
@@ -27,24 +29,24 @@ export async function POST(req: Request) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "That request body is not valid JSON." }, { status: 400 });
+      return corsJson({ error: "That request body is not valid JSON." }, { status: 400 });
     }
     const { shares, tenorDays } = body ?? {};
     const n = Number(shares);
     if (!Number.isFinite(n) || n <= 0) {
-      return NextResponse.json({ error: "Enter a number of shares greater than zero." }, { status: 400 });
+      return corsJson({ error: "Enter a number of shares greater than zero." }, { status: 400 });
     }
     // 1e9 shares of anything is not a checkout, and the number is past what
     // parseUnits will accept as a decimal string.
     if (n > 1e9) {
-      return NextResponse.json({ error: "That is more shares than this market has." }, { status: 400 });
+      return corsJson({ error: "That is more shares than this market has." }, { status: 400 });
     }
     if (!/^\d*\.?\d*$/.test(String(shares).trim())) {
-      return NextResponse.json({ error: "Enter the share count as a plain decimal number." }, { status: 400 });
+      return corsJson({ error: "Enter the share count as a plain decimal number." }, { status: 400 });
     }
     const days = Number(tenorDays ?? 7);
     if (!Number.isInteger(days) || days < 7 || days > 14) {
-      return NextResponse.json({ error: "The tenor must be a whole number of days between 7 and 14." }, { status: 400 });
+      return corsJson({ error: "The tenor must be a whole number of days between 7 and 14." }, { status: 400 });
     }
     const engine = new ethers.Contract(ADDRESSES.engine, ENGINE_ABI, provider());
     const wei = ethers.parseUnits(String(shares), 18);
@@ -61,7 +63,7 @@ export async function POST(req: Request) {
     const pool = new ethers.Contract(ADDRESSES.pool, POOL_ABI, provider());
     const available: bigint = await pool.available();
     if (available === 0n) {
-      return NextResponse.json(
+      return corsJson(
         { error: "The pool has no stablecoin to pay a merchant with right now." },
         { status: 409 }
       );
@@ -70,7 +72,7 @@ export async function POST(req: Request) {
     const maxBorrow = cappedByPool ? available : q.maxBorrow;
     const feeOnMax = cappedByPool ? await engine.feeFor(maxBorrow, days * 86400) : q.feeOnMax;
 
-    return NextResponse.json({
+    return corsJson({
       shares: wei.toString(),
       collateralValue: q.collateralValue.toString(),
       maxBorrow: maxBorrow.toString(),
@@ -84,6 +86,14 @@ export async function POST(req: Request) {
     });
   } catch (e: any) {
     const { message, status } = explain(e, "request failed");
-    return NextResponse.json({ error: message }, { status });
+    return corsJson({ error: message }, { status });
   }
+}
+
+/**
+ * A browser sends this before any cross-origin POST carrying JSON, and before
+ * a GET with a custom header. Without it the real request is never made.
+ */
+export async function OPTIONS() {
+  return corsPreflight();
 }

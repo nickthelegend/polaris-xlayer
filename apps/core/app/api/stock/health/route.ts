@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+import { corsJson, corsPreflight } from "@/lib/cors";
 import { ethers } from "ethers";
 import { ADDRESSES, ORACLE_ABI, POOL_ABI, provider } from "@/lib/stock-chain";
 
@@ -54,8 +56,16 @@ export async function GET() {
   }
 
   const ok = Object.values(checks).every((c) => c.ok);
-  return NextResponse.json(
+  return corsJson(
     { ok, blockNumber, engine: ADDRESSES.engine, checks },
     { status: ok ? 200 : 503 }
   );
+}
+
+/**
+ * A browser sends this before any cross-origin POST carrying JSON, and before
+ * a GET with a custom header. Without it the real request is never made.
+ */
+export async function OPTIONS() {
+  return corsPreflight();
 }
