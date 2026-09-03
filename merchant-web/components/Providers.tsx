@@ -1,38 +1,37 @@
 'use client';
 
-import { PrivyProvider } from '@privy-io/react-auth';
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { WagmiProvider, createConfig, http } from 'wagmi';
+import { injected } from 'wagmi/connectors';
 import { xLayerTestnet } from 'viem/chains';
 
-// Use environment variable or fallback to a demo ID (which likely won't work for auth but allows render)
-// Ideally, the user MUST provide this in .env.local
-const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID || '';
-
+/**
+ * The merchant dashboard's wallet.
+ *
+ * This mounted a PrivyProvider whose app id came from
+ * NEXT_PUBLIC_PRIVY_APP_ID. There is no such id in this repository, and Privy
+ * does not degrade — it throws "Cannot initialize the Privy provider with an
+ * invalid Privy app ID" during render, so every route in the app answered
+ * HTTP 500. The app typechecked and built perfectly and could not serve a
+ * single page.
+ *
+ * The injected connector needs no third-party account, works with whatever
+ * wallet the merchant already has, and is what the rest of this project uses.
+ */
 export default function Providers({ children }: { children: ReactNode }) {
-    if (!PRIVY_APP_ID) {
-        console.warn('WARNING: NEXT_PUBLIC_PRIVY_APP_ID is missing in environment variables.');
-    }
+    const [queryClient] = useState(() => new QueryClient());
+    const [config] = useState(() =>
+        createConfig({
+            chains: [xLayerTestnet],
+            connectors: [injected()],
+            transports: { [xLayerTestnet.id]: http() },
+        })
+    );
 
     return (
-        <PrivyProvider
-            appId={PRIVY_APP_ID}
-            config={{
-                loginMethods: ['email', 'wallet'],
-                appearance: {
-                    theme: 'dark',
-                    accentColor: '#A6F24A', // neon-lime
-                    showWalletLoginFirst: true,
-                },
-                defaultChain: xLayerTestnet,
-                supportedChains: [xLayerTestnet],
-                embeddedWallets: {
-                    ethereum: {
-                        createOnLogin: 'users-without-wallets',
-                    },
-                },
-            }}
-        >
-            {children}
-        </PrivyProvider>
+        <WagmiProvider config={config}>
+            <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        </WagmiProvider>
     );
 }

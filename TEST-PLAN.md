@@ -229,3 +229,83 @@ now reaches), F 4/4, G 6/6, and the A, C and D blocks unchanged. Contracts
 10/10, smoke 35/35, Playwright 4/4, typechecks and builds exit 0.
 
 **Nothing that passed before regressed.**
+
+---
+
+# Addendum — I and J blocks (11)
+
+Surface the earlier plans never reached. Two categories: Polaris write-paths
+and cross-surface flows that were only ever tested in pieces, and the three
+apps that were ported to X Layer and typechecked but **never actually run**.
+
+Written before testing. Same rules: exact expected result, clean console on a
+fresh tab, no failed network request.
+
+## I · Polaris flows not previously covered (6)
+
+| # | Item | Correct means |
+|---|---|---|
+| I1 | `/faucet` claim | Connected, the claim signs a real transaction and the wallet's balance for that token rises by the faucet amount, confirmed by reading the chain — not by trusting the UI. |
+| I2 | `/faucet` cooldown | A second claim inside the cooldown is refused with a sentence naming the wait, not a raw revert. |
+| I3 | `/stock/book` operator controls | With the real `RELAYER_KEY` pasted, "Relay the live print" posts a price: a real transaction, and `/api/stock/state` afterwards reports a newer `printedAt`. |
+| I4 | `/stock/book` wrong key | A wrong key is refused with a sentence; no transaction is signed. |
+| I5 | **Merchant QR round-trip** | The QR payload on `/merchant` opens a Polaris checkout with the merchant, ref and share count prefilled from the URL — the two surfaces behaving as one product. |
+| I6 | `/merchants` directory | Renders the registered merchants from `/api/merchants`; an empty directory says so rather than rendering a blank list. |
+
+## J · The ported apps, actually running (5)
+
+| # | Item | Correct means |
+|---|---|---|
+| J1 | `merchant-web` boots | `next dev` serves a page. Not a build success — an actual HTTP 200 with rendered content. |
+| J2 | `merchant-web` chain | Any chain identifier it shows or requests is X Layer (1952), never Sepolia (11155111). |
+| J3 | `apps/merchant` boots | Serves a page with rendered content. |
+| J4 | `apps/merchant` chain | Same: X Layer, never Sepolia. |
+| J5 | Neither app logs a console error on load | Fresh tab, zero errors, zero failed requests. |
+
+## I and J results — 11/11 PASS (2 failures found and fixed)
+
+| # | Result | Evidence |
+|---|---|---|
+| I1 | **PASS** | Faucet claim signed `0xd957af45…`; balance read from the chain rose exactly 1000.00. |
+| I2 | **FAIL → fixed** | The cooldown reverted as *"unknown custom error"*. `FaucetCooldown` is declared in `MockUSDC.sol`, but that ABI was not among the interfaces the decoder tries and the error had no sentence. Both added; the selector `0x62771006` now resolves to `FaucetCooldown` → "The faucet allows one claim an hour." |
+| I3 | **PASS** | The real operator key posted a print: `NasdaqGS close` at 32496000000, tx `0x4400c030…`. |
+| I4 | **PASS** | A wrong key returns 401 with a sentence and signs nothing. |
+| I5 | **PASS** | `/?merchant=…&ref=…&shares=…` prefills: shares `2`, ref `QA-ROUNDTRIP`, "Merchant 0x095Ba9281e… · from the merchant's code". |
+| I6 | **PASS** | Directory renders the one registered merchant from `/api/merchants`. |
+| J1 | **FAIL → fixed** | **`merchant-web` returned HTTP 500 on every route.** It typechecked and built and could not serve a page. |
+| J2 | **PASS** | Zero Sepolia references in what it serves; X Layer throughout. |
+| J3 | **PASS** | `apps/merchant` serves `/`, `/dashboard` and `/store`, all 200. |
+| J4 | **PASS** | Zero Sepolia references. |
+| J5 | **PASS** | Both apps: fresh tab, zero console errors, zero failed requests. |
+
+### The two failures
+
+**J1 — merchant-web could not serve a single page.** It mounted a
+`PrivyProvider` whose app id came from `NEXT_PUBLIC_PRIVY_APP_ID`, a credential
+that exists nowhere in this repository. Privy does not degrade without one — it
+throws during render, so every route answered 500. The app typechecked, built,
+and was completely non-functional, which is exactly the gap that "it compiles"
+hides.
+
+Rather than mark it untestable for want of a credential, it was ported to the
+injected connector, the same one the rest of the project uses: no third-party
+account, works with whatever wallet the merchant already has. Four files,
+Privy entirely removed, and the hand-rolled chain listener replaced with
+wagmi's own `useChainId` / `useSwitchChain`.
+
+**I2 — the faucet's most ordinary refusal was unreadable.** Fixed as above.
+
+### Two things found on the way
+
+**Eighteen places defaulted to Sepolia's chain id**, written as `11_155_111` —
+numeric separators, so every previous grep for `11155111` missed them. One was
+`apps/core/app/api/global-stats/route.ts`, in the shipped app: it passes today
+only because `CHAIN_ID=1952` happens to be set in Vercel, and a missing env var
+would have had the live API quietly reporting the wrong network. All production
+paths now default to 1952; the Sepolia constants left are a chain-name map and
+test fixtures, which are correct as they are.
+
+**"Ethereum X Layer" in eight places** — a chain that does not exist, and a scar
+from renaming "Ethereum Sepolia" wholesale during the port. The worst was
+`chainName` in `PayWithPolaris.tsx`, which is what `wallet_addEthereumChain`
+saves the network under, so a wallet would have carried the wrong name for ever.

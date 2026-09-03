@@ -14,7 +14,11 @@ import { closeDb, collections, ensureIndexes } from "./client.js";
 import { buildInstallments } from "./loanbook.js";
 import type { LoanDoc, MerchantDoc } from "./schema.js";
 
-const CHAIN_ID = Number(process.env.CHAIN_ID ?? 11_155_111);
+// Default to X Layer, not Sepolia. These read `CHAIN_ID` and fell back to
+// 11_155_111 — a chain these contracts were never deployed to — so a missing
+// env var did not fail, it quietly answered about the wrong network. The
+// underscores kept it out of every grep for "11155111" too.
+const CHAIN_ID = Number(process.env.CHAIN_ID ?? 1952);
 const MERCHANT_ID = "merch_demo_polaris";
 const MERCHANT_WALLET = "0x7a2e11b3ecebab8ea46966edadd4092583809b67";
 const DAY = 86_400_000;

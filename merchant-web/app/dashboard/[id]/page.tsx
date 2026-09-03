@@ -1,7 +1,8 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { usePrivy, useWallets } from '@privy-io/react-auth';
+import { useWallet } from '@/lib/use-wallet';
+import { useAccount, useChainId, useSwitchChain } from 'wagmi';
 import useSWR from 'swr';
 import { useState, useEffect } from 'react';
 import {
@@ -37,9 +38,18 @@ const DEFAULT_STABLECOIN = "0x1083D49aAB56502D4f4E24fFf52ce622D9B6eCd0";
 export default function AppDetails() {
     const { id } = useParams();
     const router = useRouter();
-    const { user, authenticated, login } = usePrivy();
-    const { wallets } = useWallets();
-    const wallet = wallets[0];
+    const { authenticated, login } = useWallet();
+    const { address } = useAccount();
+    /*
+     * Chain state and switching, from wagmi rather than a Privy wallet object.
+     *
+     * Privy handed back a `wallet` you asked for an EIP-1193 provider from, and
+     * everything below was written against that shape. wagmi already tracks the
+     * chain and exposes a switch, so the hand-rolled listener and the manual
+     * provider plumbing are gone rather than reimplemented.
+     */
+    const chainId = useChainId();
+    const { switchChain } = useSwitchChain();
 
     const [deploying, setDeploying] = useState(false);
     const [statusText, setStatusText] = useState('');
@@ -50,56 +60,30 @@ export default function AppDetails() {
     const [balance, setBalance] = useState('0.00');
     const [routerWithdrawing, setRouterWithdrawing] = useState(false);
     const [routerBalance, setRouterBalance] = useState('0.00');
-    const [currentChainId, setCurrentChainId] = useState<number | null>(null);
-
-    // Track current chain
-    useEffect(() => {
-        const checkChain = async () => {
-            if (!wallet) return;
-            try {
-                const provider = await wallet.getEthereumProvider();
-                const chainId = await provider.request({ method: 'eth_chainId' });
-                setCurrentChainId(parseInt(chainId as string, 16));
-            } catch (e) { }
-        };
-        checkChain();
-        // Listen for chain changes
-        if (wallet) {
-            wallet.getEthereumProvider().then((provider: any) => {
-                provider.on?.('chainChanged', (chainId: string) => {
-                    setCurrentChainId(parseInt(chainId, 16));
-                });
-            }).catch(() => { });
-        }
-    }, [wallet]);
-
-    const switchToXLayer = async () => {
-        if (!wallet) return;
-        try {
-            await wallet.switchChain(1952);
-            setCurrentChainId(1952);
-        } catch (e: any) {
-            setError('Failed to switch network. Please switch manually in your wallet.');
-        }
+    const switchToXLayer = () => {
+        switchChain(
+            { chainId: 1952 },
+            { onError: () => setError('Failed to switch network. Please switch manually in your wallet.') }
+        );
     };
 
-    const isOnXLayer = currentChainId === 1952;
+    const isOnXLayer = chainId === 1952;
 
     const { data, error: fetchError, mutate } = useSWR(
-        authenticated && user?.wallet?.address ? `/api/apps/${id}` : null,
+        authenticated && address ? `/api/apps/${id}` : null,
         async (url) => {
             const res = await fetch(url, {
-                headers: { 'x-wallet-address': user?.wallet?.address || '' }
+                headers: { 'x-wallet-address': address || '' }
             });
             return res.json();
         }
     );
 
     const { data: txData, mutate: mutateTx } = useSWR(
-        authenticated && user?.wallet?.address ? `/api/apps/${id}/transactions` : null,
+        authenticated && address ? `/api/apps/${id}/transactions` : null,
         async (url) => {
             const res = await fetch(url, {
-                headers: { 'x-wallet-address': user?.wallet?.address || '' }
+                headers: { 'x-wallet-address': address || '' }
             });
             return res.json();
         }
@@ -160,7 +144,7 @@ export default function AppDetails() {
     }, [app?.escrow_contract]);
 
     const fetchRouterBalance = async () => {
-        if (!user?.wallet?.address) return;
+        if (!address) return;
         try {
             // Use direct X Layer RPC — no wallet provider needed for reads
             const provider = new ethers.JsonRpcProvider('https://testrpc.xlayer.tech');
@@ -168,9 +152,9 @@ export default function AppDetails() {
 
             let totalBal = BigInt(0);
 
-            // Check balance on merchant's Privy wallet
+            // Check the merchant's balance on the router
             try {
-                const walletBal = await router.merchantBalances(user.wallet.address, DEFAULT_STABLECOIN);
+                const walletBal = await router.merchantBalances(address!, DEFAULT_STABLECOIN);
                 totalBal += walletBal;
             } catch {}
 
@@ -183,7 +167,7 @@ export default function AppDetails() {
             }
 
             // Also check the wallet_address stored on the app record
-            if (app?.wallet_address && app.wallet_address.toLowerCase() !== (user.wallet.address || '').toLowerCase()) {
+            if (app?.wallet_address && app.wallet_address.toLowerCase() !== (address! || '').toLowerCase()) {
                 try {
                     const appWalletBal = await router.merchantBalances(app.wallet_address, DEFAULT_STABLECOIN);
                     totalBal += appWalletBal;
@@ -197,20 +181,20 @@ export default function AppDetails() {
     };
 
     useEffect(() => {
-        if (user?.wallet?.address && app) {
+        if (address && app) {
             fetchRouterBalance();
             const int = setInterval(fetchRouterBalance, 15000);
             return () => clearInterval(int);
         }
-    }, [user?.wallet?.address, app]);
+    }, [address, app]);
 
     const handleRouterWithdraw = async () => {
-        if (!wallet) return;
+        const injected = (globalThis as any).ethereum;
+        if (!injected) return;
         setRouterWithdrawing(true);
         setError('');
         try {
-            const externalProvider = await wallet.getEthereumProvider();
-            const provider = new ethers.BrowserProvider(externalProvider);
+            const provider = new ethers.BrowserProvider(injected);
             const signer = await provider.getSigner();
             const router = new ethers.Contract(CONTRACTS.MASTER.MERCHANT_ROUTER, MERCHANT_ROUTER_ABI, signer);
 
@@ -261,12 +245,12 @@ export default function AppDetails() {
     };
 
     const handleWithdraw = async () => {
-        if (!wallet || !app?.escrow_contract) return;
+        const injected = (globalThis as any).ethereum;
+        if (!injected || !app?.escrow_contract) return;
         setWithdrawing(true);
         setError('');
         try {
-            const externalProvider = await wallet.getEthereumProvider();
-            const provider = new ethers.BrowserProvider(externalProvider);
+            const provider = new ethers.BrowserProvider(injected);
             const signer = await provider.getSigner();
             const contract = new ethers.Contract(app.escrow_contract, PolarisMerchantEscrow.abi, signer);
 
@@ -286,17 +270,18 @@ export default function AppDetails() {
     };
 
     const handleDeployEscrow = async () => {
-        if (!wallet) return;
+        const injected = (globalThis as any).ethereum;
+        if (!injected) return;
         setDeploying(true);
         setStatusText('Switching to X Layer...');
         setError('');
 
         try {
-            // Force switch to X Layer before deploying
-            await wallet.switchChain(1952);
+            // Deploying writes to X Layer, so make sure that is where the
+            // wallet is pointed before asking it to sign.
+            switchChain({ chainId: 1952 });
 
-            const externalProvider = await wallet.getEthereumProvider();
-            const provider = new ethers.BrowserProvider(externalProvider);
+            const provider = new ethers.BrowserProvider(injected);
             const signer = await provider.getSigner();
 
             // Verify we're on X Layer
@@ -322,7 +307,7 @@ export default function AppDetails() {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
-                    'x-wallet-address': user?.wallet?.address || ''
+                    'x-wallet-address': address || ''
                 },
                 body: JSON.stringify({ escrow_contract: address })
             });
@@ -398,7 +383,7 @@ export default function AppDetails() {
                             <h1 className="text-3xl font-black uppercase italic tracking-tighter">{app.name}</h1>
                             <div className="ml-4 px-2 py-0.5 rounded border border-white/10 bg-white/5 text-[9px] text-white/40 font-bold uppercase tracking-widest flex items-center gap-2">
                                 <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(166,242,74,0.5)]" />
-                                Linked: {user?.wallet?.address.slice(0, 6)}...{user?.wallet?.address.slice(-4)}
+                                Linked: {address.slice(0, 6)}...{address.slice(-4)}
                             </div>
                         </div>
                         <p className="text-white/40 text-xs uppercase tracking-widest font-medium">{app.category || 'General Application'}</p>
@@ -412,14 +397,14 @@ export default function AppDetails() {
             </header>
 
             {/* X Layer Network Banner */}
-            {currentChainId !== null && !isOnXLayer && (
+            {chainId !== null && !isOnXLayer && (
                 <div className="max-w-4xl mx-auto mb-6">
                     <div className="flex items-center justify-between bg-red-500/10 border border-red-500/30 rounded-xl px-5 py-3">
                         <div className="flex items-center gap-3">
                             <AlertCircle className="w-5 h-5 text-red-400" />
                             <div>
                                 <p className="text-sm font-bold text-red-400">Wrong Network</p>
-                                <p className="text-[10px] text-red-400/60">You are on chain {currentChainId}. Polaris requires X Layer (1952).</p>
+                                <p className="text-[10px] text-red-400/60">You are on chain {chainId}. Polaris requires X Layer (1952).</p>
                             </div>
                         </div>
                         <button
@@ -432,11 +417,11 @@ export default function AppDetails() {
                 </div>
             )}
 
-            {currentChainId !== null && isOnXLayer && (
+            {chainId !== null && isOnXLayer && (
                 <div className="max-w-4xl mx-auto mb-6">
                     <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-xl px-5 py-2">
                         <CheckCircle2 className="w-4 h-4 text-green-400" />
-                        <p className="text-[10px] text-green-400 font-bold uppercase tracking-wider">Connected to Ethereum X Layer</p>
+                        <p className="text-[10px] text-green-400 font-bold uppercase tracking-wider">Connected to X Layer</p>
                     </div>
                 </div>
             )}
@@ -665,7 +650,7 @@ window.location.href = checkoutUrl;`}
                                     </button>
                                 </div>
                                 <p className="text-[10px] text-white/30 leading-relaxed italic">
-                                    Your escrow is active on Ethereum X Layer. Payments will be routed here.
+                                    Your escrow is active on X Layer. Payments will be routed here.
                                 </p>
                             </div>
                         ) : (
@@ -709,7 +694,7 @@ window.location.href = checkoutUrl;`}
                         <div className="space-y-3">
                             <div className="flex justify-between text-[11px]">
                                 <span className="text-white/30">Network</span>
-                                <span className="text-white/60 font-bold">Ethereum X Layer</span>
+                                <span className="text-white/60 font-bold">X Layer</span>
                             </div>
                             <div className="flex justify-between text-[11px]">
                                 <span className="text-white/30">Currency</span>

@@ -1,13 +1,13 @@
 'use client';
 
-import { usePrivy } from '@privy-io/react-auth';
+import { useWallet } from '@/lib/use-wallet';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Wallet, LogOut, LayoutDashboard, LayoutGrid, Zap } from 'lucide-react';
 
 export default function Header() {
-    const { login, logout, authenticated, user } = usePrivy();
+    const { login, logout, authenticated, address } = useWallet();
     const pathname = usePathname();
 
     if (pathname === '/shop') return null;
@@ -50,7 +50,7 @@ export default function Header() {
                         <div className="flex items-center gap-4">
                             <div className="hidden lg:flex flex-col items-end">
                                 <span className="text-[10px] text-white/30 font-mono uppercase tracking-widest">
-                                    {user?.wallet?.address?.slice(0, 6)}...{user?.wallet?.address?.slice(-4)}
+                                    {address?.slice(0, 6)}...{address?.slice(-4)}
                                 </span>
                             </div>
                             <button

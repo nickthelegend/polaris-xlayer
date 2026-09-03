@@ -13,7 +13,11 @@ export const dynamic = "force-dynamic";
 // older deployment keeps working.
 const RPC =
   process.env.POLARIS_RPC_URL ?? process.env.SEPOLIA_RPC_URL ?? "https://testrpc.xlayer.tech";
-const CHAIN_ID = Number(process.env.CHAIN_ID ?? 11_155_111);
+// Default to X Layer, not Sepolia. These read `CHAIN_ID` and fell back to
+// 11_155_111 — a chain these contracts were never deployed to — so a missing
+// env var did not fail, it quietly answered about the wrong network. The
+// underscores kept it out of every grep for "11155111" too.
+const CHAIN_ID = Number(process.env.CHAIN_ID ?? 1952);
 const LOAN_ENGINE = process.env.POLARIS_LOAN_ENGINE;
 const ORIGINATOR_KEY = process.env.DEPLOYER_PRIVATE_KEY;
 

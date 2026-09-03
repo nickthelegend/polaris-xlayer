@@ -73,7 +73,7 @@ export const PayWithPolaris: React.FC<PayWithPolarisProps> = ({
                             params: [
                                 {
                                     chainId: '0x' + chainId.toString(16),
-                                    chainName: 'Ethereum X Layer',
+                                    chainName: 'X Layer',
                                     rpcUrls: ['https://testrpc.xlayer.tech'],
                                     nativeCurrency: {
                                         name: 'Ethereum',

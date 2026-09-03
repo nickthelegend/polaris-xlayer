@@ -3,7 +3,11 @@ import { closeDb } from "./client.js";
 import { indexEvents, lastIndexedBlock } from "./indexer.js";
 
 try {
-  const chainId = Number(process.env.CHAIN_ID ?? 11_155_111);
+  // Default to X Layer, not Sepolia. These read `CHAIN_ID` and fell back to
+  // 11_155_111 — a chain these contracts were never deployed to — so a missing
+  // env var did not fail, it quietly answered about the wrong network. The
+  // underscores kept it out of every grep for "11155111" too.
+  const chainId = Number(process.env.CHAIN_ID ?? 1952);
   const resume = await lastIndexedBlock(chainId);
   const from = Number(process.env.INDEX_FROM_BLOCK ?? (resume ? resume + 1 : 11_415_000));
 

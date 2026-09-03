@@ -1,13 +1,13 @@
 'use client';
 
-import { usePrivy } from '@privy-io/react-auth';
+import { useWallet } from '@/lib/use-wallet';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import useSWR, { mutate } from 'swr';
 import { Plus, Loader2, LayoutGrid, ArrowRight, Zap, Code2 } from 'lucide-react';
 
 export default function Dashboard() {
-    const { user, authenticated, login, ready } = usePrivy();
+    const { address, authenticated, login, ready } = useWallet();
     const router = useRouter();
     const [isCreating, setIsCreating] = useState(false);
     const [newAppName, setNewAppName] = useState('');
@@ -15,23 +15,20 @@ export default function Dashboard() {
 
     // 1. Sync User on Auth
     useEffect(() => {
-        if (authenticated && user?.wallet?.address) {
+        if (authenticated && address) {
             fetch('/api/auth/sync', {
                 method: 'POST',
-                body: JSON.stringify({
-                    wallet_address: user.wallet.address,
-                    email: user.email?.address
-                })
+                body: JSON.stringify({ wallet_address: address! })
             }).catch(console.error);
         }
-    }, [authenticated, user]);
+    }, [authenticated, address]);
 
     // 2. Fetch Apps
     const { data: appsData, error, isLoading } = useSWR(
-        authenticated && user?.wallet?.address ? '/api/apps' : null,
+        authenticated && address ? '/api/apps' : null,
         async (url) => {
             const res = await fetch(url, {
-                headers: { 'x-wallet-address': user?.wallet?.address || '' }
+                headers: { 'x-wallet-address': address || '' }
             });
             return res.json();
         }
@@ -50,7 +47,7 @@ export default function Dashboard() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    wallet_address: user?.wallet?.address,
+                    wallet_address: address,
                     name: newAppName,
                     category: newAppCategory || 'General'
                 })

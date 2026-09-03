@@ -21,12 +21,18 @@ export const ENGINE_ABI = abis.PolarisEngine;
 export const ORACLE_ABI = abis.StockPriceOracle;
 export const POOL_ABI = abis.LiquidityPool;
 export const ERC20_ABI = abis.TestnetStock;
+/** The stand-in stablecoin. Carries its own errors — notably the faucet cooldown. */
+export const STABLE_ABI = abis.MockUSDC;
 
 const IFACES = [
   new ethers.Interface(ENGINE_ABI as any),
   new ethers.Interface(ORACLE_ABI as any),
   new ethers.Interface(POOL_ABI as any),
   new ethers.Interface(ERC20_ABI as any),
+  // MockUSDC was missing here, so its FaucetCooldown reverted as "unknown
+  // custom error" — the faucet's most ordinary refusal was the one message a
+  // user could not read.
+  new ethers.Interface(abis.MockUSDC as any),
 ];
 
 /**
@@ -56,6 +62,9 @@ const MESSAGES: Record<string, string> = {
   NoPrice: "There is no price on chain for that token yet.",
   ZeroAmount: "That amount cannot be zero.",
   FaucetExhausted: "You have already drawn the maximum from the faucet.",
+  // The cooldown is an hour, and saying so is the difference between a refusal
+  // someone can act on and one that looks like a bug.
+  FaucetCooldown: "The faucet allows one claim an hour. Try again a little later.",
   // These two say nothing about *which* token, and the same code path moves
   // shares when opening and stablecoin when repaying. Naming the wrong one is
   // worse than naming none, so the caller supplies the noun.

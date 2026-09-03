@@ -13,7 +13,9 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { createPolarisMcpServer } from "./server.js";
 
 const server = createPolarisMcpServer({
-  chainId: Number(process.env.CHAIN_ID ?? 11_155_111),
+  // X Layer, not Sepolia: a missing CHAIN_ID should not silently point
+  // this at a chain the contracts were never deployed to.
+  chainId: Number(process.env.CHAIN_ID ?? 1952),
   rpcUrl: process.env.SEPOLIA_RPC_URL,
   keeperHubApiKey: process.env.KEEPERHUB_API_KEY,
   keeperHubBaseUrl: process.env.KEEPERHUB_BASE_URL,
