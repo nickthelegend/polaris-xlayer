@@ -1,123 +1,76 @@
-# 🌌 Polaris Core
+# Polaris — the app
 
-Polaris Core is the heartbeat of the Polaris Protocol, providing the essential infrastructure for decentralized lending, private swaps, and institutional-grade AMM pools. It serves as the primary application layer for users to interact with the protocol's liquidity and privacy features.
+This is the product: **https://polaris-xlayer.vercel.app**, on X Layer testnet
+(chain **1952**).
 
-## 🚀 Deployed Contracts (Ethereum Sepolia - Active)
+One checkout, two ways to fund it. Pay a merchant in stablecoin against
+tokenized equity you keep — the shares lock, the merchant is paid now from a
+pre-funded pool, and you still own the position. Or draw on an unsecured limit
+priced off your repayment record, which a merchant opens at the till.
 
-Official smart contract registry deployed on Ethereum Sepolia (Chain ID: 11155111).
+Four routes, because a shopper only ever does four things:
 
-### 🏦 Mock Tokens
-| Token | Address |
-|-------|---------|
-| **WETH** | `0xaf4D66F3f9D6325fd08ef6174949376702b76431` |
-| **BNB**  | `0xEB5c6F2094cEDafcC9dBba249f43BacacFb085CA` |
-| **USDC** | `0x209e6F4c016245833DE2999E170eb14F07C29BB1` |
-| **USDT** | `0x010453c439A7a91e372AA256b7B6F65f59E7F44C` |
+| Route | What it is |
+|---|---|
+| `/` | Pay. Capacity from both funding sources, then the checkout |
+| `/activity` | Everything outstanding, and where you settle it |
+| `/merchant` | Get paid. The QR a customer scans |
+| `/docs` | Integration, plus the merchant directory, faucet and the book |
 
-### 📈 Lending Pools
-| Token | Address | Collateral Ratio | Interest Rate |
-|-------|---------|------------------|---------------|
-| **WETH** | `0x1291Be112d480055DaFd8a610b7d1e203891C274` | 150% | 5% APR |
-| **BNB**  | `0x5f3f1dBD7B74C6B46e8c44f98792A1dAf8d69154` | 150% | 5% APR |
-| **USDC** | `0xb7278A61aa25c888815aFC32Ad3cC52fF24fE575` | 120% | 3% APR |
-| **USDT** | `0xCD8a1C3ba11CF5ECfa6267617243239504a98d90` | 120% | 3% APR |
+`/merchants`, `/faucet` and `/stock/book` are reachable from Docs rather than
+the nav. Everything the products used to occupy — `/credit`, `/plans`,
+`/limits`, `/stock/positions`, `/stock/merchant` — is a permanent 308 redirect,
+so already-printed merchant codes and old bookmarks still land somewhere real.
 
-### 🔐 Private Swap & FHEVM Vaults
-| Contract Name | Address |
-|-------|---------|
-| **PrivateCollateralVault** | `0xb189E42714bBc63f1767093292605F52fD29bAb6` |
-| **PrivateBorrowManager** | `0xb581Dbee8300631680f9819d80F28aa1771F6B4C` |
-| **PrivateLendingPool** | `0x1b118B4a941dF9c73047CACE70D685B25ABd8084` |
-| **PrivateLiquidationEngine** | `0x2a3ce934580d924cd8AC145aE9142019150a8Ead` |
-| **PrivateSwapUSDC** | `0x772C9513fFcffaed224048b3e22AcF9E58854b73` |
-| **PrivateSwapUSDT** | `0x066240CB1BEB2e83b74fAF198D9918fC2929b65f` |
-| **PrivateSwapWETH** | `0xa307d16DFea8D265d5D6aE441b5E463Ad6B28e01` |
-| **PrivateSwapBNB** | `0x17761eDa4f670baf6CC3DE099e30f61658a78241` |
+## Contracts it talks to
 
-### 🌊 AMM Pools
-| Pair | Address |
-|------|---------|
-| **BNB-USDC** | `0xc351628EB244ec633d5f21fBD6621e1a683B1181` |
-| **BNB-USDT** | `0xFD471836031dc5108809D173A067e8486B9047A3` |
-| **WETH-USDC** | `0x51A1ceB83B83F1985a81C295d1fF28Afef186E02` |
-| **WETH-USDT** | `0x36b58F5C1969B7b6591D752ea6F5486D069010AB` |
+Deployed on X Layer testnet and **verified** — the source is readable at
+`repo.sourcify.dev/1952/<address>`:
 
----
+| Contract | Address |
+|---|---|
+| `PolarisEngine` | `0xb649453f78b01F832d97fDD8a12Bf27ac5abf446` |
+| `LiquidityPool` | `0x8a9b94F94aa8254e43B5b0e923B4F12FAE6Fc56C` |
+| `StockPriceOracle` | `0x926cDFa64B6bF592DD73e71a1d915624f0FaF6FE` |
+| `TestnetStock` (tXAAPL) | `0x5B74fdfE5943cC84Fe46f9a783b9AB9a2fD2Bec9` |
+| Stand-in stablecoin (pUSDC) | `0x437D8039EaB3b8BbEDc4101Bc97f6812829816D6` |
 
-## 🏗️ Architecture Everything
+Addresses come from `lib/polaris-deployment.json`, copied from the deployment
+record rather than typed out here twice.
 
-The Polaris Protocol is designed with a modular, scalable architecture consisting of four primary layers:
+**Two stand-ins, named on the page.** No real xStock and no USDT0 is deployed
+on X Layer testnet — `eth_getCode` returns `0x` for both — so the tokenized
+share and the stablecoin above are stand-ins with the same decimals and
+interface. The checkout says so rather than letting a reviewer assume otherwise.
 
-### 1. Smart Contract Layer (`polaris-protocol`)
-- **Core Engine**: `LoanEngine.sol` and `PoolManager.sol` manage current state and transactions.
-- **Privacy Engine**: Integrated FHEVM (Fully Homomorphic Encryption) for private transactions.
-- **Asset Hub**: `LiquidityVault.sol` manages deposits and cross-chain oracle interfaces (anchored via Creditcoin).
+## Running it
 
-### 2. Real-Time Data Layer (Convex & Supabase)
-- **Convex**: Handles real-time transaction tracking and global protocol state indexing.
-- **Supabase**: Primary database for user settings, merchant profiles, and historical analytics.
-
-### 3. Application Layer (`polaris-core`)
-- **Next.js 14**: Modern App-router based frontend using Server Components for performance.
-- **Hook-Driven**: custom React hooks in `hooks/` interface with both smart contracts and the real-time data layer.
-- **Theming**: Premium dark-mode aesthetics using TailwindCSS and Framer Motion.
-
----
-
-## 🔄 Core Workflows
-
-### 🛡️ Cross-Chain Bridge Flow
-1.  **Source Chain (Sepolia)**: User calls `deposit(token, amount)` on `LiquidityVault`.
-2.  **Relayer**: Detects event, submits proof to **Creditcoin Oracle**.
-3.  **Oracle**: Verifies finality and returns a `queryId`.
-4.  **Master Hub (USC Testnet)**: User/Relayer calls `addLiquidityFromProof(queryId)` to update global state.
-
-### 💳 Payment Gateway Flow (Shopify Integration)
-```mermaid
-sequenceDiagram
-    participant User
-    participant Shopify as Shopify Store
-    participant Checkout as Polaris Checkout Ext
-    participant PayEase as Polaris Core (PayEase)
-    participant Contract as Creditcoin Escrow
-
-    User->>Shopify: Clicks "Pay with Polaris"
-    Shopify->>Checkout: POST /api/payment-session
-    Checkout->>PayEase: POST /api/bills/create
-    PayEase->>PayEase: Create Bill Record (Pending)
-    PayEase-->>Checkout: Returns checkout URL
-    Checkout-->>Shopify: Redirects to Polaris Payment Page
-    User->>PayEase: Connects Wallet & Approves
-    PayEase->>Contract: settlePayment(amount, hash)
-    Contract-->>PayEase: Emits PaymentSettled
-    PayEase->>Shopify: Redirects User to Success Page
-```
-
----
-
-## 🛠️ Development & Setup
-
-### Requirements
-- Node.js >= 18
-- pnpm / npm
-- Local Hardhat node running (from `polaris-protocol`)
-
-### Installation
 ```bash
-pnpm install
+pnpm --filter polaris-app dev
 ```
 
-### Run Locally
+Everything a user does is signed by their own wallet. The one server-side
+signer left is the price relayer, which is an operator role behind
+`RELAYER_KEY`, not a user action.
+
+## Tests
+
 ```bash
-npm run dev
+pnpm --filter polaris-app e2e     # Playwright, against the deployed app
+pnpm --filter polaris-app demo    # re-record the demo video
+node ../../scripts/smoke.mjs      # API contract, redirects, every page
 ```
 
----
+The e2e suite drives the real product with a wallet that really signs, so it
+costs testnet gas and needs the chain up — which is why it is not part of
+`pnpm test`. It needs `E2E_PRIVATE_KEY` (a funded testnet wallet with tXAAPL)
+and skips rather than fails without one.
 
-## 📊 Directory Structure
-- `app/`: Next.js pages and layouts.
-- `components/`: Reusable UI components.
-- `hooks/`: Blockchain and data fetching hooks.
-- `lib/`: Utility functions and shared logic.
-- `convex/`: Real-time backend functions.
-- `public/`: Static assets.
+## What is not done
+
+- **Mainnet.** This is testnet. Nothing here has moved real money.
+- **The credit line cannot be drawn from a browser.** `createLoan` takes the
+  borrower as an argument and is called by the merchant, so the app shows the
+  limit as a real on-chain profile rather than a button that would not work.
+- **The sequencer guard is untested in production**, because X Layer testnet
+  carries no uptime feed. It is covered by unit tests instead.

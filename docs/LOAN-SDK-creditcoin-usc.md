@@ -1,3 +1,7 @@
+> **History, not the current design.** Notes for a cross-chain credit oracle on
+> Creditcoin USC v2. Polaris runs on X Layer and has no USC oracle; this was in
+> `apps/core/`, the deployed app's own directory, where it read as current.
+
 # Phase 5: Loan Data Oracle Implementation (SDK Context)
 
 This document contains snippets and instructions for fetching loan data from Aave, Morpho, and Compound to build a cross-chain credit oracle on Creditcoin USC v2.

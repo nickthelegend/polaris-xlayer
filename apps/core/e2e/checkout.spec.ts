@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { createWalletClient, createPublicClient, http, type Hex } from "viem"
+import { createPublicClient, http, type Hex } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
 
 import { ACTIVE_CHAIN } from "../lib/chains"
@@ -41,7 +41,6 @@ test.describe("stock credit checkout", () => {
   test.beforeEach(async ({ page }) => {
     const account = privateKeyToAccount(KEY!)
     const transport = http(RPC)
-    const wallet = createWalletClient({ account, chain: ACTIVE_CHAIN, transport })
     const publicClient = createPublicClient({ chain: ACTIVE_CHAIN, transport })
 
     // Signing lives in Node; the page only ever asks for it.
@@ -49,12 +48,34 @@ test.describe("stock credit checkout", () => {
       if (method === "eth_requestAccounts" || method === "eth_accounts") return [account.address]
       if (method === "eth_sendTransaction") {
         const t = params[0] as { to: Hex; data?: Hex; value?: string; gas?: string }
-        const hash = await wallet.sendTransaction({
+        // Sign, then send the raw transaction — which is what a wallet does,
+        // and what the browser-side provider does everywhere else in this repo.
+        // Going through sendTransaction lands in viem's blob-transaction
+        // overload instead, which demands a `kzg` this chain has no use for.
+        const nonce = await publicClient.getTransactionCount({
+          address: account.address,
+          blockTag: "pending",
+        })
+        const gasPrice = await publicClient.getGasPrice()
+        const gas = await publicClient.estimateGas({
+          account: account.address,
           to: t.to,
           data: t.data ?? "0x",
           value: t.value ? BigInt(t.value) : 0n,
         })
-        return hash
+        const serialized = await account.signTransaction({
+          type: "legacy",
+          chainId: ACTIVE_CHAIN.id,
+          to: t.to,
+          data: t.data ?? "0x",
+          value: t.value ? BigInt(t.value) : 0n,
+          nonce,
+          gasPrice,
+          // A little headroom: an estimate taken before the block lands can be
+          // a touch short once state has moved.
+          gas: (gas * 13n) / 10n,
+        })
+        return publicClient.sendRawTransaction({ serializedTransaction: serialized })
       }
       return publicClient.request({ method, params } as never)
     })

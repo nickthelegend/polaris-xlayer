@@ -1,3 +1,14 @@
+> **History, not the current design.**
+>
+> This describes an earlier incarnation of Polaris that bridged liquidity from
+> Sepolia to a Creditcoin USC hub. None of it is how the product works now:
+> Polaris runs on X Layer, with no bridge and no USC oracle. It sat in
+> `apps/core/` — the directory of the deployed app — where it read as a
+> description of what is running. Kept because it records real work, moved
+> because it was describing a different product.
+>
+> For the current architecture see `docs/ARCHITECTURE.md` and the root README.
+
 # Polaris Protocol Architecture
 
 ## 1. Core Bridge Architecture (Real Cross-Chain)

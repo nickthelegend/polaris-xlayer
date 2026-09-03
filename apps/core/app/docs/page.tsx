@@ -1,5 +1,8 @@
 "use client"
 
+import bnpl from "@/lib/bnpl-deployment.json"
+import stock from "@/lib/polaris-deployment.json"
+
 import Link from "next/link"
 
 import { useState } from "react"
@@ -14,13 +17,25 @@ import { Check, Copy, ExternalLink } from "lucide-react"
  * ships in packages/sdk, against the addresses actually deployed.
  */
 
+/**
+ * The addresses an integrator is told to point at.
+ *
+ * Every one of these was a Sepolia address — the whole of that deployment,
+ * including CollateralVault and PolarisPayments, which were never deployed to
+ * X Layer at all. `eth_getCode` returned `0x` for all six on chain 1952, so
+ * this page was handing developers six contracts that do not exist on the
+ * chain the product runs on.
+ *
+ * Read from the deployment records rather than typed, so the next redeploy
+ * cannot leave this page describing the last one.
+ */
 const CONTRACTS: Array<[string, string]> = [
-  ["PolarisLoanEngine", "0x21E9740DDe241f0653F699DAa206AfCE1FA25405"],
-  ["ScoreManager", "0x81C333942eaEe7d3d724c6C2ea28100511934f3C"],
-  ["CollateralVault", "0xDb6781ed843Ba07Af3321bB8C3952db643324b98"],
-  ["PolarisPayments", "0x3BD1609abDC915eA9e01A399a26e2B8A2a06243f"],
-  ["MerchantRegistry", "0xb2eCAD5bE07971deE1be161C39569705186AdFD6"],
-  ["Test token (pUSDC)", "0x49C86277a91002c4943837bf20F6ED41976Db09F"],
+  ["PolarisLoanEngine", bnpl.contracts.PolarisLoanEngine],
+  ["ScoreManager", bnpl.contracts.ScoreManager],
+  ["MerchantRegistry", bnpl.contracts.MerchantRegistry],
+  ["Test token (pUSDC)", bnpl.contracts.MockUSDC],
+  ["PolarisEngine — stock credit", stock.contracts.engine],
+  ["StockPriceOracle", stock.contracts.oracle],
 ]
 
 const INSTALL = `npm install polarispay-sdk ethers`
