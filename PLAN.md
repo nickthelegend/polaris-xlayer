@@ -273,24 +273,18 @@ they run on X Layer.
 
 ---
 
-## 5. Uncommitted at the end of the execution pass
+## 5. State at the end of the execution pass
 
-The shell died mid-run — the host's root volume filled and the harness could no
-longer write task output — so the following is on disk and **not yet committed
-or pushed**:
+Committed and pushed as `a3becfd`. The working tree is clean, and the public
+repository, the deployed app, the deployed contracts and the Railway relayer
+are all in step.
 
-- `apps/core/components/footer.tsx` — chain name, health dot, Sourcify link
-- `packages/contracts/contracts/polaris/StockPriceOracle.sol` — circuit breaker
-- `packages/contracts/scripts/verify-sourcify.js`, `scripts/upgrade-oracle.js`
-- `packages/contracts/test/oracle-deviation.test.js` (11 tests)
-- `packages/contracts/test/polaris-credit.test.js` — crash posts via override
-- `packages/protocol/` — real `InsurancePool`, solc 0.8.24, 7 new tests
-- `apps/gateway/scripts/test-guard.mjs` + `package.json`
-- `.github/workflows/ci.yml`
-- `scripts/smoke.mjs`
-- `apps/core/lib/polaris-deployment.json`, `packages/contracts/deployments/…`
-  — new oracle address
-- `README.md`, `TEST-PLAN.md`, `docs/SUBMISSION.md`, this file
+Verified after the push: `scripts/smoke.mjs`, `.github/workflows/ci.yml`,
+`verify-sourcify.js` and `oracle-deviation.test.js` all resolve on `main`, and
+the published `StockPriceOracle.sol` carries the circuit breaker.
 
-The deployed app, the deployed contracts and the Railway relayer are all
-already updated and verified — only the repository is behind.
+One thing nearly went unnoticed and is worth recording: the host's root volume
+filled mid-run, and the shell command that was supposed to write
+`scripts/smoke.mjs` failed silently. This plan claimed the file existed for a
+while before a run proved it did not. Anything written during that window was
+re-checked file by file; only that one had been lost.
