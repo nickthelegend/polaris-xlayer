@@ -26,6 +26,20 @@ import { ADDRESSES, ENGINE_ABI, ERC20_ABI, explainWriteError, txUrl, waitForAllo
 const usd = (v: string, d = 6) =>
   (Number(v) / 10 ** d).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const sh = (v: string) => (Number(v) / 1e18).toFixed(4)
+
+/**
+ * Two amounts added as they are shown, so a column of figures adds up.
+ *
+ * Rounding each value to the cent on its own can leave a total a penny away
+ * from its parts. On a page whose whole job is to be checkable, that reads as
+ * a mistake.
+ */
+const sumUsd = (a: string, b: string, d = 6) => {
+  const cents = (v: string) => Math.round(Number(v) / 10 ** (d - 2))
+  return (cents(a) + cents(b)) / 100 >= 0
+    ? ((cents(a) + cents(b)) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : "0.00"
+}
 const fetcher = (u: string) => fetch(u, { cache: "no-store" }).then((r) => r.json())
 
 export default function StockCreditPage() {
@@ -463,7 +477,14 @@ function StockCredit() {
               ["Collateral value", `$${usd(quote.collateralValue)}`, ""],
               [
                 `Ceiling at ${quote.ltvBps / 100}% LTV`,
-                `$${usd((BigInt(quote.maxBorrow) + BigInt(quote.feeOnMax)).toString())}`,
+                // Summed from the values as displayed, not from the underlying
+                // ones. Rounding each of the three to the cent independently
+                // left them not adding up on screen — 204.72 − 2.49 showing
+                // 202.24 — which reads as an arithmetic error even though the
+                // exact figures reconcile. The row means "what you get plus
+                // what you pay", so deriving it from those two keeps the
+                // column honest to the eye as well as to the chain.
+                `$${sumUsd(quote.maxBorrow, quote.feeOnMax)}`,
                 "",
               ],
               ["Fee, 7 days", `−$${usd(quote.feeOnMax)}`, "text-white/70"],

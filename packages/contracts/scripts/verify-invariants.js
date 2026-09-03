@@ -52,23 +52,52 @@ async function main() {
 
   // D1: conservation on every liquidation, from the events themselves
   console.log("D1 conservation on liquidation");
-  // X Layer's RPC refuses a log query spanning more than 100 blocks, so walk
-  // back from head in windows rather than asking for the whole chain.
+
+  /*
+   * How far back to look is not a guess.
+   *
+   * This walked back a fixed 5000 blocks, which on X Layer is about three
+   * hours — so the moment a liquidation aged past that it vanished from the
+   * check and the script cheerfully reported "no liquidations yet on this
+   * deployment" while four sat in state. An invariant that stops watching is
+   * not an invariant.
+   *
+   * The loan book says how many liquidations there should be, so the search
+   * pages back until it has found all of them and then stops. Exhaustive when
+   * it needs to be, and no slower than before when nothing has been
+   * liquidated recently.
+   */
+  const total = Number(await engine.loanCount());
+  const expected = [];
+  for (let i = 0; i < total; i++) {
+    const l = await engine.getLoan(i);
+    if (Number(l.status) === 3) expected.push(i); // Status.Liquidated
+  }
+
   const head = await ethers.provider.getBlockNumber();
-  const WINDOW = 100;
-  const SPAN = Number(process.env.LOG_SPAN || 5000);
-  const logs = [];
-  for (let to = head; to > head - SPAN; to -= WINDOW) {
+  const WINDOW = 100; // X Layer refuses a log query spanning more than this
+  const found = new Map();
+  for (let to = head; to >= 0 && found.size < expected.length; to -= WINDOW) {
     const from = Math.max(0, to - WINDOW + 1);
     const batch = await engine.queryFilter(engine.filters.LoanLiquidated(), from, to);
-    logs.push(...batch);
+    for (const ev of batch) found.set(Number(ev.args.loanId), ev);
     if (from === 0) break;
   }
-  if (logs.length === 0) console.log("  (no liquidations yet on this deployment)");
-  for (const ev of logs) {
-    const id = Number(ev.args.loanId);
-    const l = await engine.getLoan(id);
-    check(`loan ${id}: seized + returned == locked`, ev.args.sharesSeized + ev.args.sharesReturned, l.shares);
+
+  if (expected.length === 0) {
+    console.log("  (no liquidations in the loan book)");
+  } else {
+    for (const id of expected) {
+      const ev = found.get(id);
+      if (!ev) {
+        // Say so rather than passing by omission.
+        console.log(`  FAIL  loan ${id} is Liquidated but its event was not found`);
+        fails += 1;
+        continue;
+      }
+      const l = await engine.getLoan(id);
+      check(`loan ${id}: seized + returned == locked`, ev.args.sharesSeized + ev.args.sharesReturned, l.shares);
+    }
   }
 
   console.log(`\n${fails === 0 ? "ALL INVARIANTS HOLD" : fails + " INVARIANT FAILURES"}`);

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { keccak256, maxUint256, toBytes } from "viem"
 import { useAccount, usePublicClient, useWriteContract } from "wagmi"
 
@@ -81,6 +81,20 @@ export function useStockCheckout(totalUsd: number) {
   const [state, setState] = useState<CheckoutState>({ step: "idle" })
   const [loadError, setLoadError] = useState<string | null>(null)
 
+  /*
+   * A lock, not a disabled button.
+   *
+   * Two clicks land before React has re-rendered the button as disabled, so
+   * both entered `pay` — the first opened the loan and the second reverted on
+   * the engine's idempotency check and overwrote the success. The shopper was
+   * shown an empty cart while a real transaction had already paid the
+   * merchant: money moved and nothing on screen said so.
+   *
+   * A ref flips synchronously, so the second call is refused in the same tick
+   * regardless of when React gets around to re-rendering.
+   */
+  const inFlight = useRef(false)
+
   // Read the chain's view of the world: price, risk, this wallet's shares.
   const refresh = useCallback(async () => {
     try {
@@ -145,6 +159,7 @@ export function useStockCheckout(totalUsd: number) {
   /** Approve if needed, then open the loan. Both signed by the shopper. */
   const pay = useCallback(
     async (orderRef: string) => {
+      if (inFlight.current) return
       if (!quote || !address || !publicClient || !chain) return
       if (!quote.affordable) {
         setState({ step: "error", message: "This wallet does not hold enough shares for that basket." })
@@ -165,6 +180,7 @@ export function useStockCheckout(totalUsd: number) {
         return
       }
 
+      inFlight.current = true
       try {
         const allowance = (await publicClient.readContract({
           address: ADDRESSES.stock as `0x${string}`,
@@ -221,6 +237,8 @@ export function useStockCheckout(totalUsd: number) {
         void refresh()
       } catch (e: unknown) {
         setState({ step: "error", message: explainWriteError(e, chain.tokens.stockSymbol) })
+      } finally {
+        inFlight.current = false
       }
     },
     [quote, address, publicClient, chain, writeContractAsync, refresh],

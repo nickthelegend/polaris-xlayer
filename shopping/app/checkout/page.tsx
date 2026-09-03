@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   ArrowLeft, CheckCircle, ExternalLink, Loader2, Lock, ShieldCheck, TrendingUp, Wallet, XCircle,
@@ -33,11 +33,29 @@ export default function CheckoutPage() {
   const router = useRouter()
   const { login, connected, connecting, short } = useWallet()
 
-  // The order reference is derived from the basket, not random: the engine
-  // keys idempotency on it, so a double-tap on Pay must hash to the same thing.
+  /*
+   * The order reference: stable across a checkout, new for the next one.
+   *
+   * The engine keys idempotency on (merchant, orderRef, borrower), so a
+   * double-tap on Pay must hash to the same thing — that part worked. But the
+   * ref was derived from the basket alone, which meant buying the same item a
+   * second time, days later, was refused for ever with "you have already paid
+   * this order reference". A shopper cannot buy two of something.
+   *
+   * A checkout session id fixes both: generated once when this page mounts and
+   * held in a ref, so every render and every double-tap reuses it, while a
+   * fresh visit to checkout is a genuinely new order.
+   */
+  const session = useRef<string>("")
+  if (!session.current) {
+    session.current =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+  }
   const orderRef = useMemo(() => {
     const line = items.map((i) => `${i.id}x${i.quantity}`).join("|")
-    return `shop-${line}-${total.toFixed(2)}`
+    return `shop-${session.current}-${line}-${total.toFixed(2)}`
   }, [items, total])
 
   const { chain, quote, state, loadError, pay, fundShares, reset } = useStockCheckout(total)
@@ -54,6 +72,9 @@ export default function CheckoutPage() {
 
   const busy = state.step === "approving" || state.step === "paying"
 
+  // The receipt outranks the empty cart. Clearing the basket is a consequence
+  // of a confirmed purchase, so an empty cart must never be what a shopper is
+  // shown after one — they would have paid and been told nothing.
   if (items.length === 0 && state.step !== "done") {
     return (
       <div className="max-w-6xl mx-auto px-6 py-24 text-center">
