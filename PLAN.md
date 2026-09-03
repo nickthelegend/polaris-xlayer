@@ -96,10 +96,11 @@ Ordered by what unblocks what. Phase 0 gates everything about winning; phases
 - **1.5 — DONE** — 100-block log cap handled by paging `queryFilter`.
 - **1.6 — DONE** — Quote refuses shares the wallet does not hold.
 - **1.7 — DONE** — No-gas failure names OKB and links the faucet.
-- **1.8 — NOT STARTED** — **The footer says `SEPOLIA` on every page of the live
-  site** (`apps/core/components/footer.tsx:32`). Replace with the active chain
-  read from `ACTIVE_CHAIN` in `apps/core/lib/chains.ts` so it cannot drift
-  again. Blocks goal 2 and goal 5.
+- **1.8 — DONE** — The footer said `SEPOLIA` on every page of the live site
+  (`apps/core/components/footer.tsx:32`). It renders
+  `ACTIVE_CHAIN.name` from `apps/core/lib/chains.ts`, so the label cannot
+  disagree with the chain the app is connected to. Verified live: the footer
+  reads `POLARIS_PROTOCOL | X LAYER TESTNET | DOCS | CONTRACTS`.
 - **1.9 — DONE** — The dot reads `/api/stock/health` on a 60s interval and is
   grey until that answers: green healthy, amber degraded, red unreachable, with
   the reason in its `title`. Verified live: *"RPC, price and liquidity all
@@ -111,12 +112,14 @@ Ordered by what unblocks what. Phase 0 gates everything about winning; phases
   nav is Pay · Activity · Get paid · Docs.
 - **2.2 — DONE** — Old paths are permanent 308 redirects in `next.config.mjs`.
 - **2.3 — DONE** — `/activity` carries stock positions and credit-line plans.
-- **2.4 — NOT STARTED** — The credit line cannot be drawn from a browser:
+- **2.4 — DECIDED, no change** — The credit line cannot be drawn from a browser:
   `createLoan(address user, uint256 amount, address poolToken)` takes the
   borrower as an argument and is merchant-called. Either build the merchant-side
   origination flow in `/merchant`, or state on the card that it is opened at the
-  till. Currently the card says "at the till" — which is honest — so this is a
-  feature decision, not a defect.
+  till. The card says "at the till", which is the truth about how the product
+  works, so the honest option was already shipped. Building merchant-side
+  origination is a feature, not a gap; recorded here so it is not repeatedly
+  rediscovered as a defect.
 
 ### PHASE 3 — Make the work verifiable  ·  the highest-leverage remaining work
 
@@ -131,11 +134,24 @@ Ordered by what unblocks what. Phase 0 gates everything about winning; phases
   `repo.sourcify.dev/1952/<engine>`, which renders *Exact Match ·
   PolarisEngine · solc 0.8.24 · cancun* with the full source tree. Verified in
   the browser.
-- **3.3 — BLOCKED, not skipped** — Recording a screen capture needs a screen
-  recorder driving a real browser session; there is no way to produce one from
-  here. Everything it depends on is ready: `docs/DEMO.md` has the script, and
-  the flow is proven end to end on chain. **This is the one task in the plan
-  that needs a person.**
+- **3.3 — DONE** — `apps/core/e2e/record-demo.mjs` records the demo by driving
+  the deployed app with a wallet that really signs, so every frame is the live
+  site and the transactions in it are real. Output:
+  `apps/core/e2e/recordings/polaris-demo.mp4`.
+
+  The captured run is a complete round trip — 1.0 tXAAPL locked and
+  **101.118504 pUSDC paid to the merchant** (`0x21c351f4…`), then
+  **102.362400 pUSDC repaid and the share returned** (`0x80ba9bf3…`), both
+  confirmed on chain. Because it is a script rather than a one-off capture,
+  re-running it after a UI change produces a current recording instead of a
+  stale one.
+
+  Two things it taught: taking the first Repay button recorded a hang, because
+  the topmost loan owed more than the wallet held and the app correctly refused
+  it — the script now settles the cheapest affordable position and surfaces the
+  app's own error rather than waiting for a success that is not coming. And the
+  transaction count was under-reported until the tally moved out of the page,
+  since the init script re-runs on every navigation.
 - **3.4 — DONE** — `.github/workflows/ci.yml` runs typecheck, package build,
   the full 356-test suite and the app build on every push to `main` and every
   pull request. Verified by running exactly those four commands locally: all
@@ -208,10 +224,20 @@ Ordered by what unblocks what. Phase 0 gates everything about winning; phases
   page answers; it exits non-zero on failure so CI can gate on it, and
   `BASE=… node scripts/smoke.mjs` points it at any deployment. Run against
   production: **35 passed, 0 failed, exit 0.**
-- **6.3 — NOT STARTED** — No browser-level regression test. The checkout and
-  repay flows are proven by hand via an injected EIP-1193 provider; that harness
-  lives only in session transcripts. Commit it as a Playwright spec that injects
-  the same provider and drives quote → approve → openLoan → repay.
+- **6.3 — DONE** — `apps/core/e2e/checkout.spec.ts`, run with
+  `pnpm --filter polaris-app e2e`. Four specs against the deployed app: the
+  pitch is readable with no wallet, a quote is refused for shares the wallet
+  does not hold, the full checkout signs and pays with the quote reconciling
+  (ceiling − fee == merchant), and the position repays. **4 passed.**
+
+  The wallet is real: signing happens in Node with viem and the page gets a
+  thin `window.ethereum` that forwards to it. The first attempt loaded ethers
+  from a CDN inside the page and failed for a reason worth keeping — an init
+  script runs before `document.documentElement` exists, so there is nothing to
+  append a script tag to. Signing outside the page removes that problem and a
+  network dependency with it. The suite is deliberately outside `pnpm test`: it
+  costs testnet gas and needs the chain up, and it skips rather than fails when
+  `E2E_PRIVATE_KEY` is absent.
 
 ---
 

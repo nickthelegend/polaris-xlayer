@@ -9,7 +9,9 @@
     "start": "next start",
     "deploy:contracts": "node scripts/quick-deploy.js",
     "test": "jest",
-    "seed-db": "ts-node scripts/seed-db.ts"
+    "seed-db": "ts-node scripts/seed-db.ts",
+    "e2e": "playwright test",
+    "demo": "node e2e/record-demo.mjs"
   },
   "dependencies": {
     "@apollo/client": "^4.1.4",
@@ -90,6 +92,7 @@
     "zod": "3.25.76"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.1.9",
     "@types/jest": "^30.0.0",
     "@types/node": "^22",

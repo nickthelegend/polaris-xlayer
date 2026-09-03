@@ -8,6 +8,13 @@ merchant is paid immediately from a pool, and the shopper still owns the stock.
 
 Live: **https://polaris-xlayer.vercel.app** · X Layer testnet, chain **1952**
 
+**Demo:** [`apps/core/e2e/recordings/polaris-demo.mp4`](apps/core/e2e/recordings/polaris-demo.mp4)
+— a recording of the deployed app, driven by a wallet that really signs. The
+round trip in it is on chain: 1.0 tXAAPL locked and 101.118504 pUSDC paid to
+the merchant ([`0x21c351f4…`](https://www.oklink.com/x-layer-testnet/tx/0x21c351f44470f4b8c9c5af746c015e62b21760733b77e4c5c9443bb512a60536)),
+then repaid and the share returned ([`0x80ba9bf3…`](https://www.oklink.com/x-layer-testnet/tx/0x80ba9bf33f634e4d042fdb8c76a5a20c4a4ad5dae93da893dda9b5fe6a76be9c)).
+Re-record it with `pnpm --filter polaris-app demo`.
+
 ---
 
 ## What is actually deployed
