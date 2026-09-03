@@ -5,7 +5,11 @@ typechain/
 typechain-types/
 coverage/
 coverage.json
-/deployments/
+# Deployment records are committed, not ignored: an address on a public chain
+# is a public fact, and merchant-web's lib/constants.ts is generated from this
+# directory. Ignoring it meant anyone cloning the repo could see the generated
+# constants but not what produced them, or regenerate them after a redeploy.
+# packages/contracts/deployments/ has always been committed for the same reason.
 dist/
 build/
 

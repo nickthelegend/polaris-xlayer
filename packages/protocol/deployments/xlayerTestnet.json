@@ -1,0 +1,34 @@
+{
+  "network": "xlayerTestnet",
+  "chainId": 1952,
+  "deployedAt": "2026-09-03T03:22:43.008Z",
+  "deployer": "0xb51756B8Ee57Cc622669E3B3EF67FA305821Bf56",
+  "contracts": {
+    "USDC": "0x35b28346088C9A7BD31D68CFc95263A3A830E260",
+    "USDT": "0x43920BeB09F74f64691E52DDA91bDe5Ba7168657",
+    "EVM_V1_DECODER": "0xd7167Ae45c13f12677326600195f423170E3B52c",
+    "CREDIT_ORACLE": "0xA01f61e320F60565ae333Be1eE6035Fa9Be40458",
+    "POOL_MANAGER": "0x6f6a896fF8BF702767889427A76327DFD19E9322",
+    "SCORE_MANAGER": "0xe9CBebA225620Fc27a50c8BAF895A19732501a60",
+    "PROTOCOL_FUNDS": "0x7362ac5c50A9c2D474779cECD4627615182b20d8",
+    "CREDIT_VAULT": "0x006EE3CD409c56322C7071BC28aF54A7E9307ae6",
+    "LIQUIDITY_VAULT": "0x011775A3686552e0a0536B0540Fff9042dBd53D6",
+    "LOAN_ENGINE": "0x8219Ae1133Ffc29DC6E1eA14499175dA2A50ac26",
+    "MERCHANT_ROUTER": "0xeB4236e77f192d8368af8df8aC17B9cBeEbb4025",
+    "INSURANCE_POOL": "0xBF7BCe8Eed0f596d9f16ea750206821a59c316f3"
+  },
+  "standIns": [
+    {
+      "what": "USDC and USDT",
+      "why": "no canonical stablecoin for this protocol exists on this network"
+    },
+    {
+      "what": "credit oracle attester",
+      "why": "the deployer attests, because no attester service runs on a testnet"
+    },
+    {
+      "what": "query verifier",
+      "why": "no native query precompile on this network, so the built-in fallback is used"
+    }
+  ]
+}
