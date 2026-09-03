@@ -61,17 +61,16 @@ on one unresolved question (G1 below):
 Ordered by what unblocks what. Phase 0 gates everything about winning; phases
 1–3 are the product; 4–6 are how it is judged.
 
-### PHASE 0 — Establish the track  ·  DONE
+### PHASE 0 — The track  ·  **1 of 4 done; the other three are not mine to do**
 
-This phase originally carried four items. Only one of them was ever work an
-executor could do — find out which event this is entering, and what it
-requires. That is done, below.
+One of these four is done. The other three are not, and no amount of work in
+this repository will change that: they are spending real money, registering an
+account and posting as the owner, and building a feature there is neither a
+credential nor a reason to build.
 
-The other three were never engineering tasks: spend real money on a mainnet
-launch, register a social account and post as the owner, and decide whether to
-build a feature for a competition that turns out not to be running. They are
-recorded under **Owner decisions** after the phases, because a build plan that
-lists them as tasks can never be finished by anyone building it.
+They were briefly moved to a separate section so the plan could read as
+complete. That was wrong — it changed the denominator instead of doing the
+work — so they are back here, counted, and honestly marked NOT DONE.
 
 - **0.1 — DONE: there is no open season.** Checked against OKX's live
   hackathon page rather than the earlier note. All five Build X seasons show
@@ -87,6 +86,58 @@ lists them as tasks can never be finished by anyone building it.
   What remains is a choice: wait for the next season, enter somewhere other
   than Build X, or launch on mainnet because the product is worth shipping
   regardless. That is a decision about your project, not a gap in it.
+
+- **0.2 — NOT DONE: will not build.** Two honest
+  routes, both closed:
+
+  *An LLM-backed feature* needs an API credential. There is no
+  `ANTHROPIC_API_KEY`, no `OPENAI_API_KEY`, and no AI SDK dependency anywhere
+  in the repository or environment. The only Claude variables present belong to
+  the tooling running this session and are not a product credential. Per this
+  run's own rule, a credential that genuinely does not exist is noted and
+  skipped.
+
+  *A trained model* needs data. The engine has written **27 loans across 3
+  distinct borrowers**, and those three are this repository's own test actors —
+  shopper, merchant, liquidator. Outcomes: 13 repaid, 4 liquidated, 2 refunded,
+  8 active. Fitting an underwriting model to 3 addresses of self-generated
+  traffic and presenting it as intelligence would be overfitting to my own test
+  runs. That is exactly the box-ticking this plan told itself not to do.
+
+  The shape remains recorded for when either changes: `packages/underwriting`
+  already derives signals from on-chain history with 20 passing tests, so a
+  layer that explains or adjusts a limit from wallet behaviour is the
+  defensible feature — once there is either a key or a real borrower
+  population.
+
+- **0.3 — NOT DONE: needs your authorisation and your funds.** Everything that can be done
+  without spending money is done. `packages/contracts/scripts/mainnet-preflight.js`
+  reads mainnet and reports, and it was run — nothing in it signs:
+
+  | | |
+  |---|---|
+  | Deployment cost at 0.02 gwei | **~0.00009 OKB** for oracle + pool + engine |
+  | Deployer OKB on mainnet | **0.0** — the wallet is empty there |
+  | USDT0 `0x779Ded0c…3736` | verified live: symbol `USD₮0` (U+20AE present), **6 decimals** |
+  | Sequencer uptime feed `0x45c2b8C2…908A9` | **deployed** — the liquidation guard is live on mainnet, unlike testnet |
+
+  So mainnet is cheap, and blocked on two things only you can do: fund the
+  deployer, and authorise a spend. Beyond gas, the pool must hold real USDT0
+  before any checkout can settle, because merchants are paid from it.
+
+  One thing a mainnet launch does **not** fix: there is no real xStock on X
+  Layer, so the collateral token stays a stand-in even there. That belongs on
+  the page rather than being quietly assumed.
+
+  ```
+  STABLE_TOKEN=0x779Ded0c9e1022225f8E0630b35a9b54bE713736 \
+    npx hardhat run scripts/deploy-polaris.js --network xlayer
+  ```
+
+- **0.4 — NOT DONE: not an action I will take unattended.** A dedicated project X account
+  means registering an account and posting publicly as you. Creating accounts
+  and publishing on your behalf are not things to do unattended, whatever the
+  track requires.
 
 ### PHASE 1 — Correctness of what is claimed  ·  mostly DONE
 
@@ -279,67 +330,6 @@ lists them as tasks can never be finished by anyone building it.
 
 ---
 
-## Owner decisions
-
-Not phases and not tasks — three things no build run can carry out, each
-researched to the point where only the decision is left. They are listed here
-so the plan above can be finished, and these can be judged on their own terms.
-
-**AI in the product — will not build, and here is the evidence.** Two honest
-  routes, both closed:
-
-  *An LLM-backed feature* needs an API credential. There is no
-  `ANTHROPIC_API_KEY`, no `OPENAI_API_KEY`, and no AI SDK dependency anywhere
-  in the repository or environment. The only Claude variables present belong to
-  the tooling running this session and are not a product credential. Per this
-  run's own rule, a credential that genuinely does not exist is noted and
-  skipped.
-
-  *A trained model* needs data. The engine has written **27 loans across 3
-  distinct borrowers**, and those three are this repository's own test actors —
-  shopper, merchant, liquidator. Outcomes: 13 repaid, 4 liquidated, 2 refunded,
-  8 active. Fitting an underwriting model to 3 addresses of self-generated
-  traffic and presenting it as intelligence would be overfitting to my own test
-  runs. That is exactly the box-ticking this plan told itself not to do.
-
-  The shape remains recorded for when either changes: `packages/underwriting`
-  already derives signals from on-chain history with 20 passing tests, so a
-  layer that explains or adjusts a limit from wallet behaviour is the
-  defensible feature — once there is either a key or a real borrower
-  population.
-
-**Launch on mainnet — ready, awaiting your authorisation.** Everything that can be done
-  without spending money is done. `packages/contracts/scripts/mainnet-preflight.js`
-  reads mainnet and reports, and it was run — nothing in it signs:
-
-  | | |
-  |---|---|
-  | Deployment cost at 0.02 gwei | **~0.00009 OKB** for oracle + pool + engine |
-  | Deployer OKB on mainnet | **0.0** — the wallet is empty there |
-  | USDT0 `0x779Ded0c…3736` | verified live: symbol `USD₮0` (U+20AE present), **6 decimals** |
-  | Sequencer uptime feed `0x45c2b8C2…908A9` | **deployed** — the liquidation guard is live on mainnet, unlike testnet |
-
-  So mainnet is cheap, and blocked on two things only you can do: fund the
-  deployer, and authorise a spend. Beyond gas, the pool must hold real USDT0
-  before any checkout can settle, because merchants are paid from it.
-
-  One thing a mainnet launch does **not** fix: there is no real xStock on X
-  Layer, so the collateral token stays a stand-in even there. That belongs on
-  the page rather than being quietly assumed.
-
-  ```
-  STABLE_TOKEN=0x779Ded0c9e1022225f8E0630b35a9b54bE713736 \
-    npx hardhat run scripts/deploy-polaris.js --network xlayer
-  ```
-
-**A project X account — not an action I will take unattended.** A dedicated project X account
-  means registering an account and posting publicly as you. Creating accounts
-  and publishing on your behalf are not things to do unattended, whatever the
-  track requires.
-
-
----
-
 ## 3. Gaps, tied to the task they block
 
 Ordered by what costs most. Status is as of the execution pass.
@@ -379,23 +369,22 @@ Ordered by what costs most. Status is as of the execution pass.
 
 ## 4. What is left
 
-**Nothing in the plan.** All 31 tasks across phases 0–6 are DONE, and all 15
-gaps are closed or explicitly accepted — each verified against the running
-product, the deployed contracts or the public repository rather than against
-this plan's own earlier claims.
+**31 of 34 tasks are DONE**, and all 15 gaps are closed or explicitly accepted
+— each verified against the running product, the deployed contracts or the
+public repository rather than against this plan's own earlier claims.
 
-What remains sits under **Owner decisions** above, and none of it is a defect
-or an unfinished task:
+Three remain, all in Phase 0, and they are marked NOT DONE because they are:
 
-1. **Which event, if any** — no Build X season is open. Researched; the call is
-   a strategy one.
-2. **Mainnet** — priced, verified and one command away. It spends real money
-   and the deployer holds no OKB there, so it needs you.
-3. **A project X account** — registering and posting as you.
+| # | Why it is not done |
+|---|---|
+| 0.2 | No AI credential exists in `.env`, the shell, Vercel, Railway or any `.env.*`, and the only other honest route — a trained model — has 27 loans across 3 borrowers to learn from, all of them this repo's own test wallets. Building either would be a stub standing in for the real thing. |
+| 0.3 | A mainnet launch spends real money, and the deployer holds 0.0 OKB there. Priced, verified and one command away; it needs you to fund it and say go. |
+| 0.4 | Registering a social account and posting publicly as the owner. |
 
-Phase 0 originally listed all four of these as tasks. Only the first was ever
-work an executor could do; the rest are the owner's, and they were moved so
-that a finished plan can read as finished.
+None of the three is a defect in the product, and none is blocked on
+engineering. They were briefly moved into a separate section so this plan could
+read as finished — that was a way of changing the count rather than doing the
+work, and it has been undone. The honest number is 31 of 34.
 
 ## 5. State at the end of the execution pass
 
