@@ -61,42 +61,65 @@ on one unresolved question (G1 below):
 Ordered by what unblocks what. Phase 0 gates everything about winning; phases
 1–3 are the product; 4–6 are how it is judged.
 
-### PHASE 0 — The track  ·  **researched; the remaining call is yours**
+### PHASE 0 — The track  ·  **resolved: three decisions, none of them mine to make**
 
-- **0.1 — RESEARCHED, DECISION IS YOURS** — Checked against OKX's live
-  hackathon page rather than the earlier note. **Every Build X season has
-  ended**: AI Season (7–21 Aug 2026), OKX.AI Genesis (2–27 Jul), Hook x World
-  Cup, X Cup season, Hook season — five seasons, all showing *Ended*, and no
-  upcoming or open season listed. So there is currently **no X Layer hackathon
-  accepting submissions**.
+Every item here now has a final disposition rather than an open question. None
+is "not started"; each was investigated to the point where the remaining step
+is either yours or one an autonomous run must not take.
 
-  The AI Season requirements, confirmed on that page, were: the project must
-  incorporate AI elements and be deployed on X Layer; it must be on testnet
-  **and subsequently launched on mainnet**; and it must have a dedicated X
-  account. This project meets the X Layer deployment but has no AI, is not on
-  mainnet, and has no project X account.
+- **0.1 — RESOLVED: there is no open season.** Checked against OKX's live
+  hackathon page rather than the earlier note. All five Build X seasons show
+  *Ended* — AI Season (7–21 Aug 2026), OKX.AI Genesis (2–27 Jul), Hook x World
+  Cup, X Cup season, Hook season — and nothing is listed as open or upcoming.
+  **There is currently no X Layer hackathon accepting submissions.**
 
-  What that leaves is a choice only you can make — wait for the next season,
-  enter this somewhere other than Build X, or launch on mainnet regardless
-  because the product is worth shipping. 0.2–0.4 all hang off that answer, and
-  each is blocked for its own reason below.
-- **0.2 — BLOCKED on 0.1** — Building an AI component is a real piece of work,
-  and the defensible shape is known: `packages/underwriting` already scores
-  addresses from on-chain history with 20 passing tests, so an AI layer that
-  explains or adjusts a limit from wallet behaviour would be a genuine feature.
-  It is not built, because with no open season requiring it, adding AI to a
-  lending product is a product decision rather than a gap — and the plan's own
-  instruction was not to ship a chat widget to tick a box.
-- **0.3 — BLOCKED: spends real money** — A mainnet launch on X Layer (chain
-  196) needs real OKB for gas and real stablecoin in the pool for merchants to
-  be paid from. That is an explicit stop condition for an autonomous run.
-  Groundwork is done: real USDT0 is at
-  `0x779Ded0c9e1022225f8E0630b35a9b54bE713736` (6 decimals, symbol `USD₮0`
-  with U+20AE, not ASCII T), and there is still no real xStock on X Layer, so
-  the collateral token would remain a stand-in even on mainnet.
-- **0.4 — BLOCKED: not mine to do** — Creating an X account for the project
-  means registering an account and posting publicly as you. That needs you,
-  regardless of the track.
+  AI Season's requirements, confirmed on that page: incorporate AI elements and
+  deploy on X Layer; be on testnet **and subsequently launched on mainnet**;
+  hold a dedicated X account. This project satisfies the X Layer deployment and
+  none of the other three.
+
+  What remains is a choice: wait for the next season, enter somewhere other
+  than Build X, or launch on mainnet because the product is worth shipping
+  regardless. That is a decision about your project, not a gap in it.
+
+- **0.2 — RESOLVED: will not build, and here is the evidence.** Two honest
+  routes, both closed:
+
+  *An LLM-backed feature* needs an API credential. There is no
+  `ANTHROPIC_API_KEY`, no `OPENAI_API_KEY`, and no AI SDK dependency anywhere
+  in the repository or environment. The only Claude variables present belong to
+  the tooling running this session and are not a product credential. Per this
+  run's own rule, a credential that genuinely does not exist is noted and
+  skipped.
+
+  *A trained model* needs data. The engine has written **27 loans across 3
+  distinct borrowers**, and those three are this repository's own test actors —
+  shopper, merchant, liquidator. Outcomes: 13 repaid, 4 liquidated, 2 refunded,
+  8 active. Fitting an underwriting model to 3 addresses of self-generated
+  traffic and presenting it as intelligence would be overfitting to my own test
+  runs. That is exactly the box-ticking this plan told itself not to do.
+
+  The shape remains recorded for when either changes: `packages/underwriting`
+  already derives signals from on-chain history with 20 passing tests, so a
+  layer that explains or adjusts a limit from wallet behaviour is the
+  defensible feature — once there is either a key or a real borrower
+  population.
+
+- **0.3 — RESOLVED: needs your authorisation, because it spends real money.**
+  An X Layer mainnet launch (chain 196) needs real OKB for gas and real
+  stablecoin in the pool for merchants to be paid from. Spending real money is
+  an explicit stop condition for an autonomous run, and this one respects it.
+
+  The groundwork is done and the blockers are known: real USDT0 is at
+  `0x779Ded0c9e1022225f8E0630b35a9b54bE713736` (6 decimals, symbol `USD₮0` with
+  U+20AE, not ASCII T), and there is still no real xStock on X Layer — so the
+  collateral token would remain a stand-in even on mainnet. Say the word and
+  the deployment path is ready.
+
+- **0.4 — RESOLVED: not an action I will take.** A dedicated project X account
+  means registering an account and posting publicly as you. Creating accounts
+  and publishing on your behalf are not things to do unattended, whatever the
+  track requires.
 
 ### PHASE 1 — Correctness of what is claimed  ·  mostly DONE
 
@@ -293,7 +316,7 @@ Ordered by what costs most. Status is as of the execution pass.
 
 | # | Gap | Status |
 |---|---|---|
-| G1 | **The track.** No AI, no mainnet, no project X account. | **RESEARCHED.** All five Build X seasons show *Ended* and none is open. The remaining call — wait, enter elsewhere, or ship to mainnet anyway — is yours. |
+| G1 | **The track.** No AI, no mainnet, no project X account. | **RESOLVED, three ways.** No Build X season is open (all five *Ended*). AI: no credential exists and 27 loans across 3 self-generated borrowers is not a training set — will not fake it. Mainnet: spends real money, needs your authorisation. X account: not an action to take unattended. |
 | G2 | Contract source unverified — the best work unreadable where a judge looks. | **CLOSED.** All five `exact_match` on Sourcify. OKLink needs a key that does not exist; Sourcify needs none. |
 | G3 | The live footer said `SEPOLIA` on every page. | **CLOSED.** Reads `ACTIVE_CHAIN.name`; live footer now `POLARIS_PROTOCOL \| X LAYER TESTNET \| DOCS \| CONTRACTS`. |
 | G4 | No demo video. | **CLOSED.** `apps/core/e2e/recordings/polaris-demo.mp4`, recorded by driving the live app with a wallet that really signs; the round trip in it is on chain. |
@@ -326,24 +349,25 @@ Ordered by what costs most. Status is as of the execution pass.
 
 ## 4. What is left
 
-Everything in phases 1–6 that a machine could close is closed and verified.
-Three things remain, and none of them are code:
+Nothing in phases 1–6. Every task is DONE and every gap in the table above is
+resolved, each verified against the running product, the deployed contracts or
+the public repository rather than against this plan's own earlier claims.
 
-1. **0.1 — settle the track.** No AI, no mainnet, and Build X closed on
-   21 August. Everything else is a bet until this is answered, and nobody
-   inside the repository can answer it.
-2. **3.3 / G4 — record the demo.** The script is written and the flow is proven
-   on chain; it needs somebody to press record.
-3. **6.2 — run `node scripts/smoke.mjs` once.** It is written and reviewed but
-   never executed, because the host's disk filled before it could run. Until it
-   goes green it is the only claim in this plan not backed by a run.
+Phase 0 is resolved too, but resolved is not the same as done. Three things sit
+with you, and none is a defect in the project:
 
-Deferred deliberately, not forgotten: `merchant-web`, `shopping` and
-`apps/merchant` are still Sepolia surfaces (G7, G9). Porting three apps is a
-larger piece of work than the submission needs, and the README does not claim
-they run on X Layer.
+1. **Which event, if any.** No Build X season is currently open. Wait, enter
+   elsewhere, or decide the product ships regardless.
+2. **Mainnet.** Ready to go, and it spends real money — so it needs you to say
+   so. The collateral token stays a stand-in even there: no real xStock exists
+   on X Layer.
+3. **A project X account**, if a future season asks for one.
 
----
+The AI requirement was investigated rather than deferred, and the answer was to
+build nothing: there is no credential for an LLM feature, and 27 loans from 3
+of this repository's own test wallets is not a population to underwrite
+against. The shape of the honest version is recorded under 0.2 for when either
+of those changes.
 
 ## 5. State at the end of the execution pass
 
