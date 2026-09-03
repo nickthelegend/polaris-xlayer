@@ -179,7 +179,12 @@ confirmed working before moving on. Nothing below is "it compiles".
 | 24 | APR breakdown | Origination $0.12 + interest $0.02 reconciling against a $0.14 fee |
 | 26 | Embeddable checkout (partial) | CORS on the public reads, so any storefront on any domain can price a basket |
 | 61 | Empty states | Empty cart and empty orders, each with a way out |
-| 65 | Idempotent order refs | Derived from the basket, so a double-tap on Pay is a no-op rather than a second loan |
+| 65 | Idempotent order refs | Derived from the basket plus a checkout session, so a double-tap collapses to one loan while a genuine repeat purchase still works |
+| 29 | Add tXAAPL and pUSDC to the wallet | `wallet_watchAsset` verified firing with the right addresses and decimals (18 / 6). This is what makes "you still own the position" visible rather than asserted — the shares stay in the wallet's token list, locked rather than gone |
+| 35 | OKB gas check before the pay button | Verified against a wallet with a literal `0x0` balance: the warning shows and no dead-end Pay button is offered |
+| 36 | X Layer faucet deep-link | Offered exactly when the wallet cannot pay for gas |
+| 44 | Oracle provenance panel | Source, venue state, the venue's own timestamp, the print's age and the oracle address — matching the chain, with why Chainlink carries no equity feed here |
+| 64 | Double-submit guard | A ref-based lock: three clicks produce exactly one transaction |
 
 ## Deliberately not built, with reasons
 

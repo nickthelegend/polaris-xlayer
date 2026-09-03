@@ -53,7 +53,14 @@ export type StockQuote = {
 }
 
 type ChainState = {
-  price: { usdPerShare: string; marketOpen: boolean; source: string; fresh: boolean }
+  price: {
+    usdPerShare: string
+    marketOpen: boolean
+    source: string
+    fresh: boolean
+    printedAt: number
+    ageSeconds: number
+  }
   risk: {
     maxLtvBps: number
     closedMarketHaircutBps: number
@@ -76,6 +83,17 @@ export function useStockCheckout(totalUsd: number) {
   const { address } = useAccount()
   const publicClient = usePublicClient()
   const { writeContractAsync } = useWriteContract()
+
+  /*
+   * Gas, checked before the button is offered rather than after it fails.
+   *
+   * A wallet that has never touched X Layer holds no OKB, which is every judge
+   * and every first-time visitor. Letting them fill in a basket, price it, and
+   * only then discover they cannot sign is the point at which a demo gets
+   * abandoned. The faucet is one link away; the checkout should say so up
+   * front.
+   */
+  const [gas, setGas] = useState<bigint | null>(null)
 
   const [chain, setChain] = useState<ChainState | null>(null)
   const [state, setState] = useState<CheckoutState>({ step: "idle" })
@@ -107,12 +125,16 @@ export function useStockCheckout(totalUsd: number) {
       if (json.error) throw new Error(json.error)
       setChain(json)
       setLoadError(null)
+
+      if (publicClient && address) {
+        setGas(await publicClient.getBalance({ address }))
+      }
     } catch (e: unknown) {
       setLoadError(
         "Could not reach Polaris to price this basket. The storefront is up; the chain read is not.",
       )
     }
-  }, [address])
+  }, [address, publicClient])
 
   useEffect(() => {
     void refresh()
@@ -265,6 +287,10 @@ export function useStockCheckout(totalUsd: number) {
 
   return {
     chain,
+    /** Native OKB, for the gas the shopper needs to sign anything at all. */
+    gas,
+    /** True once we know the wallet cannot pay for a transaction. */
+    needsGas: gas !== null && gas === 0n,
     quote,
     state,
     loadError,

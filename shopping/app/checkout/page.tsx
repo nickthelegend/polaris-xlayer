@@ -10,7 +10,8 @@ import { useCart } from "@/lib/cart-context"
 import { useWallet } from "@/lib/use-wallet"
 import { useStockCheckout } from "@/lib/use-stock-checkout"
 import { feeBreakdown, formatShares, formatUsd } from "@/lib/stock-pricing"
-import { EXPLORER } from "@/lib/polaris-client"
+import { ADDRESSES, EXPLORER } from "@/lib/polaris-client"
+import { AddTokens } from "@/components/add-token"
 
 /**
  * Checkout, paid with stock.
@@ -58,7 +59,7 @@ export default function CheckoutPage() {
     return `shop-${session.current}-${line}-${total.toFixed(2)}`
   }, [items, total])
 
-  const { chain, quote, state, loadError, pay, fundShares, reset } = useStockCheckout(total)
+  const { chain, quote, state, loadError, pay, fundShares, reset, needsGas } = useStockCheckout(total)
   const [form, setForm] = useState({
     name: "Avery Sterling",
     email: "avery@syndicate.net",
@@ -109,6 +110,15 @@ export default function CheckoutPage() {
             <Figure label="Shares_Locked" value={`${formatShares(state.shares)} ${chain?.tokens.stockSymbol ?? ""}`} />
             <Figure label="Settle_Within" value="7_Days" />
           </div>
+          <div className="mt-6">
+            <p className="text-[10px] uppercase font-bold text-white/35 tracking-widest">
+              See_Them_In_Your_Wallet
+            </p>
+            <div className="mt-2">
+              <AddTokens />
+            </div>
+          </div>
+
           <div className="mt-6 flex flex-wrap gap-3">
             <a
               href={`${EXPLORER}/tx/${state.hash}`}
@@ -252,7 +262,22 @@ export default function CheckoutPage() {
                     <Row label="Merchant_Receives" value={`$${formatUsd(quote.merchantReceives)}`} accent />
                   </div>
 
-                  {!quote.affordable ? (
+                  {needsGas ? (
+                    <div className="mt-6">
+                      <p className="text-[11px] leading-relaxed text-amber-300/90">
+                        This wallet holds no OKB, so it cannot pay for gas on X Layer testnet — no
+                        transaction can be signed until it does.
+                      </p>
+                      <a
+                        href="https://www.okx.com/xlayer/faucet"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-3 block text-center border border-white/15 py-3 rounded text-[10px] font-black uppercase tracking-widest hover:border-white/40 transition-all"
+                      >
+                        Get_OKB_From_The_X_Layer_Faucet
+                      </a>
+                    </div>
+                  ) : !quote.affordable ? (
                     <div className="mt-6">
                       <p className="text-[11px] leading-relaxed text-amber-300/90">
                         This basket needs {formatShares(quote.shares)} {chain?.tokens.stockSymbol}, and
@@ -280,6 +305,40 @@ export default function CheckoutPage() {
                         <>Pay_${total.toFixed(2)}_With_Stock</>
                       )}
                     </button>
+                  )}
+
+                  {/* Where the number came from.
+                      The price is the one thing on this page a shopper cannot
+                      derive for themselves, and the whole product hangs off it.
+                      Naming the venue, the venue's own timestamp and how old
+                      the print is lets them check it against the exchange
+                      rather than take it on trust — which is the difference
+                      between a feed and an assertion. */}
+                  {chain && (
+                    <details className="mt-5 group">
+                      <summary className="cursor-pointer list-none text-[10px] uppercase font-bold tracking-widest text-white/35 hover:text-white/60 transition-colors">
+                        Where_This_Price_Came_From
+                      </summary>
+                      <div className="mt-3 space-y-1.5 pl-3 border-l border-white/10">
+                        <Row label="Source" value={chain.price.source} />
+                        <Row label="Venue" value={chain.price.marketOpen ? "open" : "closed"} />
+                        <Row
+                          label="Printed"
+                          value={new Date(chain.price.printedAt * 1000).toISOString().replace("T", " ").slice(0, 19) + "Z"}
+                        />
+                        <Row
+                          label="Age"
+                          value={`${chain.price.ageSeconds}s`}
+                          note={chain.price.fresh ? "within bound" : "stale"}
+                        />
+                        <Row label="Oracle" value={`${ADDRESSES.oracle.slice(0, 10)}…`} />
+                      </div>
+                      <p className="mt-3 pl-3 text-[10px] leading-relaxed text-white/30">
+                        Posted on chain with its provenance, so it can be checked against the venue.
+                        Chainlink carries no equity feed on X Layer — all 26 of its price feeds here
+                        are crypto.
+                      </p>
+                    </details>
                   )}
 
                   <p className="mt-4 text-[10px] leading-relaxed text-white/30">
