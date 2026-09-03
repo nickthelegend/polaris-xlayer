@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useAccount, useConnect, useDisconnect } from "wagmi"
+import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi"
+
+import { ACTIVE_CHAIN, ADD_CHAIN_PARAMS } from "@/lib/chains"
 
 /**
  * One place the storefront asks about the wallet.
@@ -27,6 +29,7 @@ export function useWallet() {
   useEffect(() => setMounted(true), [])
   const { connect, connectors, isPending } = useConnect()
   const { disconnect } = useDisconnect()
+  const { switchChain } = useSwitchChain()
 
   return {
     /** True only once the client has mounted and wagmi has settled. */
@@ -41,5 +44,27 @@ export function useWallet() {
     },
     logout: () => disconnect(),
     short: mounted && address ? `${address.slice(0, 6)}…${address.slice(-4)}` : null,
+
+    /**
+     * Whether the wallet is pointed at the chain the contracts are on.
+     *
+     * A wallet connected to Ethereum will read every balance as zero and fail
+     * every write, and nothing on screen would have said why — the shop would
+     * simply look broken.
+     */
+    wrongNetwork: mounted && isConnected && chain?.id !== ACTIVE_CHAIN.id,
+    switchToXLayer: () => {
+      switchChain(
+        { chainId: ACTIVE_CHAIN.id },
+        {
+          onError: () => {
+            // 4902: the wallet has never heard of X Layer. Adding it is the fix.
+            void (globalThis as { ethereum?: { request: (a: unknown) => Promise<unknown> } }).ethereum
+              ?.request({ method: "wallet_addEthereumChain", params: [ADD_CHAIN_PARAMS] })
+              .catch(() => undefined)
+          },
+        },
+      )
+    },
   }
 }

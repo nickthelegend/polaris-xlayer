@@ -32,7 +32,7 @@ const POLARIS = process.env.NEXT_PUBLIC_POLARIS_URL ?? "https://polaris-xlayer.v
 export default function CheckoutPage() {
   const { total, items, clearCart } = useCart()
   const router = useRouter()
-  const { login, connected, connecting, short } = useWallet()
+  const { login, connected, connecting, short, wrongNetwork, switchToXLayer } = useWallet()
 
   /*
    * The order reference: stable across a checkout, new for the next one.
@@ -224,7 +224,20 @@ export default function CheckoutPage() {
                 <p className="mt-6 text-[11px] leading-relaxed text-amber-300/80">{loadError}</p>
               )}
 
-              {!connected ? (
+              {connected && wrongNetwork ? (
+                <div className="mt-6">
+                  <p className="text-[11px] leading-relaxed text-amber-300/90">
+                    This wallet is on a different network. Polaris runs on X Layer testnet — on
+                    anything else your balances read as zero and nothing can be signed.
+                  </p>
+                  <button
+                    onClick={switchToXLayer}
+                    className="mt-3 w-full border border-white/15 py-3 rounded text-[10px] font-black uppercase tracking-widest hover:border-white/40 transition-all"
+                  >
+                    Switch_To_X_Layer
+                  </button>
+                </div>
+              ) : !connected ? (
                 <button
                   onClick={login}
                   disabled={connecting}

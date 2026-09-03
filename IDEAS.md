@@ -185,6 +185,8 @@ confirmed working before moving on. Nothing below is "it compiles".
 | 36 | X Layer faucet deep-link | Offered exactly when the wallet cannot pay for gas |
 | 44 | Oracle provenance panel | Source, venue state, the venue's own timestamp, the print's age and the oracle address — matching the chain, with why Chainlink carries no equity feed here |
 | 64 | Double-submit guard | A ref-based lock: three clicks produce exactly one transaction |
+| 30 | Wrong-network handling | Verified with a wallet on Ethereum mainnet: the warning shows, no misleading quote is offered, the switch is requested, and the 4902 fallback adds X Layer (`0x7A0` = 1952) |
+| 68 | A 404 that belongs to the shop | Styled to the storefront with two ways out, instead of Next's white default reading as a crash |
 
 ## Deliberately not built, with reasons
 
@@ -202,3 +204,33 @@ confirmed working before moving on. Nothing below is "it compiles".
   does not strengthen *this* pitch.
 - **Everything else in tiers 3–6** — not reached. Ranked below what was built,
   and the honest status is "not started", not "skipped".
+
+---
+
+## Full accounting of all 100
+
+**Built and verified working (21):**
+1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 24, 26 (partial — CORS half), 29, 30, 35, 36,
+44, 61, 64, 65, 68.
+
+**Refused on the merits (1):**
+- **12** — a repay-early savings line. `amountOwed` is `principal + fee` for the
+  life of the loan; the fee is prepaid and fixed, so settling early frees the
+  shares sooner and costs exactly the same. The panel would invent a discount
+  the contract does not give. The checkout says the opposite plainly instead.
+
+**Blocked (3):**
+- **31** and the live half of **42** — need mainnet, which spends real money.
+- **99, 100** — the iMin printer path is already built and proven elsewhere in
+  this repo; re-demoing it does not strengthen *this* pitch.
+
+**Not reached (75):**
+10, 13–23, 25, 27, 28, 32–34, 37–41, 43, 45–60, 62, 63, 66, 67, 69–98.
+
+These ranked below what was built and the run stopped while working down the
+list, not because they were judged worthless. The honest status is "not
+started". Several are close to free and would be the next ones taken: **10**
+(reuse the merchant QR payload so the two surfaces are visibly one product),
+**56** (show each cart line's share cost), **63** (tell a cancelled signature
+apart from a failed one), and **28** (offer OKX Wallet first, since this is
+X Layer).
