@@ -52,6 +52,23 @@ module.exports = {
       accounts: ALL_KEYS,
     },
   },
+  /*
+   * Verify on Sourcify, not only OKLink.
+   *
+   * OKLink's verify endpoint needs an API key, and there is not one in this
+   * repository — which left every contract reading "Contract source code
+   * unverified" on the explorer, so the strongest part of this project was
+   * the one part a reviewer could not read. Sourcify supports X Layer testnet
+   * (1952) and mainnet (196), takes no key, and publishes a full-matched
+   * source bundle anyone can fetch. The OKLink config stays below so a single
+   * OKLINK_API_KEY switches it on as well.
+   */
+  sourcify: {
+    enabled: true,
+    apiUrl: "https://sourcify.dev/server",
+    browserUrl: "https://repo.sourcify.dev",
+  },
+
   etherscan: {
     apiKey: {
       sepolia: process.env.ETHERSCAN_API_KEY || "",

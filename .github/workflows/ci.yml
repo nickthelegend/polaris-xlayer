@@ -1,0 +1,64 @@
+# The tests only count if something runs them.
+#
+# There are 356 across the contracts, the loan book, settlement, underwriting
+# and the agent tooling, and nothing ran them on a push — so a green suite was
+# a claim about the last time somebody remembered, not about main.
+#
+# The Solana packages are deliberately absent: they need a Rust and Anchor
+# toolchain and a local validator, they are not part of the X Layer product,
+# and installing that on every push to test code nothing here depends on would
+# make the signal slower and no better.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build packages
+        run: pnpm build
+
+      # 356 tests: contracts 201, db 82, keeperhub 45, underwriting 20, mcp 8.
+      - name: Test
+        run: pnpm test
+
+      # The app is what is deployed, and it is not covered by pnpm build,
+      # which only walks packages/.
+      - name: Build the app
+        run: pnpm --filter polaris-app build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  # The product-level checks from TEST-PLAN.md, against the live deployment.
+  # Separate from `test` because it depends on something being deployed, and a
+  # unit-test failure and a production outage should not look the same.
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Smoke the deployment
+        run: node scripts/smoke.mjs

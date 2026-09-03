@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "start": "node --experimental-strip-types src/server.ts",
-    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "test": "node scripts/test-guard.mjs",
     "typecheck": "tsc --noEmit",
-    "underwrite": "node --experimental-strip-types src/cli.ts"
+    "underwrite": "node --experimental-strip-types src/cli.ts",
+    "test:solana": "node --experimental-strip-types --test test/*.test.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",

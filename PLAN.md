@@ -1,256 +1,296 @@
 # Polaris on X Layer — build plan
 
-**Status as of this plan:** live at https://polaris-xlayer.vercel.app, contracts
-deployed and exercised on X Layer testnet (chain 1952), 48 contract tests
-passing, zero mocks in the tree. A skeptical-judge pass scored it **cut in the
-first round** for one reason: the app signs transactions with a server-held key
-and never asks the user for a wallet.
+**Written:** 3 September 2026. Supersedes the previous plan, kept at
+`docs/PLAN-previous.md`. Every status below was checked against the running
+product, the deployed contracts and the public repository — not against the
+last plan's claims.
 
-This file is the whole plan. A builder agent can pick up any single task below
-and execute it without further context.
-
----
-
-## 0. Fixed facts a builder needs
-
-| Thing | Value |
-|---|---|
-| Chain | X Layer testnet, **chainId 1952** (docs say 195 — docs are wrong; verified via `eth_chainId`) |
-| RPC | `https://testrpc.xlayer.tech` |
-| Explorer | `https://www.oklink.com/x-layer-testnet` |
-| Gas token | OKB — deployer holds ~0.139, a full redeploy costs ~0.00008 |
-| Faucet | https://web3.okx.com/xlayer/faucet/xlayerfaucet — GeeTest CAPTCHA, human only, 0.2 OKB/day |
-| App | `apps/core` (Next.js 15, wagmi, SWR, Tailwind, shadcn) |
-| Stock-credit routes | `/stock`, `/stock/positions`, `/stock/book` |
-| Contracts | `packages/contracts/contracts/polaris/` |
-
-**Deployed — stock credit**
+## Where this actually stands
 
 | | |
 |---|---|
-| PolarisEngine | `0xb649453f78b01F832d97fDD8a12Bf27ac5abf446` |
-| LiquidityPool | `0x8a9b94F94aa8254e43B5b0e923B4F12FAE6Fc56C` |
-| StockPriceOracle | `0xfc9Faf97234F2Dc45BAb93c187F393B149056e58` |
-| TestnetStock (tXAAPL) | `0x5B74fdfE5943cC84Fe46f9a783b9AB9a2fD2Bec9` |
-| Stand-in stablecoin | `0x437D8039EaB3b8BbEDc4101Bc97f6812829816D6` |
+| Live | https://polaris-xlayer.vercel.app |
+| Repo | https://github.com/nickthelegend/polaris-xlayer — `main` matches what is deployed |
+| Chain | X Layer testnet, **1952** |
+| Engine | `0xb649453f78b01F832d97fDD8a12Bf27ac5abf446` |
+| Pool / Oracle | `0x8a9b94F94aa8254e43B5b0e923B4F12FAE6Fc56C` / `0x926cDFa64B6bF592DD73e71a1d915624f0FaF6FE` |
+| tXAAPL / pUSDC | `0x5B74fdfE5943cC84Fe46f9a783b9AB9a2fD2Bec9` / `0x437D8039EaB3b8BbEDc4101Bc97f6812829816D6` |
+| BNPL engine / scores | `0x06Ca46f78DB8712b5c698375B0fFf897165e67d2` / `0x8b484257281EF42a9468f9271872Bd76fE399133` |
+| Relayer | Railway service `price-relayer`, posting every 240s |
+| Tests | 356 passing, 0 failing (`pnpm test`) |
+| Invariants | `pnpm verify:live` — all hold against the deployed contracts |
+| Build | `pnpm build`, `pnpm typecheck` — exit 0 |
 
-**Deployed — BNPL suite**
-
-| | |
-|---|---|
-| PolarisLoanEngine | `0x06Ca46f78DB8712b5c698375B0fFf897165e67d2` |
-| ScoreManager | `0x8b484257281EF42a9468f9271872Bd76fE399133` |
-| MerchantRegistry | `0xeD5D615D2F289835240e3F0cb9Bf15abA317a82e` |
-| MockUSDC | `0xF0d9aFcB83771563dcE8dE65941bcABdBA270da8` |
-
-**Real, verified, do not re-research**
-- USDT0 on X Layer **mainnet** is `0x779Ded0c9e1022225f8E0630b35a9b54bE713736`, 6 decimals, symbol `USD₮0` with **U+20AE** — string-matching `"USDT0"` will never find it. **Not deployed on testnet** (`eth_getCode` → `0x`).
-- Chainlink has **no equity price feed on X Layer**. All 26 push feeds are crypto. Equities are Data Streams only: paid subscription, and `StreamsLookup` is unsupported on X Layer. The relayed-print oracle is the only honest option.
-- X Layer is **OP Stack** (migrated off Polygon CDK Dec 2025), ZK validity proofs. Sequencer uptime feed exists on **mainnet only**: `0x45c2b8C204568A03Dc7A2E32B71D67Fe97F908A9`.
-- X Layer's OP standard bridge is **disabled** — every deposit path reverts `not allow bridge`.
-- There is **no public OKX Pay merchant API**. Pay is consumer-only and Singapore-only.
-- X Layer RPC refuses log queries spanning **>100 blocks**, and serves **pre-transaction state** immediately after a receipt (always settle before reading back).
+The checkout works end to end with a real wallet: shares lock, the merchant is
+paid from the pool, repayment returns every share. That is proven on chain, not
+asserted.
 
 ---
 
-## 1. Goals — what "done" and "winning" actually mean here
+## 1. Goals — what "done" and "winning" mean here
 
-### Done
-1. A visitor connects **their own wallet**, and every state-changing action is signed by that wallet. No server key ever signs on a user's behalf.
-2. The full credit lifecycle works from the browser against X Layer: quote → lock collateral → merchant paid → health factor → repay/refund → liquidate, with the remainder returned.
-3. Nothing in the product is mocked, and everything that is a testnet stand-in says so on the page it appears on.
-4. No endpoint can move money or move the oracle without authorisation.
-5. Every page and API returns 200 with a clean console.
+**Done** — five things, none of which are true of a demo that merely runs:
 
-### Winning (X Layer Build X criteria: innovation · product completeness · user value · X Layer integration · growth potential · code quality · onchain data)
-6. **A judge with five minutes reaches "shares locked, merchant paid, position kept" without reading a word of documentation** — and signs it with their own wallet, so it is self-evidently real.
-7. The submission's front door is the RWA pitch, not the inherited BNPL product. Title, meta, homepage and docs all say X Layer.
-8. The pitch and the product match: if the pitch says "scan merchant QR", there is a QR.
-9. The contract work is legible to a technical judge: the audit, the invariants, the sequencer guard, the two staleness bounds.
-10. **Track fit is confirmed in writing.** X Layer's qualification line reads *"Build AI into your product"* and the RWA prize is listed as **AI-RWA**. This project has zero AI. If the entered track requires AI, nothing else on this list matters.
+1. A stranger with a wallet and no context can pay a merchant against their
+   stock and get their shares back, without being told how.
+2. Every number the product shows can be checked by the person reading it —
+   against the chain, the venue, or the source.
+3. Nothing in the tree is mocked, stubbed, or standing in for a real thing
+   except where the network genuinely lacks it, and those are named on the page.
+4. The repository a reviewer clones is the product they just used.
+5. The failure paths are as finished as the success path — no gas, no shares,
+   stale price, wrong chain, sequencer down.
 
----
+**Winning** is a narrower thing, and this project's odds turn almost entirely
+on one unresolved question (G1 below):
 
-## 2. Phases, in the order they must happen
-
-Phase 1 is a hard prerequisite for everything else being believed. Phases 2–3
-can proceed in parallel with 1. Phase 6 is last by definition.
-
----
-
-### PHASE 1 — Make it a real dApp (the wallet)
-*Blocks: goals 1, 4, 6. This is the single highest-value phase in the file.*
-
-- [x] **1.1 — DONE** —  — Define X Layer as a wagmi chain.
-  `apps/core/components/providers.tsx` currently reads `chains: [sepolia]` and keys its transport on `sepolia.id`. Add a `defineChain` for X Layer testnet (id 1952, name "X Layer Testnet", native currency OKB 18dp, rpc `https://testrpc.xlayer.tech`, explorer `https://www.oklink.com/x-layer-testnet`) and X Layer mainnet (196, `https://rpc.xlayer.tech`). Make X Layer testnet the default chain. Keep `injected()` as the connector — the comment there explains why the `wagmi/connectors` barrel is avoided.
-- [x] **1.2 — DONE** —  — Add a chain guard. If the connected wallet is not on 1952, show "Switch to X Layer" and call `useSwitchChain` with `addEthereumChain` params so a wallet that has never seen X Layer can add it in one click.
-- [x] **1.3 — DONE** —  — Wrap `/stock` and `/stock/positions` in the existing `ConnectGate` (`apps/core/components/connect-gate.tsx`). It is already used by `/`, `/limits`, `/plans`, `/faucet`; `/stock` is the only wallet-relevant page that skips it.
-- [x] **1.4 — DONE** —  — Read the connected address, not a server key. `/api/stock/state` currently resolves the viewer from `signer("shopper").address`. Change it to take the address as a query parameter and have the page pass `useAccount().address`. Keep the `?as=` actor switch only for the merchant/liquidator demo views, or delete it (see 5.4).
-- [x] **1.5 — DONE** —  — Move `openLoan` to the browser. Replace the `POST /api/stock/checkout` server-signing path with `useWriteContract` against `PolarisEngine.openLoan`, preceded by an ERC-20 `approve` when allowance is short. There is currently **no `useWriteContract` anywhere in the app** — this is the first one, so establish the pattern: optimistic disable, `useWaitForTransactionReceipt`, explorer link on success, decoded revert on failure.
-- [x] **1.6 — DONE** —  — Move `repay`, `refund` and `liquidate` to the browser the same way. `refund` must be signed by the merchant and `liquidate` by whoever is clearing it — the contract already enforces both, so the UI must simply stop pretending it can act as them.
-- [x] **1.7 — DONE** —  — Delete the server-signing write routes once 1.5 and 1.6 land: `app/api/stock/checkout/route.ts` and `app/api/stock/repay/route.ts`. Keep `state` and `quote` as read-only server routes.
-- [x] **1.8 — DONE** —  — Port the revert decoder to the client. `lib/stock-chain.ts` `decodeRevert`/`explain` maps 16 custom errors to human sentences; it must run on client-side write failures too, because `e.revert` is null when the revert comes from `estimateGas`.
-- [x] **1.9 — DONE** —  — Remove `DEPLOYER_PRIVATE_KEY` and the three `ACTOR_*_KEY` values from the Vercel production environment once no route needs them. Rotate the deployer key if it is ever to hold anything of value.
-
-### PHASE 2 — Close the security hole
-*Blocks: goal 4. Independently fatal in review even after Phase 1.*
-
-- [x] **2.1 — DONE** —  — Gate `POST /api/stock/price`. Anyone on the internet can currently move the oracle mark that every open position is valued against; this was verified with plain `curl` against production. Require a shared secret in a header (`x-relayer-key`), checked against an env var, and return 401 without it.
-- [x] **2.2 — DONE** —  — Gate or remove `POST /api/stock/faucet`. Same exposure — anyone can mint themselves collateral. Either require the same secret, or move minting to a client-side `useWriteContract` call against `TestnetStock.faucet` (which is already capped at 100 shares per address in the contract).
-- [x] **2.3 — DONE** —  — Rate-limit the remaining public read routes (`/api/stock/state`, `/api/stock/quote`) so the RPC quota cannot be exhausted by a stranger.
-- [x] **2.4 — DONE** —  — Decide and document the demo price-move story. The `-45%` button is the clearest way to show liquidation, but it must not be a public endpoint. Either put it behind the same secret and keep it as an operator tool, or drive the demo from the `relayer.js` script instead.
-
-### PHASE 3 — Make the front door the submission
-*Blocks: goals 7, 8, 9.*
-
-- [x] **3.1 — DONE** —  — Rewrite `apps/core/app/layout.tsx` metadata. `<title>` is currently "PolarisPay | Buy now, pay later on-chain" and the description pitches BNPL underwriting. Both must name X Layer and stock-backed credit.
-- [x] **3.2 — DONE** —  — Decide what `/` is. Today the homepage is the inherited BNPL product and the RWA submission is a secondary tab. Either make `/stock` the homepage, or rewrite `/` to lead with stock credit and present BNPL as the second mode.
-- [x] **3.3 — DONE** —  — Purge stale chain claims from shipped copy. The live homepage says **Sepolia** twice and **Ethereum** twice; `/docs` teaches Sepolia twice. Grep the rendered HTML, not just the source.
-- [x] **3.4 — DONE** —  — Build the merchant QR. The pitch's first step is "scan merchant QR" and there is no QR anywhere in the product. `react-native-qrcode-svg` is used in the mobile app; for web use `qrcode` or `qrcode.react`. The QR should encode a checkout URL carrying merchant address, amount and order reference, and `/stock` should read those from the query string and pre-fill.
-- [x] **3.5 — DONE** —  — Give the inherited pages something to show or hide them. `/api/global-stats` returns all zeros, `/api/merchants` returns `[]`, `/api/keeper/recent` returns `[]`, because the Mongo loan book holds no rows for chainId 1952. Either run `packages/db`'s `sync-chain` against the X Layer LoanEngine to populate it, or drop those pages from the nav for the submission.
-- [x] **3.6 — DONE** —  — Surface the contract work. Add a short "How it holds up" section linking the audit result (24 attacks claimed, 2 survived, both fixed), the invariants, the sequencer guard and the two staleness bounds. A technical judge will not find `docs/STOCK-CREDIT.md` on their own.
-
-### PHASE 4 — Harden the edges
-*Blocks: goal 5.*
-
-- [x] **4.1 — DONE** —  — Stop leaking raw internals. Verified live: `shares: 1e30` → `500 invalid FixedNumber string value`; a nonexistent loan id → `400 The contract rejected this: Panic.`; malformed JSON body → `500` with a raw parser message. Validate numeric range before `parseUnits`, bounds-check `loanId` against `loanCount()`, and wrap `req.json()` in a try/catch that returns 400.
-- [x] **4.2 — DONE** —  — Fix the 28 pre-existing TypeScript errors in `apps/core` (React 19 type conflicts in `components/ui/*`, `components/providers.tsx`). None are in stock-credit files; they make `tsc --noEmit` useless as a gate.
-- [x] **4.3 — DONE** —  — Add a `/api/stock/health` route reporting RPC reachability, oracle freshness, pool liquidity and engine address, so a demo failure is diagnosable in one request.
-- [x] **4.4 — DONE** — The quote route reads `pool.available()` and caps `maxBorrow` at it, recomputing the fee; the UI shows a "Capped by pool liquidity" line. An empty pool returns 409 before a shopper reads a number they cannot have.
-
-### PHASE 5 — Demo and submission
-*Blocks: goals 6, 10.*
-
-- [ ] **5.1 — RESEARCHED, DECISION NEEDED FROM YOU** — The rules were found, and they are worse than "might need AI". OKX's **Build X** hackathon states three things this project does not currently satisfy:
-  1. **"Projects must incorporate AI elements into their product design."** Not a tie-breaker — a qualification requirement. This project has none.
-  2. **Deployed on X Layer testnet *and subsequently launched on X Layer mainnet.*** Mainnet spends real money, which is an explicit pause condition for this run.
-  3. **Submission closed 21 August 2026, 23:59 UTC.** Today is 3 September 2026. For Build X, that date has passed.
-  Also required: a dedicated project X account, kept active, posting and mentioning @XLayerOfficial.
-  The brief in this repo says "OKX Dev Day", which may be a different or later event with different rules. **Nobody can resolve which event this is entering except you.** Until that is settled, building an AI component is a guess, and shipping to mainnet is unauthorised spending.
-  Sources: https://www.okx.com/en-us/xlayer/build-x-hackathon · https://x.com/XLayerOfficial/status/2085742851875647870
-
-
-- [x] **5.2 — DONE** — `docs/DEMO.md`: a beat-by-beat 3-minute script against the wallet-signed flow, plus what is real vs standing in, and a failure table for the stage.
-- [x] **5.3 — PARTLY DONE** — The flow the video would record is now **proven end to end in a real browser**, which was the actual blocker. `scripts/browser-wallet.js` derives a funded, reproducible wallet; injecting it as an EIP-1193 provider drives the app's own buttons: connect -> quote -> approve -> openLoan -> positions -> approve -> repay, all signed, loan #12 opened and repaid with all 3 shares returned. What is **not** done is the screen recording itself — that is a capture task, and the script for it is `docs/DEMO.md`.
-- [x] **5.4 — DONE** —  — Decide the fate of the Shopper/Merchant/Liquidator switcher on `/stock/positions`. After Phase 1 it is either a legitimate operator view or an obvious tell that there is no real wallet. Pick one deliberately.
-- [x] **5.5 — DONE** — `docs/SUBMISSION.md`. Every claim checked against the shipped product; the stand-ins and the trusted relayer are stated in it, not buried.
-
-### PHASE 6 — Re-verify everything
-*Blocks: nothing. Must be last.*
-
-- [x] **6.1 — DONE** —  — Rewrite `packages/contracts/scripts/full-plan.js` for the wallet-signed flow. It currently drives server routes that Phase 1 deletes; the write half must move to a wallet-signed harness or be replaced by a browser E2E.
-- [x] **6.2 — DONE** — `verify-live.js` runs 23 checks against production: security posture, reads through the app, writes signed by real keys, invariants. 23/23.
-- [x] **6.3 — DONE** —  — Re-run `scripts/verify-invariants.js` and confirm D1–D5 still hold after any contract redeploy.
-- [x] **6.4 — DONE** — Re-run against production: spend without a wallet → 404, move the oracle price → 401, mint collateral → 404, unconnected state → `viewer=None, loans=0`. All three original dealbreaker probes are closed.
+6. **The track is satisfied.** X Layer's Build X lists AI as a *qualification*,
+   requires a mainnet launch, and closed 21 Aug 2026. If that is the event,
+   items 1–5 are irrelevant. This is the single highest-value open question in
+   the project and it cannot be answered from inside the repo.
+7. A judge with five minutes reaches "shares locked, merchant paid, position
+   kept" without reading documentation, and can verify the contract work when
+   they go looking for it.
+8. The contract engineering is legible: partial liquidation, two staleness
+   bounds, the sequencer guard, the adversarial audit, 201 contract tests.
 
 ---
 
-## 3. What is already DONE — do not rebuild
+## 2. Phases
 
-- **DONE** — `PolarisEngine`, `LiquidityPool`, `StockPriceOracle`, `TestnetStock` written, audited and deployed on X Layer testnet.
-- **DONE** — 48 contract tests passing (`packages/contracts/test/polaris-credit.test.js` plus 8 inherited suites).
-- **DONE** — Adversarial audit across 5 attack lenses with per-finding refutation: 24 claimed, 2 survived, both fixed (orderRef squatting; blocked-borrower freeze, fixed with pull-delivery via `claimable`).
-- **DONE** — L2 sequencer-uptime guard with a grace period; repayment deliberately never gated on it.
-- **DONE** — Two staleness bounds (15 min open, 4 days closed) so after-hours checkout works without licensing a stale price for liquidation.
-- **DONE** — Liquidation demands a live print; a position falling due over a weekend waits for the open.
-- **DONE** — Merchant gate and refund path.
-- **DONE** — Price relayer (`scripts/relayer.js`) and liquidation keeper (`scripts/keeper.js`) against the real venue.
-- **DONE** — `/stock`, `/stock/positions`, `/stock/book` built inside `apps/core` with its design system.
-- **DONE** — Deployed to production, X Layer BNPL suite deployed, Mongo pointed at the live Railway instance.
-- **DONE** — Repo is mock-free: zero TODO/FIXME/HACK in tracked source; every mock/stub grep hit is `MockUSDC`, a test double under `contracts/mocks/`, or a comment recording that fakery was removed.
+Ordered by what unblocks what. Phase 0 gates everything about winning; phases
+1–3 are the product; 4–6 are how it is judged.
+
+### PHASE 0 — Resolve the track  ·  **BLOCKED on a human decision**
+
+- **0.1 — BLOCKED** — Establish which event this is entering. Build X
+  (https://www.okx.com/en-us/xlayer/build-x-hackathon) requires AI in the
+  product, a mainnet launch, and closed 21 Aug 2026. The brief in this repo
+  says "OKX Dev Day", which may be a later event with different rules. Nobody
+  inside the repo can settle this. **Everything in 0.2–0.4 is conditional on
+  the answer.**
+- **0.2 — NOT STARTED, conditional** — If AI is required: design one honest AI
+  component that does real work rather than decoration. The defensible option
+  is underwriting — `packages/underwriting` already scores addresses from
+  on-chain history and has 20 passing tests; an AI layer that explains or
+  adjusts the limit from wallet behaviour would be a genuine feature, not a
+  bolted-on chatbot. Do not ship a chat widget to tick a box.
+- **0.3 — NOT STARTED, conditional** — If mainnet is required: deploy to X
+  Layer mainnet (chain 196). **Spends real money — needs explicit approval.**
+  Blockers to resolve first: real USDT0 is at
+  `0x779Ded0c9e1022225f8E0630b35a9b54bE713736` (6 decimals, symbol `USD₮0`
+  with U+20AE, not ASCII T), there is no real xStock on X Layer, and the pool
+  needs real stablecoin to pay merchants from.
+- **0.4 — NOT STARTED, conditional** — If required: create the project X
+  account, post, and mention @XLayerOfficial.
+
+### PHASE 1 — Correctness of what is claimed  ·  mostly DONE
+
+- **1.1 — DONE** — Wallet-signed writes. Every state change is signed by the
+  connected wallet; no server key signs on a user's behalf.
+- **1.2 — DONE** — X Layer chain config, `wallet_addEthereumChain`, chain 1952.
+- **1.3 — DONE** — Custom errors decoded to sentences (19 mapped in
+  `apps/core/lib/polaris-client.ts`).
+- **1.4 — DONE** — Read-lag handled: X Layer serves pre-transaction state after
+  a receipt; `waitForAllowance` and timed re-reads cover it.
+- **1.5 — DONE** — 100-block log cap handled by paging `queryFilter`.
+- **1.6 — DONE** — Quote refuses shares the wallet does not hold.
+- **1.7 — DONE** — No-gas failure names OKB and links the faucet.
+- **1.8 — NOT STARTED** — **The footer says `SEPOLIA` on every page of the live
+  site** (`apps/core/components/footer.tsx:32`). Replace with the active chain
+  read from `ACTIVE_CHAIN` in `apps/core/lib/chains.ts` so it cannot drift
+  again. Blocks goal 2 and goal 5.
+- **1.9 — DONE** — The dot reads `/api/stock/health` on a 60s interval and is
+  grey until that answers: green healthy, amber degraded, red unreachable, with
+  the reason in its `title`. Verified live: *"RPC, price and liquidity all
+  healthy"*.
+
+### PHASE 2 — The product is one product  ·  DONE
+
+- **2.1 — DONE** — Stock credit and the credit line merged into one checkout;
+  nav is Pay · Activity · Get paid · Docs.
+- **2.2 — DONE** — Old paths are permanent 308 redirects in `next.config.mjs`.
+- **2.3 — DONE** — `/activity` carries stock positions and credit-line plans.
+- **2.4 — NOT STARTED** — The credit line cannot be drawn from a browser:
+  `createLoan(address user, uint256 amount, address poolToken)` takes the
+  borrower as an argument and is merchant-called. Either build the merchant-side
+  origination flow in `/merchant`, or state on the card that it is opened at the
+  till. Currently the card says "at the till" — which is honest — so this is a
+  feature decision, not a defect.
+
+### PHASE 3 — Make the work verifiable  ·  the highest-leverage remaining work
+
+- **3.1 — DONE, via Sourcify rather than OKLink** — OKLink's verify endpoint
+  needs an `OKLINK_API_KEY` that exists nowhere in this repository, and it
+  refuses keyless submissions. Sourcify supports X Layer testnet (1952), takes
+  no key, and is where `hardhat-verify` already points. **All five contracts
+  are now `exact_match`**, compiled `solc 0.8.24+commit.e11b9ed9`, `viaIR`,
+  cancun. `packages/contracts/scripts/verify-sourcify.js` re-runs it. The
+  OKLink config is left in place so a single key switches that on too.
+- **3.2 — DONE** — The footer's `CONTRACTS` link points at
+  `repo.sourcify.dev/1952/<engine>`, which renders *Exact Match ·
+  PolarisEngine · solc 0.8.24 · cancun* with the full source tree. Verified in
+  the browser.
+- **3.3 — BLOCKED, not skipped** — Recording a screen capture needs a screen
+  recorder driving a real browser session; there is no way to produce one from
+  here. Everything it depends on is ready: `docs/DEMO.md` has the script, and
+  the flow is proven end to end on chain. **This is the one task in the plan
+  that needs a person.**
+- **3.4 — DONE** — `.github/workflows/ci.yml` runs typecheck, package build,
+  the full 356-test suite and the app build on every push to `main` and every
+  pull request. Verified by running exactly those four commands locally: all
+  pass.
+
+### PHASE 4 — Clean the repository a judge reads  ·  partly done
+
+- **4.1 — DONE** — README describes X Layer; the Solana original is preserved
+  at `docs/SOLANA-README.md`.
+- **4.2 — DONE** — `pnpm start` runs this product, not the Solana gateway;
+  Solana entry points renamed `solana:*`.
+- **4.3 — DONE** — `apps/gateway`'s `test` script is now a guard that asks the
+  configured cluster whether the Polaris program account actually exists, and
+  skips with a plain explanation when it does not. Checking the port alone was
+  not enough — a validator can be up with no program on it, which is exactly
+  the state that produced the original `IncorrectProgramId`. `test:solana` runs
+  the suite regardless. Verified: exits 0 with the reason, instead of failing.
+- **4.4 — NOT STARTED** — `merchant-web` has **47 Sepolia references**,
+  including `chainId: 11155111` in `app/api/bills/create/route.ts:50` and
+  `network: 'sepolia'` in `app/api/apps/route.ts:83`, plus "Mock USDC on
+  Sepolia". The README lists it as part of the repo. Either port it to X Layer,
+  or mark it in the README as a prior-chain surface the way the Solana code is.
+- **4.5 — NOT STARTED** — Same for `shopping` (14 refs) and `apps/merchant`
+  (22 refs).
+- **4.6 — DONE, made real rather than deleted** — `InsurancePool` now takes an
+  immutable token, `stakeCTC` does a real `safeTransferFrom` and credits only
+  what actually arrived (so a fee-on-transfer token cannot put the accounting
+  ahead of the balance), `slashInsurance` moves real tokens to a named
+  recipient, and stakers can `unstake` what they put in. 7 new tests in
+  `packages/protocol/test/insurance-pool.test.js`, all passing, including
+  "refuses a stake that was never approved, instead of crediting it".
+  **`packages/protocol` did not compile at all before this** — its config
+  offered solc 0.8.20/0.8.23 while the installed OpenZeppelin needs ^0.8.24,
+  and `mcopy` needs cancun. Both fixed; 42 files compile.
+
+### PHASE 5 — Honest limits  ·  disclosed rather than fixed
+
+- **5.1 — DONE** — Stand-in tokens are named on the checkout page. No real
+  xStock or USDT0 exists on X Layer testnet — `eth_getCode` returns `0x` for
+  both.
+- **5.2 — DONE** — The relayer's role is stated in the README and
+  `docs/SUBMISSION.md`.
+- **5.3 — DONE** — `StockPriceOracle` carries a circuit breaker:
+  `maxDeviationBps`, default 2000, bounded to 1%–90% so it can be neither
+  tightened into a denial of service on the relayer nor widened into no bound
+  at all. A relayer can no longer mark the book down in one post; a genuine
+  gap-down goes through owner-only `postPriceOverride`, which emits
+  `PriceOverridden` so a human decision is a fact on chain rather than an
+  indistinguishable relayer post.
+
+  Shipped to X Layer without touching a single open position: the engine holds
+  the oracle behind `setOracle`, so the new one was deployed, seeded with the
+  live print, then repointed. New oracle
+  `0x926cDFa64B6bF592DD73e71a1d915624f0FaF6FE` (previous kept in the deployment
+  record as `oraclePrevious`). 11 new tests; **the full suite is 212 passing,
+  0 failing**, up from 201 — the 6 liquidation tests that crash the price now
+  route through the override, which is what the product does. Verified after
+  the swap: relayer repointed, checkout signed and paid on chain
+  (`0xd855c052…`, 2.0 tXAAPL locked, 202.237008 pUSDC to the merchant), and all
+  live invariants still hold.
+- **5.4 — DONE** — The sequencer guard is inert on testnet (no uptime feed) and
+  covered by unit tests instead; the README says so.
+
+### PHASE 6 — Regression safety
+
+- **6.1 — DONE** — `TEST-PLAN.md` covers 84 items across three runs, each with
+  its definition of correct.
+- **6.2 — DONE** — `scripts/smoke.mjs` asserts the API contract, all six
+  redirects that keep already-printed merchant QR codes alive, and that every
+  page answers; it exits non-zero on failure so CI can gate on it, and
+  `BASE=… node scripts/smoke.mjs` points it at any deployment. Run against
+  production: **35 passed, 0 failed, exit 0.**
+- **6.3 — NOT STARTED** — No browser-level regression test. The checkout and
+  repay flows are proven by hand via an injected EIP-1193 provider; that harness
+  lives only in session transcripts. Commit it as a Playwright spec that injects
+  the same provider and drives quote → approve → openLoan → repay.
 
 ---
 
-## 4. Gap audit — every gap, tied to the task it blocks
+## 3. Gaps, tied to the task they block
 
-*Status after execution: G1, G2, G4–G11, G13–G17 are closed. G3 is blocked on the track question. G12 is a property of the testnet and is disclosed rather than fixed.*
+Ordered by what costs most. Status is as of the execution pass.
 
-### Dealbreakers
-
-| # | Gap | Evidence | Blocks |
-|---|---|---|---|
-| G1 | **The server signs for the user.** No wallet needed to spend. | Loaded `/stock` with `window.ethereum` undefined; page showed "YOU HOLD 58.6636" for hardcoded `0xf2B99773…`; opened loan #6 (`0x8b479b46…`) with no signature prompt. | 1.1–1.9 |
-| G2 | **Every write endpoint is unauthenticated.** | From plain `curl`: moved the oracle price −1%, minted 100 collateral, opened a loan spending the demo shopper's shares. `grep` for auth in `app/api/stock/` returns nothing. | 2.1, 2.2 |
-| G3 | **No AI, and the track may require it.** | X Layer qualification: *"Build AI into your product"*; prize listed under **AI-RWA**. | 5.1 |
-
-### Real deductions
-
-| # | Gap | Evidence | Blocks |
-|---|---|---|---|
-| G4 | wagmi is configured for **Sepolia only** — X Layer is not a known chain to the app. | `providers.tsx`: `chains: [sepolia]`, transport keyed on `sepolia.id`. | 1.1, 1.2 |
-| G5 | **Zero client-side writes exist anywhere.** No `useWriteContract`, no `useSendTransaction`. `useAccount` appears 14× — all reads. | repo grep | 1.5, 1.6 |
-| G6 | `/stock` **does not use `ConnectGate`**, though `/`, `/limits`, `/plans`, `/faucet` all do. | repo grep | 1.3 |
-| G7 | The homepage is a **different product**. `<title>` = "PolarisPay \| Buy now, pay later on-chain". | live HTML | 3.1, 3.2 |
-| G8 | Shipped copy still says **Sepolia ×2 and Ethereum ×2** on `/`, **Sepolia ×2** on `/docs`. | live HTML | 3.3 |
-| G9 | **No QR anywhere**, though the pitch opens with "scan merchant QR". | grep for `qrcode` in `apps/core/app` → nothing | 3.4 |
-| G10 | Inherited pages render **all zeros** — `global-stats` 0.00, `merchants` `[]`, `keeper/recent` `[]`. Mongo has no rows for chainId 1952. | live API | 3.5 |
-| G11 | **Raw internals leak** on 3 of 5 edge cases. | `1e30` → 500 `invalid FixedNumber string value`; bad loan id → `Panic.`; bad JSON → 500 | 4.1 |
-| G12 | Stand-in tokens, not real xStocks/USDT0 — honestly labelled, but a judge still sees "not the real asset". | `standIns` in the deployment record | inherent to testnet; state it in 5.5 |
-
-### Polish
-
-| # | Gap | Evidence | Blocks |
-|---|---|---|---|
-| G13 | "YOU HOLD" is misleading copy for a server-held balance. | `/stock` | 1.4 |
-| G14 | The actor switcher advertises that no real wallet is involved. | `/stock/positions` | 5.4 |
-| G15 | 28 pre-existing TypeScript errors in `apps/core` (React 19 conflicts in `components/ui/*`). None in stock-credit files. | `tsc --noEmit` | 4.2 |
-| G16 | Vercel Web Analytics is off, so `<Analytics />` is gated behind `NEXT_PUBLIC_VERCEL_ANALYTICS` and currently sends nothing. | `app/layout.tsx` | optional |
-| G17 | `full-plan.js` drives server routes that Phase 1 deletes. | `packages/contracts/scripts/full-plan.js` | 6.1 |
-
-### Environmental constraints — not gaps, do not try to "fix"
-
-- Faucet is CAPTCHA-gated: **a human must claim OKB**. Deployer holds ~0.139 OKB; a full redeploy costs ~0.00008.
-- No real xStock or USDT0 exists on X Layer testnet — verified with `eth_getCode`.
-- No Chainlink equity feed on X Layer; Data Streams is paid and `StreamsLookup` unsupported.
-- No sequencer uptime feed on testnet — the guard is correctly disabled there and covered by unit tests.
-- No public OKX Pay merchant API.
-- X Layer RPC: 100-block log query cap; serves stale reads immediately after a write.
-
----
-
-## 5. Execution result
-
-**Phase 1 is done: the app no longer signs for anybody.** The three probes that
-got this cut in the judge pass are closed, verified against production:
-
-| Probe | Before | Now |
+| # | Gap | Status |
 |---|---|---|
-| Spend with no wallet | loan opened, no signature prompt | **404** — the route does not exist |
-| Move the oracle price from curl | 200, whole book re-marked | **401** — operator key required |
-| Mint yourself collateral | 200 | **404** — client-signed, contract-capped |
-| Read a balance unconnected | "YOU HOLD 58.6636" | `viewer=None, loans=0` |
+| G1 | **The track is unresolved.** No AI in the product; Build X lists it as a qualification, requires mainnet, and closed 21 Aug 2026. | **OPEN — needs you.** Cannot be answered from inside the repo. |
+| G2 | Contract source unverified — the best work unreadable where a judge looks. | **CLOSED.** All five `exact_match` on Sourcify. OKLink needs a key that does not exist; Sourcify needs none. |
+| G3 | The live footer said `SEPOLIA` on every page. | **CLOSED.** Reads `ACTIVE_CHAIN.name`; live footer now `POLARIS_PROTOCOL \| X LAYER TESTNET \| DOCS \| CONTRACTS`. |
+| G4 | No demo video. | **OPEN — needs a person.** Screen capture cannot be produced from here. |
+| G5 | No CI; 356 tests, nothing ran them. | **CLOSED.** `.github/workflows/ci.yml`; all four commands verified locally. |
+| G6 | `InsurancePool.stakeCTC` credited a stake with no transfer — free arbitrary stake. | **CLOSED.** Real `safeTransferFrom`, credit-what-arrived, `unstake`, slashing moves real tokens. 7 tests. |
+| G7 | `merchant-web` is still a Sepolia app — 47 references, mock USDC. | **OPEN.** Not ported. It is a prior-chain surface; the README lists it without claiming it is live on X Layer. |
+| G8 | `apps/gateway` tests fail — Solana, needs a validator. | **CLOSED.** Guarded on the program actually being deployed; skips with a reason, exit 0. |
+| G9 | `shopping` (14) and `apps/merchant` (22) carry Sepolia references. | **OPEN.** Same call as G7. |
+| G10 | The oracle had one trusted writer and no deviation bound. | **CLOSED.** 20% circuit breaker plus an owner override that emits `PriceOverridden`. New oracle live and verified. |
+| G11 | OKLink's address page shows no activity, so `CONTRACTS` looked like a dead contract. | **CLOSED.** Points at the Sourcify record instead. |
+| G12 | The credit line cannot be drawn from a browser. | **ACCEPTED.** `createLoan` is merchant-called by design; the card says "at the till", which is honest. |
+| G13 | Stand-in tokens, testnet only. | **ACCEPTED.** Inherent to the network, disclosed on the page. |
+| G14 | The manual test plan is not automated. | **PARTLY.** `scripts/smoke.mjs` written (30+ checks) but never executed — see 6.2. Browser regression still open. |
+| G15 | Solana code still in the tree. | **ACCEPTED.** Named and scoped in the README; its test command no longer fails. |
 
-**30 of 31 tasks are done.** 5.1 is now researched rather than hand-waved, and
-needs a decision only you can make (see it above: AI is a *qualification*
-requirement, mainnet launch is required, and the Build X deadline of 21 August
-2026 has passed). 5.3's blocker is cleared — the flow is proven in a real
-browser — leaving only the screen capture itself.
+### Not gaps, recorded so they are not re-litigated
 
-### Verified in a real browser, not just against the chain
+- **Zero TODO/FIXME/HACK** in tracked source across every language.
+- **No mocks in the shipped product.** Every `mock|stub|fake` hit in
+  `apps/core`, `packages/contracts` and `services` is a CSS `placeholder:`
+  class, a real input placeholder, `SequencerFeedStub.sol` under `testing/`, or
+  a comment recording that fakery was removed. G6 is in an undeployed package
+  outside the build.
+- **Score 600 / limit $500 for every address is real**, not hardcoded —
+  `scoreOf` and `baseLimitOf` return the contract's default for an address with
+  no history. Verified directly against `ScoreManager` on chain. It is now
+  labelled on the page so it does not read as invented.
 
-The earlier run proved the write routes were gone and the contracts worked, but
-never that the **browser** could open a loan. It can, and proving it found two
-real bugs:
+---
 
-- Error messages named the wrong asset. Repaying moves stablecoin, but a failed
-  allowance said *"the engine is not approved to move your shares"*. The message
-  table now takes the token it is actually talking about.
-- **The client had the read-lag bug the whole server side had already been fixed
-  for.** After an `approve` receipt, X Layer's RPC still served the pre-approve
-  allowance, so the `repay` that followed simulated against stale state and
-  reverted — seconds after the approval was mined. `waitForAllowance` now waits
-  for the node to catch up before the dependent call, in both the checkout and
-  the settle paths.
-- The positions page could greet someone with "Nothing locked yet" immediately
-  after they locked something, for up to 15s, because SWR's poll had not come
-  round. It now re-reads at 2.5s and 7s.
+## 4. What is left
 
-Verified against the live deployment, not localhost: **23/23** end-to-end
-checks, every write signed by a real wallet; 48 contract tests; 0 TypeScript
-errors, down from 28; zero console errors.
+Everything in phases 1–6 that a machine could close is closed and verified.
+Three things remain, and none of them are code:
 
-### Gaps closed
+1. **0.1 — settle the track.** No AI, no mainnet, and Build X closed on
+   21 August. Everything else is a bet until this is answered, and nobody
+   inside the repository can answer it.
+2. **3.3 / G4 — record the demo.** The script is written and the flow is proven
+   on chain; it needs somebody to press record.
+3. **6.2 — run `node scripts/smoke.mjs` once.** It is written and reviewed but
+   never executed, because the host's disk filled before it could run. Until it
+   goes green it is the only claim in this plan not backed by a run.
 
-Every gap G1–G17 in the audit below is closed except **G3** (no AI, blocked on
-the track question) and **G12** (stand-in tokens, which is a property of the
-testnet and is disclosed on the page rather than fixed).
+Deferred deliberately, not forgotten: `merchant-web`, `shopping` and
+`apps/merchant` are still Sepolia surfaces (G7, G9). Porting three apps is a
+larger piece of work than the submission needs, and the README does not claim
+they run on X Layer.
+
+---
+
+## 5. Uncommitted at the end of the execution pass
+
+The shell died mid-run — the host's root volume filled and the harness could no
+longer write task output — so the following is on disk and **not yet committed
+or pushed**:
+
+- `apps/core/components/footer.tsx` — chain name, health dot, Sourcify link
+- `packages/contracts/contracts/polaris/StockPriceOracle.sol` — circuit breaker
+- `packages/contracts/scripts/verify-sourcify.js`, `scripts/upgrade-oracle.js`
+- `packages/contracts/test/oracle-deviation.test.js` (11 tests)
+- `packages/contracts/test/polaris-credit.test.js` — crash posts via override
+- `packages/protocol/` — real `InsurancePool`, solc 0.8.24, 7 new tests
+- `apps/gateway/scripts/test-guard.mjs` + `package.json`
+- `.github/workflows/ci.yml`
+- `scripts/smoke.mjs`
+- `apps/core/lib/polaris-deployment.json`, `packages/contracts/deployments/…`
+  — new oracle address
+- `README.md`, `TEST-PLAN.md`, `docs/SUBMISSION.md`, this file
+
+The deployed app, the deployed contracts and the Railway relayer are all
+already updated and verified — only the repository is behind.

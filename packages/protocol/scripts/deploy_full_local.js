@@ -62,7 +62,7 @@ async function main() {
     console.log("ScoreManager deployed to:", scoreManager.target);
 
     const InsurancePool = await hre.ethers.getContractFactory("InsurancePool");
-    const insurancePool = await InsurancePool.deploy();
+    const insurancePool = await InsurancePool.deploy(usdc.target);
     await insurancePool.waitForDeployment();
     console.log("InsurancePool deployed to:", insurancePool.target);
 

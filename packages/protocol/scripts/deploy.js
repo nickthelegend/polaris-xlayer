@@ -60,7 +60,7 @@ async function main() {
 
     // 8. Deploy InsurancePool
     const InsurancePool = await hre.ethers.getContractFactory("InsurancePool");
-    const insurancePool = await InsurancePool.deploy();
+    const insurancePool = await InsurancePool.deploy(await usdc.getAddress());
     await insurancePool.waitForDeployment();
     console.log("InsurancePool deployed to:", await insurancePool.getAddress());
 

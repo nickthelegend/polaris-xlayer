@@ -6,9 +6,10 @@
   "contracts": {
     "stock": "0x5B74fdfE5943cC84Fe46f9a783b9AB9a2fD2Bec9",
     "stable": "0x437D8039EaB3b8BbEDc4101Bc97f6812829816D6",
-    "oracle": "0xfc9Faf97234F2Dc45BAb93c187F393B149056e58",
+    "oracle": "0x926cDFa64B6bF592DD73e71a1d915624f0FaF6FE",
     "pool": "0x8a9b94F94aa8254e43B5b0e923B4F12FAE6Fc56C",
-    "engine": "0xb649453f78b01F832d97fDD8a12Bf27ac5abf446"
+    "engine": "0xb649453f78b01F832d97fDD8a12Bf27ac5abf446",
+    "oraclePrevious": "0xfc9Faf97234F2Dc45BAb93c187F393B149056e58"
   },
   "risk": {
     "maxLtvBps": 3500,

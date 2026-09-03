@@ -36,7 +36,7 @@ Swap-to-pay is not a third option — it is the first one with extra steps.
 |---|---|
 | PolarisEngine | `0xb649453f78b01F832d97fDD8a12Bf27ac5abf446` |
 | LiquidityPool | `0x8a9b94F94aa8254e43B5b0e923B4F12FAE6Fc56C` |
-| StockPriceOracle | `0xfc9Faf97234F2Dc45BAb93c187F393B149056e58` |
+| StockPriceOracle | `0x926cDFa64B6bF592DD73e71a1d915624f0FaF6FE` |
 | PolarisLoanEngine (BNPL) | `0x06Ca46f78DB8712b5c698375B0fFf897165e67d2` |
 
 ## Three decisions that are the actual work

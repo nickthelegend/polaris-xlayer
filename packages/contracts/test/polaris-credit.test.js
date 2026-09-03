@@ -28,8 +28,24 @@ describe("Polaris", () => {
   const PRICE = usd(220); // XAAPL at $220
   const TENOR = 7 * 24 * 60 * 60;
 
+  /**
+   * Post a print the way the product would.
+   *
+   * The oracle carries a circuit breaker: a relayer cannot move the mark more
+   * than `maxDeviationBps` in one step, because every open position is valued
+   * against it. A crash large enough to make a position liquidatable is, by
+   * construction, larger than that — so it goes through the owner override,
+   * which is exactly what happens in production and leaves `PriceOverridden`
+   * on chain. This helper picks the same path the real caller would.
+   */
   async function post(price = PRICE, open = true) {
-    await oracle.postPrice(await stock.getAddress(), price, await time.latest(), open, "NASDAQ last");
+    const addr = await stock.getAddress();
+    const at = await time.latest();
+    if (await oracle.withinDeviation(addr, price)) {
+      await oracle.postPrice(addr, price, at, open, "NASDAQ last");
+    } else {
+      await oracle.postPriceOverride(addr, price, at, open, "NASDAQ last", "crash, for the test");
+    }
   }
 
   beforeEach(async () => {
@@ -412,7 +428,7 @@ describe("Polaris — the sequencer goes down", () => {
     await engine.connect(borrower).openLoan(
       await stock.getAddress(), shares(10), merchant.address, ethers.id("seq"), stable(700), TENOR
     );
-    await oracle.postPrice(await stock.getAddress(), usd(130), await time.latest(), true, "live");
+    await oracle.postPriceOverride(await stock.getAddress(), usd(130), await time.latest(), true, "live", "crash, for the test");
   });
 
   it("is liquidatable while the sequencer is healthy", async () => {
@@ -436,7 +452,7 @@ describe("Polaris — the sequencer goes down", () => {
     // The price went stale while we waited — which is exactly the state after
     // a real outage. A stale print is not a licence to liquidate.
     expect(await engine.isLiquidatable(0)).to.equal(false);
-    await oracle.postPrice(await stock.getAddress(), usd(130), await time.latest(), true, "live");
+    await oracle.postPriceOverride(await stock.getAddress(), usd(130), await time.latest(), true, "live", "crash, for the test");
     expect(await engine.isLiquidatable(0)).to.equal(true);
   });
 
@@ -547,12 +563,12 @@ describe("Polaris — the hardening", () => {
     );
     // Price collapses, but it collapsed at the close — the shares cannot
     // actually be sold, so they cannot be taken either.
-    await oracle.postPrice(await stock.getAddress(), usd(130), await time.latest(), false, "close");
+    await oracle.postPriceOverride(await stock.getAddress(), usd(130), await time.latest(), false, "close", "crash, for the test");
     expect(await engine.isLiquidatable(0)).to.equal(false);
     await expect(engine.connect(liquidator).liquidate(0)).to.be.revertedWithCustomError(engine, "NotLiquidatable");
 
     // The moment the venue opens on the same price, it is liquidatable.
-    await oracle.postPrice(await stock.getAddress(), usd(130), await time.latest(), true, "live");
+    await oracle.postPriceOverride(await stock.getAddress(), usd(130), await time.latest(), true, "live", "crash, for the test");
     expect(await engine.isLiquidatable(0)).to.equal(true);
     await expect(engine.connect(liquidator).liquidate(0)).to.not.be.reverted;
   });
@@ -607,7 +623,7 @@ describe("Polaris — a blocked borrower cannot brick the position", () => {
 
   it("liquidation still completes when the issuer has blocked the borrower", async () => {
     await stock.setBlocked(borrower.address, true);
-    await oracle.postPrice(await stock.getAddress(), usd(130), await time.latest(), true, "live");
+    await oracle.postPriceOverride(await stock.getAddress(), usd(130), await time.latest(), true, "live", "crash, for the test");
     expect(await engine.isLiquidatable(0)).to.equal(true);
 
     await expect(engine.connect(liquidator).liquidate(0)).to.not.be.reverted;

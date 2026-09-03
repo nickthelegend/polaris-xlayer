@@ -4,9 +4,14 @@ require("dotenv").config();
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
     solidity: {
+        // The installed OpenZeppelin requires ^0.8.24 (EIP712, Strings,
+        // Bytes), so this package stopped compiling at all with only 0.8.20
+        // and 0.8.23 configured. 0.8.24 is what packages/contracts already
+        // uses, which keeps one compiler across the repository.
         compilers: [
             { version: "0.8.20", settings: { viaIR: true, optimizer: { enabled: true, runs: 200 } } },
-            { version: "0.8.23", settings: { viaIR: true, optimizer: { enabled: true, runs: 200 } } }
+            { version: "0.8.23", settings: { viaIR: true, optimizer: { enabled: true, runs: 200 } } },
+            { version: "0.8.24", settings: { viaIR: true, optimizer: { enabled: true, runs: 200 }, evmVersion: "cancun" } }
         ],
     },
     networks: {
