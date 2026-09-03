@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useSWRConfig } from 'swr';
 import { X } from 'lucide-react';
 
-// Mock USDC on Sepolia
+// The stand-in stablecoin on X Layer testnet
 const STABLECOIN_ADDRESS = "0x1083D49aAB56502D4f4E24fFf52ce622D9B6eCd0";
 
 interface Props {

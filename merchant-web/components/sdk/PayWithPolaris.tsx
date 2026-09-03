@@ -73,8 +73,8 @@ export const PayWithPolaris: React.FC<PayWithPolarisProps> = ({
                             params: [
                                 {
                                     chainId: '0x' + chainId.toString(16),
-                                    chainName: 'Ethereum Sepolia',
-                                    rpcUrls: ['https://eth-sepolia.g.alchemy.com/v2/3qRB0TMQQv3hyKgav_6lF'],
+                                    chainName: 'Ethereum X Layer',
+                                    rpcUrls: ['https://testrpc.xlayer.tech'],
                                     nativeCurrency: {
                                         name: 'Ethereum',
                                         symbol: 'ETH',

@@ -77,7 +77,7 @@ export default function Shop() {
                             />
 
                             <p className="text-xs text-center text-gray-400 mt-4">
-                                Testing Mode: This will process on Ethereum Sepolia (USDC)
+                                Testing Mode: This will process on Ethereum X Layer (USDC)
                             </p>
                         </div>
                     </div>

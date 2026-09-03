@@ -25,16 +25,16 @@ import { BrowserProvider } from 'ethers';
  * use to send real transactions.
  */
 
-const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 11155111);
+const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 1952);
 const CHAIN_HEX = `0x${CHAIN_ID.toString(16)}`;
 
-/** Shown to the wallet if the user does not have Sepolia configured yet. */
+/** Shown to the wallet if the user does not have X Layer configured yet. */
 const CHAIN_PARAMS = {
     chainId: CHAIN_HEX,
-    chainName: 'Sepolia',
-    nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
-    rpcUrls: ['https://ethereum-sepolia-rpc.publicnode.com'],
-    blockExplorerUrls: ['https://sepolia.etherscan.io'],
+    chainName: 'X Layer',
+    nativeCurrency: { name: 'OKB', symbol: 'OKB', decimals: 18 },
+    rpcUrls: ['https://testrpc.xlayer.tech'],
+    blockExplorerUrls: ['https://www.oklink.com/x-layer-testnet'],
 };
 
 type Eip1193 = {
@@ -169,7 +169,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             });
         } catch (err) {
             // 4902 means the wallet has never heard of this chain. Adding it is
-            // the fix, and it is the common case for a first-time Sepolia user.
+            // the fix, and it is the common case for a first-time X Layer user.
             if ((err as { code?: number }).code === 4902) {
                 await eth.request({ method: 'wallet_addEthereumChain', params: [CHAIN_PARAMS] });
             } else {

@@ -197,7 +197,7 @@ export default function CheckoutPage() {
                                     <span className="bg-green-500/10 border border-green-500/20 text-green-400 text-[10px] font-black px-2 py-0.5 rounded uppercase">0%_APR</span>
                                 </div>
                                 <p className="text-[11px] text-white/60 leading-relaxed font-medium">
-                                    Buy now, pay later with your Polaris Credit Limit. Zero-collateral, sub-second settlement on Sepolia.
+                                    Buy now, pay later with your Polaris Credit Limit. Zero-collateral settlement on X Layer.
                                 </p>
                                 {loading && (
                                     <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm">
@@ -250,7 +250,7 @@ export default function CheckoutPage() {
                     <div className="flex items-center gap-3 p-4 bg-white/5 rounded border border-white/10">
                         <ShieldCheck className="w-5 h-5 text-green-500" />
                         <span className="text-[10px] font-bold text-white/60 leading-tight uppercase tracking-wider">
-                            Secured by Sepolia Native Verification & Polaris Escrow Protocol
+                            Secured by X Layer settlement &amp; the Polaris escrow contracts
                         </span>
                     </div>
                 </div>

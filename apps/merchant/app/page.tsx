@@ -221,10 +221,10 @@ export default function Home() {
             <footer className="border-t border-foreground/8">
                 <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-4 px-6 py-8 md:px-10">
                     <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/65">
-                        Polaris · Sepolia
+                        Polaris · X Layer
                     </p>
                     <a
-                        href="https://sepolia.etherscan.io/address/0x21E9740DDe241f0653F699DAa206AfCE1FA25405"
+                        href="https://www.oklink.com/x-layer-testnet/address/0x21E9740DDe241f0653F699DAa206AfCE1FA25405"
                         target="_blank"
                         rel="noreferrer"
                         className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/65 transition-colors hover:text-foreground/90"

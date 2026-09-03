@@ -31,7 +31,7 @@ const MERCHANT_ROUTER_ABI = [
     "function merchantBalances(address merchant, address token) view returns (uint256)"
 ];
 
-// Mock USDC on Sepolia
+// The stand-in stablecoin on X Layer testnet
 const DEFAULT_STABLECOIN = "0x1083D49aAB56502D4f4E24fFf52ce622D9B6eCd0";
 
 export default function AppDetails() {
@@ -73,17 +73,17 @@ export default function AppDetails() {
         }
     }, [wallet]);
 
-    const switchToSepolia = async () => {
+    const switchToXLayer = async () => {
         if (!wallet) return;
         try {
-            await wallet.switchChain(11155111);
-            setCurrentChainId(11155111);
+            await wallet.switchChain(1952);
+            setCurrentChainId(1952);
         } catch (e: any) {
             setError('Failed to switch network. Please switch manually in your wallet.');
         }
     };
 
-    const isOnSepolia = currentChainId === 11155111;
+    const isOnXLayer = currentChainId === 1952;
 
     const { data, error: fetchError, mutate } = useSWR(
         authenticated && user?.wallet?.address ? `/api/apps/${id}` : null,
@@ -111,7 +111,7 @@ export default function AppDetails() {
     const fetchBalance = async () => {
         if (!app?.escrow_contract) return;
         try {
-            const provider = new ethers.JsonRpcProvider('https://1rpc.io/sepolia');
+            const provider = new ethers.JsonRpcProvider('https://testrpc.xlayer.tech');
             const abi = ["function balanceOf(address) view returns (uint256)"];
             const usdc = new ethers.Contract(DEFAULT_STABLECOIN, abi, provider);
             const bal = await usdc.balanceOf(app.escrow_contract);
@@ -125,7 +125,7 @@ export default function AppDetails() {
         if (!app?.escrow_contract) return;
         setRefreshingLogs(true);
         try {
-            const provider = new ethers.JsonRpcProvider('https://1rpc.io/sepolia');
+            const provider = new ethers.JsonRpcProvider('https://testrpc.xlayer.tech');
             const contract = new ethers.Contract(app.escrow_contract, PolarisMerchantEscrow.abi, provider);
 
             const filter = contract.filters.PaymentSettled();
@@ -162,8 +162,8 @@ export default function AppDetails() {
     const fetchRouterBalance = async () => {
         if (!user?.wallet?.address) return;
         try {
-            // Use direct Sepolia RPC — no wallet provider needed for reads
-            const provider = new ethers.JsonRpcProvider('https://1rpc.io/sepolia');
+            // Use direct X Layer RPC — no wallet provider needed for reads
+            const provider = new ethers.JsonRpcProvider('https://testrpc.xlayer.tech');
             const router = new ethers.Contract(CONTRACTS.MASTER.MERCHANT_ROUTER, MERCHANT_ROUTER_ABI, provider);
 
             let totalBal = BigInt(0);
@@ -235,7 +235,7 @@ export default function AppDetails() {
             // Withdraw from Signer if balance exists
             if (signerBal > BigInt(0)) {
                 console.log('Withdrawing from Signer address...');
-                const tx = await router.merchantWithdraw(DEFAULT_STABLECOIN, signerBal, 11155111);
+                const tx = await router.merchantWithdraw(DEFAULT_STABLECOIN, signerBal, 1952);
                 await tx.wait();
                 console.log('Signer withdrawal complete');
             }
@@ -288,24 +288,24 @@ export default function AppDetails() {
     const handleDeployEscrow = async () => {
         if (!wallet) return;
         setDeploying(true);
-        setStatusText('Switching to Sepolia...');
+        setStatusText('Switching to X Layer...');
         setError('');
 
         try {
-            // Force switch to Sepolia before deploying
-            await wallet.switchChain(11155111);
+            // Force switch to X Layer before deploying
+            await wallet.switchChain(1952);
 
             const externalProvider = await wallet.getEthereumProvider();
             const provider = new ethers.BrowserProvider(externalProvider);
             const signer = await provider.getSigner();
 
-            // Verify we're on Sepolia
+            // Verify we're on X Layer
             const network = await provider.getNetwork();
-            if (Number(network.chainId) !== 11155111) {
-                throw new Error('Please switch to Sepolia network in your wallet');
+            if (Number(network.chainId) !== 1952) {
+                throw new Error('Please switch to X Layer network in your wallet');
             }
 
-            setStatusText('Deploying Escrow Contract on Sepolia...');
+            setStatusText('Deploying Escrow Contract on X Layer...');
             const factory = new ethers.ContractFactory(
                 PolarisMerchantEscrow.abi,
                 PolarisMerchantEscrow.bytecode,
@@ -411,32 +411,32 @@ export default function AppDetails() {
                 </div>
             </header>
 
-            {/* Sepolia Network Banner */}
-            {currentChainId !== null && !isOnSepolia && (
+            {/* X Layer Network Banner */}
+            {currentChainId !== null && !isOnXLayer && (
                 <div className="max-w-4xl mx-auto mb-6">
                     <div className="flex items-center justify-between bg-red-500/10 border border-red-500/30 rounded-xl px-5 py-3">
                         <div className="flex items-center gap-3">
                             <AlertCircle className="w-5 h-5 text-red-400" />
                             <div>
                                 <p className="text-sm font-bold text-red-400">Wrong Network</p>
-                                <p className="text-[10px] text-red-400/60">You are on chain {currentChainId}. Polaris requires Sepolia (11155111).</p>
+                                <p className="text-[10px] text-red-400/60">You are on chain {currentChainId}. Polaris requires X Layer (1952).</p>
                             </div>
                         </div>
                         <button
-                            onClick={switchToSepolia}
+                            onClick={switchToXLayer}
                             className="bg-primary text-black px-5 py-2 rounded-lg font-black text-[10px] uppercase tracking-tighter hover:scale-105 transition-all shadow-md shadow-primary/20"
                         >
-                            Switch to Sepolia
+                            Switch to X Layer
                         </button>
                     </div>
                 </div>
             )}
 
-            {currentChainId !== null && isOnSepolia && (
+            {currentChainId !== null && isOnXLayer && (
                 <div className="max-w-4xl mx-auto mb-6">
                     <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-xl px-5 py-2">
                         <CheckCircle2 className="w-4 h-4 text-green-400" />
-                        <p className="text-[10px] text-green-400 font-bold uppercase tracking-wider">Connected to Ethereum Sepolia</p>
+                        <p className="text-[10px] text-green-400 font-bold uppercase tracking-wider">Connected to Ethereum X Layer</p>
                     </div>
                 </div>
             )}
@@ -646,7 +646,7 @@ window.location.href = checkoutUrl;`}
                                     <label className="text-[9px] uppercase text-white/30 block mb-1">Contract Address</label>
                                     <div className="flex items-center justify-between gap-1">
                                         <code className="text-[10px] text-white/60 truncate">{app.escrow_contract}</code>
-                                        <a href={`https://sepolia.etherscan.io/address/${app.escrow_contract}`} target="_blank" className="text-primary hover:text-white">
+                                        <a href={`https://www.oklink.com/x-layer-testnet/address/${app.escrow_contract}`} target="_blank" className="text-primary hover:text-white">
                                             <ExternalLink className="w-3 h-3" />
                                         </a>
                                     </div>
@@ -665,7 +665,7 @@ window.location.href = checkoutUrl;`}
                                     </button>
                                 </div>
                                 <p className="text-[10px] text-white/30 leading-relaxed italic">
-                                    Your escrow is active on Ethereum Sepolia. Payments will be routed here.
+                                    Your escrow is active on Ethereum X Layer. Payments will be routed here.
                                 </p>
                             </div>
                         ) : (
@@ -709,7 +709,7 @@ window.location.href = checkoutUrl;`}
                         <div className="space-y-3">
                             <div className="flex justify-between text-[11px]">
                                 <span className="text-white/30">Network</span>
-                                <span className="text-white/60 font-bold">Ethereum Sepolia</span>
+                                <span className="text-white/60 font-bold">Ethereum X Layer</span>
                             </div>
                             <div className="flex justify-between text-[11px]">
                                 <span className="text-white/30">Currency</span>
@@ -717,7 +717,7 @@ window.location.href = checkoutUrl;`}
                             </div>
                             <div className="flex justify-between text-[11px]">
                                 <span className="text-white/30">Chain ID</span>
-                                <span className="text-white/60 font-bold">11155111</span>
+                                <span className="text-white/60 font-bold">1952</span>
                             </div>
                         </div>
                     </section>

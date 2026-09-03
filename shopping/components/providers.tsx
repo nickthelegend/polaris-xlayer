@@ -19,38 +19,51 @@ export function Providers({ children }: { children: React.ReactNode }) {
                         createOnLogin: "users-without-wallets",
                     }
                 },
+                // Polaris runs on X Layer. This said X Layer, which is a chain the
+                // contracts this storefront settles against are not deployed on.
                 defaultChain: {
-                    id: 11155111,
-                    name: "Ethereum Sepolia",
-                    network: "sepolia",
+                    id: 1952,
+                    name: "X Layer Testnet",
+                    network: "xlayer-testnet",
                     nativeCurrency: {
-                        name: "ETH",
-                        symbol: "ETH",
+                        name: "OKB",
+                        symbol: "OKB",
                         decimals: 18,
                     },
                     rpcUrls: {
                         default: {
-                            http: ["https://eth-sepolia.g.alchemy.com/v2/3qRB0TMQQv3hyKgav_6lF"],
+                            http: ["https://testrpc.xlayer.tech"],
                         },
                         public: {
-                            http: ["https://eth-sepolia.g.alchemy.com/v2/3qRB0TMQQv3hyKgav_6lF"],
+                            http: ["https://testrpc.xlayer.tech"],
                         },
+                    },
+                    blockExplorers: {
+                        default: { name: "OKLink", url: "https://www.oklink.com/x-layer-testnet" },
                     },
                 },
                 supportedChains: [
                     {
-                        id: 11155111,
-                        name: "Ethereum Sepolia",
-                        network: "sepolia",
-                        nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
-                        rpcUrls: {
-                            default: { http: ["https://eth-sepolia.g.alchemy.com/v2/3qRB0TMQQv3hyKgav_6lF"] },
-                            public: { http: ["https://eth-sepolia.g.alchemy.com/v2/3qRB0TMQQv3hyKgav_6lF"] },
+                    id: 1952,
+                    name: "X Layer Testnet",
+                    network: "xlayer-testnet",
+                    nativeCurrency: {
+                        name: "OKB",
+                        symbol: "OKB",
+                        decimals: 18,
+                    },
+                    rpcUrls: {
+                        default: {
+                            http: ["https://testrpc.xlayer.tech"],
                         },
-                        blockExplorers: {
-                            default: { name: "Etherscan", url: "https://sepolia.etherscan.io" },
+                        public: {
+                            http: ["https://testrpc.xlayer.tech"],
                         },
-                    }
+                    },
+                    blockExplorers: {
+                        default: { name: "OKLink", url: "https://www.oklink.com/x-layer-testnet" },
+                    },
+                },
                 ]
             }}
         >

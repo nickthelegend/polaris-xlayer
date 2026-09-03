@@ -47,3 +47,7 @@ packages/contracts/typechain-types/
 target/
 test-ledger/
 .program-id.txt
+
+# merchant-web and shopping are not pnpm workspace members; they install standalone.
+merchant-web/node_modules/
+shopping/node_modules/

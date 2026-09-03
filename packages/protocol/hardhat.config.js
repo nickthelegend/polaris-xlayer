@@ -1,5 +1,5 @@
 require("@nomicfoundation/hardhat-toolbox");
-require("dotenv").config();
+require("dotenv").config({ path: "../../.env" });
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -18,9 +18,27 @@ module.exports = {
         hardhat: {
             chainId: 1337,
         },
+        // Polaris runs on X Layer. This package had every chain it has ever
+        // been on except the one the product is deployed to, which is why
+        // merchant-web was still pointed at Sepolia addresses.
+        xlayerTestnet: {
+            url: process.env.XLAYER_TESTNET_RPC_URL || "https://testrpc.xlayer.tech",
+            chainId: 1952,
+            accounts: process.env.DEPLOYER_PRIVATE_KEY
+                ? [process.env.DEPLOYER_PRIVATE_KEY]
+                : process.env.PRIVATE_KEY
+                  ? [process.env.PRIVATE_KEY]
+                  : [],
+        },
         ganache: {
             url: "http://127.0.0.1:7545",
-            accounts: ["0xdb8cfa2db2a866e6fea3d4388da2278f8ef7367180d5921b96661d946b244c86"],
+            // This had a private key written into it. It only ever unlocked a
+            // local ganache account, but a key committed to a public repository
+            // is a key that gets copied into somewhere that matters — and it
+            // taught anyone reading the file that this is how keys are handled
+            // here. Every other network below reads the environment; so does
+            // this one now.
+            accounts: process.env.GANACHE_PRIVATE_KEY ? [process.env.GANACHE_PRIVATE_KEY] : [],
         },
         ctcTestnet: {
             url: "https://rpc.cc3-testnet.creditcoin.network",

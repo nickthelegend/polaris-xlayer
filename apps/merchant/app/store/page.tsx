@@ -13,10 +13,10 @@ import { useWallet } from '@/components/WalletProvider';
  * The point of this page is to be the actual buyer journey, not a mock of one:
  * connect a wallet, have the chain tell you what you can afford, approve once,
  * and open a plan the keeper then collects on schedule. Every number on screen
- * is read from Sepolia and every button sends a real transaction.
+ * is read from X Layer and every button sends a real transaction.
  */
 
-const CHAIN_ID = 11155111;
+const CHAIN_ID = 1952;
 const CONTRACTS = {
   stablecoin: '0x49C86277a91002c4943837bf20F6ED41976Db09F',
   loanEngine: '0x21E9740DDe241f0653F699DAa206AfCE1FA25405',
@@ -244,7 +244,7 @@ export default function Store() {
     <div className="min-h-screen bg-background font-display text-foreground">
       <main className="mx-auto max-w-[1180px] px-6 pb-24 pt-12 md:px-10">
         <header className="max-w-[52ch]">
-          <p className="label">Demo store · live Sepolia</p>
+          <p className="label">Demo store · live X Layer</p>
           <h1 className="mt-4 text-[clamp(2rem,4.5vw,2.75rem)] font-semibold leading-[1.08] tracking-[-0.03em]">
             Buy something on credit
           </h1>
@@ -350,7 +350,7 @@ export default function Store() {
                   {connecting ? 'Connecting…' : 'Connect wallet'}
                 </button>
                 <p className="mt-4 text-xs leading-relaxed text-foreground/60">
-                  Sepolia testnet. Nothing here moves real money.
+                  X Layer testnet. Nothing here moves real money.
                 </p>
               </>
             )}
@@ -559,7 +559,7 @@ function Row({ term, value }: { term: string; value: string }) {
   );
 }
 
-const explorer = (hash: string) => `https://sepolia.etherscan.io/tx/${hash}`;
+const explorer = (hash: string) => `https://www.oklink.com/x-layer-testnet/tx/${hash}`;
 
 /** Two decimals, thousands separated. */
 function money(raw: string): string {
@@ -583,7 +583,7 @@ function readable(err: unknown): string {
   const raw =
     (err as { shortMessage?: string })?.shortMessage ?? (err as Error)?.message ?? String(err);
   if (/user rejected|user denied/i.test(raw)) return 'You cancelled the request.';
-  if (/insufficient funds/i.test(raw)) return 'Not enough Sepolia ETH for the network fee.';
+  if (/insufficient funds/i.test(raw)) return 'Not enough X Layer ETH for the network fee.';
   if (/ExceedsCreditLimit/i.test(raw)) return 'This order is above your credit limit.';
   if (/DuplicatePayment/i.test(raw)) return 'This order has already been paid.';
   if (/FaucetCooldown/i.test(raw)) return 'The faucet allows one claim per hour.';

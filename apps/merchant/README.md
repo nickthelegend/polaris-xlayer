@@ -48,6 +48,6 @@ cluster live in the workspace's `deployments/`. It builds no transaction and
 holds no key — a merchant's trade is public state under their own address, so
 the dashboard is read-only by construction.
 
-An earlier version of this app was wired to Fhenix Sepolia contracts. That is
+An earlier version of this app was wired to Fhenix X Layer contracts. That is
 no longer the case anywhere in this repository.
 

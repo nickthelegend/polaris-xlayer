@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     checkoutUrl: `${coreUrl}/pay/${billHash}`,
     merchantName: app.name,
     escrowAddress: app.escrow_contract,
-    chainId: 11155111, // Sepolia
+    chainId: 1952, // X Layer testnet
     status: "pending",
   });
   } catch (err) {

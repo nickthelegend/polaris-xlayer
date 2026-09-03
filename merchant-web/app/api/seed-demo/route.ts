@@ -26,7 +26,7 @@ export async function GET() {
             category: 'E-commerce',
             client_id,
             client_secret,
-            network: 'sepolia',
+            network: 'xlayer-testnet',
             status: 'active',
             escrow_contract: '0x0000000000000000000000000000000000000000',
             created_at: new Date(),

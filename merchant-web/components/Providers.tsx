@@ -2,7 +2,7 @@
 
 import { PrivyProvider } from '@privy-io/react-auth';
 import { ReactNode } from 'react';
-import { sepolia } from 'viem/chains';
+import { xLayerTestnet } from 'viem/chains';
 
 // Use environment variable or fallback to a demo ID (which likely won't work for auth but allows render)
 // Ideally, the user MUST provide this in .env.local
@@ -23,8 +23,8 @@ export default function Providers({ children }: { children: ReactNode }) {
                     accentColor: '#A6F24A', // neon-lime
                     showWalletLoginFirst: true,
                 },
-                defaultChain: sepolia,
-                supportedChains: [sepolia],
+                defaultChain: xLayerTestnet,
+                supportedChains: [xLayerTestnet],
                 embeddedWallets: {
                     ethereum: {
                         createOnLogin: 'users-without-wallets',

@@ -46,7 +46,7 @@ export default function DemoLedger() {
         <div className="min-h-screen bg-background text-foreground font-display selection:bg-primary/25">
             <main className="mx-auto max-w-[1180px] px-6 py-14 md:px-10">
                 <p className="mb-8 inline-block rounded-full border border-white/15 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-white/55">
-                    Demo · live Sepolia data · read only
+                    Demo · live X Layer data · read only
                 </p>
                 <Ledger
                     data={data}

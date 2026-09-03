@@ -39,7 +39,7 @@ export default function Home() {
 
                     <p className="text-lg text-white/50 max-w-2xl mx-auto mb-10 leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-100 font-medium">
                         The complete payment stack for web3 developers. Integrate decentralized payments,
-                        generate bills, and settle on-chain instantly on Ethereum Sepolia.
+                        generate bills, and settle on-chain instantly on Ethereum X Layer.
                     </p>
 
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-200">
@@ -75,7 +75,7 @@ export default function Home() {
                     <FeatureCard
                         icon={<Zap className="w-6 h-6 text-primary" />}
                         title="Instant Sync"
-                        description="Powered by Ethereum Sepolia for secure and transparent settlements."
+                        description="Powered by Ethereum X Layer for secure and transparent settlements."
                     />
                 </div>
             </section>
@@ -113,7 +113,7 @@ export function Checkout() {
             </section>
 
             <footer className="border-t border-white/5 py-12 text-center text-white/20 text-[10px] uppercase tracking-[0.3em] font-bold">
-                <p>&copy; 2026 Polaris Protocol // Built on Ethereum Sepolia</p>
+                <p>&copy; 2026 Polaris Protocol // Built on Ethereum X Layer</p>
             </footer>
         </div>
     );

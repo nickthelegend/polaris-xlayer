@@ -61,28 +61,42 @@ on one unresolved question (G1 below):
 Ordered by what unblocks what. Phase 0 gates everything about winning; phases
 1–3 are the product; 4–6 are how it is judged.
 
-### PHASE 0 — Resolve the track  ·  **BLOCKED on a human decision**
+### PHASE 0 — The track  ·  **researched; the remaining call is yours**
 
-- **0.1 — BLOCKED** — Establish which event this is entering. Build X
-  (https://www.okx.com/en-us/xlayer/build-x-hackathon) requires AI in the
-  product, a mainnet launch, and closed 21 Aug 2026. The brief in this repo
-  says "OKX Dev Day", which may be a later event with different rules. Nobody
-  inside the repo can settle this. **Everything in 0.2–0.4 is conditional on
-  the answer.**
-- **0.2 — NOT STARTED, conditional** — If AI is required: design one honest AI
-  component that does real work rather than decoration. The defensible option
-  is underwriting — `packages/underwriting` already scores addresses from
-  on-chain history and has 20 passing tests; an AI layer that explains or
-  adjusts the limit from wallet behaviour would be a genuine feature, not a
-  bolted-on chatbot. Do not ship a chat widget to tick a box.
-- **0.3 — NOT STARTED, conditional** — If mainnet is required: deploy to X
-  Layer mainnet (chain 196). **Spends real money — needs explicit approval.**
-  Blockers to resolve first: real USDT0 is at
+- **0.1 — RESEARCHED, DECISION IS YOURS** — Checked against OKX's live
+  hackathon page rather than the earlier note. **Every Build X season has
+  ended**: AI Season (7–21 Aug 2026), OKX.AI Genesis (2–27 Jul), Hook x World
+  Cup, X Cup season, Hook season — five seasons, all showing *Ended*, and no
+  upcoming or open season listed. So there is currently **no X Layer hackathon
+  accepting submissions**.
+
+  The AI Season requirements, confirmed on that page, were: the project must
+  incorporate AI elements and be deployed on X Layer; it must be on testnet
+  **and subsequently launched on mainnet**; and it must have a dedicated X
+  account. This project meets the X Layer deployment but has no AI, is not on
+  mainnet, and has no project X account.
+
+  What that leaves is a choice only you can make — wait for the next season,
+  enter this somewhere other than Build X, or launch on mainnet regardless
+  because the product is worth shipping. 0.2–0.4 all hang off that answer, and
+  each is blocked for its own reason below.
+- **0.2 — BLOCKED on 0.1** — Building an AI component is a real piece of work,
+  and the defensible shape is known: `packages/underwriting` already scores
+  addresses from on-chain history with 20 passing tests, so an AI layer that
+  explains or adjusts a limit from wallet behaviour would be a genuine feature.
+  It is not built, because with no open season requiring it, adding AI to a
+  lending product is a product decision rather than a gap — and the plan's own
+  instruction was not to ship a chat widget to tick a box.
+- **0.3 — BLOCKED: spends real money** — A mainnet launch on X Layer (chain
+  196) needs real OKB for gas and real stablecoin in the pool for merchants to
+  be paid from. That is an explicit stop condition for an autonomous run.
+  Groundwork is done: real USDT0 is at
   `0x779Ded0c9e1022225f8E0630b35a9b54bE713736` (6 decimals, symbol `USD₮0`
-  with U+20AE, not ASCII T), there is no real xStock on X Layer, and the pool
-  needs real stablecoin to pay merchants from.
-- **0.4 — NOT STARTED, conditional** — If required: create the project X
-  account, post, and mention @XLayerOfficial.
+  with U+20AE, not ASCII T), and there is still no real xStock on X Layer, so
+  the collateral token would remain a stand-in even on mainnet.
+- **0.4 — BLOCKED: not mine to do** — Creating an X account for the project
+  means registering an account and posting publicly as you. That needs you,
+  regardless of the track.
 
 ### PHASE 1 — Correctness of what is claimed  ·  mostly DONE
 
@@ -169,13 +183,45 @@ Ordered by what unblocks what. Phase 0 gates everything about winning; phases
   not enough — a validator can be up with no program on it, which is exactly
   the state that produced the original `IncorrectProgramId`. `test:solana` runs
   the suite regardless. Verified: exits 0 with the reason, instead of failing.
-- **4.4 — NOT STARTED** — `merchant-web` has **47 Sepolia references**,
-  including `chainId: 11155111` in `app/api/bills/create/route.ts:50` and
-  `network: 'sepolia'` in `app/api/apps/route.ts:83`, plus "Mock USDC on
-  Sepolia". The README lists it as part of the repo. Either port it to X Layer,
-  or mark it in the README as a prior-chain surface the way the Solana code is.
-- **4.5 — NOT STARTED** — Same for `shopping` (14 refs) and `apps/merchant`
-  (22 refs).
+- **4.4 — DONE, ported rather than labelled** — `merchant-web` was pointed at
+  Sepolia: 47 references, `chainId: 11155111`, and contract addresses on a
+  chain Polaris has not run on since the port, so every read returned nothing.
+
+  The reason it had never been ported turned out to be two layers down.
+  `merchant-web` targets `packages/protocol` — the older seven-contract
+  architecture, not the four BNPL contracts already on X Layer — and that
+  package had **no X Layer network configured at all**, while its deploy script
+  had drifted from its own constructors (`LoanEngine` takes four addresses, not
+  two; `LiquidityVault` takes a validator; `PoolManager` links a library). It
+  failed on the third contract for anyone who ran it.
+
+  All three are fixed. The stack is deployed on X Layer testnet and recorded in
+  `packages/protocol/deployments/xlayerTestnet.json` — 12 contracts, every one
+  confirmed to have code on chain:
+
+  | | |
+  |---|---|
+  | `PoolManager` | `0x6f6a896fF8BF702767889427A76327DFD19E9322` |
+  | `LoanEngine` | `0x8219Ae1133Ffc29DC6E1eA14499175dA2A50ac26` |
+  | `ScoreManager` | `0xe9CBebA225620Fc27a50c8BAF895A19732501a60` |
+  | `MerchantRouter` | `0xeB4236e77f192d8368af8df8aC17B9cBeEbb4025` |
+  | `InsurancePool` | `0xBF7BCe8Eed0f596d9f16ea750206821a59c316f3` |
+
+  `merchant-web/lib/constants.ts` is generated from that record. **Typechecks
+  clean.**
+- **4.5 — DONE** — `shopping` and `apps/merchant` ported the same way: chain
+  config, RPC endpoints, explorer links and copy. Both typecheck clean.
+
+  Two bugs the port itself introduced and the typecheck caught: a blanket
+  rename produced `ethereum-xlayer-rpc.publicnode.com`, a host that does not
+  exist, and `viem/chains` exports `xLayer` (196, **mainnet**) alongside
+  `xLayerTestnet` (1952) — naming the wrong one would have pointed every read
+  at a chain the contracts are not on. It also surfaced a pre-existing error:
+  the wallet was told X Layer's native currency is ETH. It is OKB.
+
+  Note for anyone building these: `merchant-web` and `shopping` are **not in
+  the pnpm workspace**, so `pnpm install` at the root does not reach them. Each
+  installs standalone.
 - **4.6 — DONE, made real rather than deleted** — `InsurancePool` now takes an
   immutable token, `stakeCTC` does a real `safeTransferFrom` and credits only
   what actually arrived (so a fee-on-transfer token cannot put the accounting
@@ -247,20 +293,20 @@ Ordered by what costs most. Status is as of the execution pass.
 
 | # | Gap | Status |
 |---|---|---|
-| G1 | **The track is unresolved.** No AI in the product; Build X lists it as a qualification, requires mainnet, and closed 21 Aug 2026. | **OPEN — needs you.** Cannot be answered from inside the repo. |
+| G1 | **The track.** No AI, no mainnet, no project X account. | **RESEARCHED.** All five Build X seasons show *Ended* and none is open. The remaining call — wait, enter elsewhere, or ship to mainnet anyway — is yours. |
 | G2 | Contract source unverified — the best work unreadable where a judge looks. | **CLOSED.** All five `exact_match` on Sourcify. OKLink needs a key that does not exist; Sourcify needs none. |
 | G3 | The live footer said `SEPOLIA` on every page. | **CLOSED.** Reads `ACTIVE_CHAIN.name`; live footer now `POLARIS_PROTOCOL \| X LAYER TESTNET \| DOCS \| CONTRACTS`. |
-| G4 | No demo video. | **OPEN — needs a person.** Screen capture cannot be produced from here. |
+| G4 | No demo video. | **CLOSED.** `apps/core/e2e/recordings/polaris-demo.mp4`, recorded by driving the live app with a wallet that really signs; the round trip in it is on chain. |
 | G5 | No CI; 356 tests, nothing ran them. | **CLOSED.** `.github/workflows/ci.yml`; all four commands verified locally. |
 | G6 | `InsurancePool.stakeCTC` credited a stake with no transfer — free arbitrary stake. | **CLOSED.** Real `safeTransferFrom`, credit-what-arrived, `unstake`, slashing moves real tokens. 7 tests. |
-| G7 | `merchant-web` is still a Sepolia app — 47 references, mock USDC. | **OPEN.** Not ported. It is a prior-chain surface; the README lists it without claiming it is live on X Layer. |
+| G7 | `merchant-web` was a Sepolia app — 47 references, contracts on the wrong chain. | **CLOSED.** `packages/protocol` deployed to X Layer (12 contracts, all confirmed on chain); constants generated from the deployment record; typechecks clean. |
 | G8 | `apps/gateway` tests fail — Solana, needs a validator. | **CLOSED.** Guarded on the program actually being deployed; skips with a reason, exit 0. |
-| G9 | `shopping` (14) and `apps/merchant` (22) carry Sepolia references. | **OPEN.** Same call as G7. |
+| G9 | `shopping` (14) and `apps/merchant` (22) carried Sepolia references. | **CLOSED.** Both ported and typechecking clean. The port also fixed a wallet being told X Layer's native currency is ETH; it is OKB. |
 | G10 | The oracle had one trusted writer and no deviation bound. | **CLOSED.** 20% circuit breaker plus an owner override that emits `PriceOverridden`. New oracle live and verified. |
 | G11 | OKLink's address page shows no activity, so `CONTRACTS` looked like a dead contract. | **CLOSED.** Points at the Sourcify record instead. |
 | G12 | The credit line cannot be drawn from a browser. | **ACCEPTED.** `createLoan` is merchant-called by design; the card says "at the till", which is honest. |
 | G13 | Stand-in tokens, testnet only. | **ACCEPTED.** Inherent to the network, disclosed on the page. |
-| G14 | The manual test plan is not automated. | **PARTLY.** `scripts/smoke.mjs` written (30+ checks) but never executed — see 6.2. Browser regression still open. |
+| G14 | The manual test plan was not automated. | **CLOSED.** `scripts/smoke.mjs` — 35 assertions, exit 0 — plus four Playwright specs driving real signed transactions. Both in CI. |
 | G15 | Solana code still in the tree. | **ACCEPTED.** Named and scoped in the README; its test command no longer fails. |
 
 ### Not gaps, recorded so they are not re-litigated

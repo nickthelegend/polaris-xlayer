@@ -46,7 +46,7 @@ export default function Header() {
                             className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-300 text-sm font-semibold hover:bg-amber-500/20 transition-all"
                         >
                             <AlertTriangle className="w-4 h-4" />
-                            Switch to Sepolia
+                            Switch to X Layer
                         </button>
                     )}
 

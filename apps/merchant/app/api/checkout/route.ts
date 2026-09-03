@@ -7,7 +7,12 @@ import { buildInstallments, collections, recordEvent } from "@polarispay/db";
 
 export const dynamic = "force-dynamic";
 
-const RPC = process.env.SEPOLIA_RPC_URL ?? "https://ethereum-sepolia-rpc.publicnode.com";
+// POLARIS_RPC_URL, not SEPOLIA_RPC_URL: the contracts are on X Layer, and a
+// fallback pointing at a chain they were never deployed to answers every read
+// with zeros instead of failing loudly. SEPOLIA_RPC_URL is still read so an
+// older deployment keeps working.
+const RPC =
+  process.env.POLARIS_RPC_URL ?? process.env.SEPOLIA_RPC_URL ?? "https://testrpc.xlayer.tech";
 const CHAIN_ID = Number(process.env.CHAIN_ID ?? 11_155_111);
 const LOAN_ENGINE = process.env.POLARIS_LOAN_ENGINE;
 const ORIGINATOR_KEY = process.env.DEPLOYER_PRIVATE_KEY;
@@ -164,7 +169,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       loanId: loanId.toString(),
       orderId,
       transactionHash: receipt?.hash,
-      transactionLink: `https://sepolia.etherscan.io/tx/${receipt?.hash}`,
+      transactionLink: `https://www.oklink.com/x-layer-testnet/tx/${receipt?.hash}`,
       installments,
       totalOwedRaw: onChain.totalOwed.toString(),
     });

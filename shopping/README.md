@@ -35,4 +35,4 @@ Open [http://localhost:3000](http://localhost:3000) to view the demo store and t
 As a demo application, this project uses mock credentials. For production implementations, follow the instructions in the [Polaris Merchant App](../polaris-merchant-app).
 
 ## 🚀 Polaris BNPL System
-User -> Shopify Store -> Polaris Checkout -> `polaris-core` settles on Creditcoin/Sepolia via `polaris-protocol`.
+User -> Shopify Store -> Polaris Checkout -> `polaris-core` settles on X Layer via `polaris-protocol`.
