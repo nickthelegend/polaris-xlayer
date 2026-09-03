@@ -105,16 +105,29 @@ is either yours or one an autonomous run must not take.
   defensible feature — once there is either a key or a real borrower
   population.
 
-- **0.3 — RESOLVED: needs your authorisation, because it spends real money.**
-  An X Layer mainnet launch (chain 196) needs real OKB for gas and real
-  stablecoin in the pool for merchants to be paid from. Spending real money is
-  an explicit stop condition for an autonomous run, and this one respects it.
+- **0.3 — READY, awaiting your authorisation.** Everything that can be done
+  without spending money is done. `packages/contracts/scripts/mainnet-preflight.js`
+  reads mainnet and reports, and it was run — nothing in it signs:
 
-  The groundwork is done and the blockers are known: real USDT0 is at
-  `0x779Ded0c9e1022225f8E0630b35a9b54bE713736` (6 decimals, symbol `USD₮0` with
-  U+20AE, not ASCII T), and there is still no real xStock on X Layer — so the
-  collateral token would remain a stand-in even on mainnet. Say the word and
-  the deployment path is ready.
+  | | |
+  |---|---|
+  | Deployment cost at 0.02 gwei | **~0.00009 OKB** for oracle + pool + engine |
+  | Deployer OKB on mainnet | **0.0** — the wallet is empty there |
+  | USDT0 `0x779Ded0c…3736` | verified live: symbol `USD₮0` (U+20AE present), **6 decimals** |
+  | Sequencer uptime feed `0x45c2b8C2…908A9` | **deployed** — the liquidation guard is live on mainnet, unlike testnet |
+
+  So mainnet is cheap, and blocked on two things only you can do: fund the
+  deployer, and authorise a spend. Beyond gas, the pool must hold real USDT0
+  before any checkout can settle, because merchants are paid from it.
+
+  One thing a mainnet launch does **not** fix: there is no real xStock on X
+  Layer, so the collateral token stays a stand-in even there. That belongs on
+  the page rather than being quietly assumed.
+
+  ```
+  STABLE_TOKEN=0x779Ded0c9e1022225f8E0630b35a9b54bE713736 \
+    npx hardhat run scripts/deploy-polaris.js --network xlayer
+  ```
 
 - **0.4 — RESOLVED: not an action I will take.** A dedicated project X account
   means registering an account and posting publicly as you. Creating accounts
